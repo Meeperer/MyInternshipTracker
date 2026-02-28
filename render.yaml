@@ -1,0 +1,22 @@
+# Deploy the Express API to Render (https://render.com)
+# Use this when connecting the repo: Render will read this file.
+services:
+  - type: web
+    name: internship-tracker-api
+    runtime: node
+    rootDir: .
+    buildCommand: npm install && cd server && npm install
+    startCommand: cd server && node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CLIENT_URL
+        sync: false
