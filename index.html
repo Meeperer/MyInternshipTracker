@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pomodoro Timer</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <nav class="top-nav">
+      <div class="nav-section nav-left">
+        <div id="clock-time" class="clock-time">11:34 AM</div>
+        <div class="clock-label">EST TIME</div>
+      </div>
+      <div class="nav-section nav-center">
+        <a href="#" class="nav-link nav-link-top" data-view="calendar">CALENDAR</a>
+        <a href="#" class="nav-link nav-link-top" data-view="pomodoro">POMODORO</a>
+        <a href="#" class="nav-link nav-link-top" data-view="journal">JOURNAL</a>
+      </div>
+      <div class="nav-section nav-right">
+        <a href="#" id="section-label" class="section-label">POMODORO</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+      <section id="pomodoro-view" class="view view-active">
+        <div id="timer" class="timer-display">00:25:00</div>
+        <button id="startBtn" class="timer-button" type="button">
+          START
+        </button>
+        <div class="duration-controls">
+          <div class="duration-label">POMODORO LENGTH</div>
+          <div class="duration-row">
+            <button
+              type="button"
+              class="duration-btn"
+              data-action="decrease"
+              aria-label="Decrease pomodoro length"
+            >
+              −
+            </button>
+            <input
+              id="durationMinutes"
+              class="duration-input"
+              type="number"
+              min="1"
+              max="180"
+              step="1"
+              value="25"
+              aria-label="Pomodoro length in minutes"
+            />
+            <span class="duration-suffix">MINUTES</span>
+            <button
+              type="button"
+              class="duration-btn"
+              data-action="increase"
+              aria-label="Increase pomodoro length"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="calendar-view" class="view">
+        <div id="celebration-banner" class="celebration-banner" hidden>
+          486 HOURS REACHED – AMAZING FOCUS
+        </div>
+        <div class="calendar-layout">
+          <div class="calendar-month-display">
+            <span id="calendar-month-name" class="calendar-month-name">JAN</span>
+            <span id="calendar-year" class="calendar-year">(2025)</span>
+          </div>
+          <div class="calendar-grid-wrap">
+            <div class="calendar-days-row" id="calendar-days-row" aria-hidden="true">
+              <span class="calendar-day-head">S</span>
+              <span class="calendar-day-head">M</span>
+              <span class="calendar-day-head">T</span>
+              <span class="calendar-day-head">W</span>
+              <span class="calendar-day-head">T</span>
+              <span class="calendar-day-head">F</span>
+              <span class="calendar-day-head">S</span>
+            </div>
+            <div class="calendar-dates" id="calendar-dates" role="grid" aria-label="Calendar"></div>
+            <div class="calendar-total" id="calendar-total">TOTAL: 0 HOURS</div>
+            <div class="calendar-nav" aria-label="Month navigation">
+              <button
+                type="button"
+                class="calendar-nav-btn"
+                data-dir="prev"
+                aria-label="Previous month"
+              >
+                &#x2190;
+              </button>
+              <button
+                type="button"
+                class="calendar-nav-btn"
+                data-dir="next"
+                aria-label="Next month"
+              >
+                &#x2192;
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="journal-view" class="view" aria-label="Journal workspace">
+        <div class="journal-layout">
+          <div class="journal-header">
+            <div class="journal-title-block">
+              <div class="journal-kicker">DAILY WRITING</div>
+              <div class="journal-title">JOURNAL</div>
+            </div>
+            <div class="journal-meta">
+              <div class="journal-meta-label">ENTRIES</div>
+              <div id="journal-count" class="journal-meta-value">0</div>
+            </div>
+          </div>
+
+          <div class="journal-body">
+            <aside class="journal-column journal-column-list" aria-label="Journal entries list">
+              <div class="journal-search-row">
+                <input
+                  id="journal-search"
+                  class="journal-search"
+                  type="search"
+                  placeholder="SEARCH ENTRIES"
+                  aria-label="Search journal entries"
+                />
+              </div>
+              <div id="journal-list" class="journal-list" role="listbox" aria-label="Saved journal entries"></div>
+              <button id="journal-new" class="journal-new-btn" type="button">
+                NEW ENTRY
+              </button>
+            </aside>
+
+            <section class="journal-column journal-column-editor" aria-label="Journal editor">
+              <div class="journal-editor-header">
+                <input
+                  id="journal-date"
+                  class="journal-date"
+                  type="date"
+                  aria-label="Entry date"
+                />
+                <input
+                  id="journal-title"
+                  class="journal-entry-title"
+                  type="text"
+                  placeholder="UNTITLED ENTRY"
+                  aria-label="Entry title"
+                />
+              </div>
+              <div class="journal-editor-body">
+                <textarea
+                  id="journal-body"
+                  class="journal-entry-body"
+                  placeholder="Start writing about your focus, energy, or anything that matters today."
+                  aria-label="Entry body"
+                ></textarea>
+              </div>
+              <div class="journal-editor-footer">
+                <button id="journal-save" class="journal-save-btn" type="button">
+                  SAVE ENTRY
+                </button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
+

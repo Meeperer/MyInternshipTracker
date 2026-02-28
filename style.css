@@ -1,0 +1,878 @@
+@font-face {
+  font-family: "Recoleta";
+  src: url("fonts/Recoleta-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Motor";
+  src: url("fonts/Motor-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Moonshine";
+  src: url("fonts/Moonshine-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Aileron";
+  src: url("fonts/Aileron-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+
+:root {
+  --bg-color: #fdffe4;
+  --primary-red: #be3519;
+  --hover-red: #9e2a13;
+  --dark-neutral: #1e1e1e;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--bg-color);
+  color: var(--primary-red);
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+.top-nav {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.5rem 3rem 1rem;
+}
+
+.nav-section {
+  display: flex;
+  align-items: center;
+}
+
+.nav-left {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.clock-time {
+  display: inline-block;
+  font-family: "Moonshine", "Recoleta", serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--dark-neutral);
+}
+
+.clock-label {
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+  letter-spacing: 0.2em;
+  color: var(--dark-neutral);
+  font-family: "Moonshine", "Recoleta", serif;
+}
+
+.section-label {
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--dark-neutral);
+}
+
+.nav-center {
+  gap: 3rem;
+  align-self: flex-start;
+}
+
+.nav-link-top {
+  font-size: 0.7rem;
+  padding-top: 0.6rem;
+  padding-bottom: 0;
+  letter-spacing: 0.2em;
+}
+
+.nav-link-top::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background-color: var(--primary-red);
+}
+
+.nav-link-top::after {
+  display: none;
+}
+
+.nav-right {
+  min-width: 7rem;
+  justify-content: flex-end;
+}
+
+.nav-link {
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  position: relative;
+  font-size: 0.9rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding-bottom: 0.25rem;
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background-color: var(--primary-red);
+  opacity: 0.5;
+}
+
+.nav-link-underlined::after,
+.nav-link-active::after {
+  opacity: 1;
+}
+
+.nav-link-active {
+  font-weight: 700;
+  color: var(--hover-red);
+}
+
+.nav-link:hover {
+  color: var(--hover-red);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  padding: 2.5rem 1.5rem 5rem;
+}
+
+.view {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-active {
+  display: flex;
+}
+
+/* Center pomodoro timer within the main viewport without affecting calendar */
+#pomodoro-view.view-active {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+/* Journal layout inspired by Myjo but on Pomodoro theme */
+#journal-view.view-active {
+  margin-top: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.journal-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+  max-width: 72rem;
+}
+
+.journal-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.journal-title-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.journal-kicker {
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dark-neutral);
+}
+
+.journal-title {
+  font-family: "Recoleta", "Times New Roman", serif;
+  font-size: 2.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.journal-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+
+.journal-meta-label {
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--dark-neutral);
+}
+
+.journal-meta-value {
+  font-family: "Recoleta", "Times New Roman", serif;
+  font-size: 1.4rem;
+}
+
+.journal-body {
+  display: grid;
+  grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: stretch;
+}
+
+.journal-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.journal-column-list {
+  gap: 1.25rem;
+}
+
+.journal-search-row {
+  display: flex;
+}
+
+.journal-search {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--primary-red);
+  background: transparent;
+  color: var(--dark-neutral);
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 0.15rem 0;
+}
+
+.journal-search::placeholder {
+  color: var(--dark-neutral);
+  opacity: 0.7;
+}
+
+.journal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.journal-entry-item {
+  text-align: left;
+  padding: 0.35rem 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--dark-neutral);
+}
+
+.journal-entry-item-label {
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.journal-entry-item-title {
+  font-family: "Aileron", system-ui, sans-serif;
+  font-size: 0.9rem;
+}
+
+.journal-entry-item-active .journal-entry-item-label,
+.journal-entry-item-active .journal-entry-item-title {
+  color: var(--primary-red);
+}
+
+.journal-entry-item + .journal-entry-item {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.journal-new-btn {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--primary-red);
+  cursor: pointer;
+}
+
+.journal-new-btn:hover,
+.journal-new-btn:focus-visible {
+  color: var(--hover-red);
+  outline: none;
+}
+
+.journal-column-editor {
+  gap: 1rem;
+}
+
+.journal-editor-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.journal-date {
+  border: none;
+  border-bottom: 1px solid var(--primary-red);
+  background: transparent;
+  color: var(--dark-neutral);
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0.1rem 0;
+}
+
+.journal-entry-title {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: "Recoleta", "Times New Roman", serif;
+  font-size: 1.4rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary-red);
+}
+
+.journal-editor-body {
+  flex: 1;
+}
+
+.journal-entry-body {
+  width: 100%;
+  min-height: 12rem;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: transparent;
+  padding: 0.75rem 0;
+  resize: vertical;
+  font-family: "Aileron", system-ui, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--dark-neutral);
+}
+
+.journal-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.journal-save-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--primary-red);
+  cursor: pointer;
+}
+
+.journal-save-btn::after {
+  content: "";
+  display: block;
+  margin-top: 0.1rem;
+  height: 1px;
+  background-color: var(--primary-red);
+}
+
+.journal-save-btn:hover,
+.journal-save-btn:focus-visible {
+  color: var(--hover-red);
+  outline: none;
+}
+
+@media (max-width: 900px) {
+  .journal-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .journal-column-list {
+    max-width: 100%;
+  }
+}
+
+.timer-display {
+  font-family: "Recoleta", "Times New Roman", serif;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--primary-red);
+  font-size: clamp(4rem, 26vw, 14rem);
+}
+
+.timer-char {
+  display: inline-block;
+}
+
+.timer-char[data-char=":"] {
+  font-size: 0.4em;
+  vertical-align: 0.35em;
+}
+
+.duration-controls {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.duration-label {
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+}
+
+.duration-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.9rem;
+}
+
+.duration-btn {
+  background: none;
+  border: none;
+  color: var(--primary-red);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.25s ease, transform 0.25s ease;
+}
+
+.duration-btn:hover,
+.duration-btn:focus-visible {
+  color: var(--hover-red);
+  transform: scale(1.08);
+  outline: none;
+}
+
+.duration-input {
+  width: 3.2rem;
+  text-align: center;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--primary-red);
+  color: var(--primary-red);
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.9rem;
+  padding: 0.1rem 0;
+  -moz-appearance: textfield;
+}
+
+.duration-input::-webkit-outer-spin-button,
+.duration-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.duration-suffix {
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+}
+
+.timer-button {
+  margin-top: 1.8rem;
+  background: none;
+  border: none;
+  color: var(--primary-red);
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: color 0.25s ease, transform 0.25s ease;
+}
+
+.timer-button:hover,
+.timer-button:focus-visible {
+  color: var(--hover-red);
+  transform: scale(1.05);
+  outline: none;
+}
+
+/* Calendar view: two-column layout, full width */
+#calendar-view.view-active {
+  align-items: stretch;
+  align-self: stretch;
+  width: 100%;
+  text-align: left;
+  flex: 1;
+}
+
+.calendar-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 3rem;
+  flex: 1;
+}
+
+.calendar-month-display {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 12rem;
+}
+
+.calendar-month-name {
+  font-family: "Recoleta", "Times New Roman", serif;
+  font-weight: 900;
+  color: var(--primary-red);
+  font-size: 8.5rem;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+}
+
+.calendar-year {
+  font-family: "Recoleta", "Times New Roman", serif;
+  font-weight: 900;
+  color: var(--primary-red);
+  font-size: 3rem;
+  margin-top: -0.15em;
+  letter-spacing: -0.02em;
+}
+
+.calendar-grid-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+  flex: 0 0 auto;
+  width: 38rem;
+  max-width: 38rem;
+}
+
+.calendar-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 1.75rem;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  gap: 1.75rem;
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 1.1rem;
+  z-index: 10;
+}
+
+.calendar-nav-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--dark-neutral);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.calendar-nav-btn:hover,
+.calendar-nav-btn:focus-visible {
+  color: var(--primary-red);
+  outline: none;
+}
+
+.calendar-days-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  font-family: "Aileron", system-ui, sans-serif;
+  font-size: 2.2rem;
+  font-weight: 900;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+.calendar-day-head {
+  padding: 0.15em 0;
+}
+
+.calendar-day-head:nth-child(1) {
+  color: var(--dark-neutral);
+}
+
+.calendar-day-head:nth-child(n+2) {
+  color: var(--primary-red);
+}
+
+.calendar-day-head:nth-child(7) {
+  color: var(--dark-neutral);
+}
+
+.calendar-dates {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.35rem 0;
+  grid-auto-rows: 2.3em;
+  font-family: "Aileron", system-ui, sans-serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.calendar-date-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.3em;
+}
+
+.calendar-total {
+  align-self: flex-end;
+  margin-top: 0.75rem;
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--dark-neutral);
+}
+
+.calendar-total.milestone {
+  color: var(--primary-red);
+}
+
+.celebration-banner {
+  position: fixed;
+  left: 50%;
+  top: 1.25rem;
+  transform: translateX(-50%);
+  font-family: "Motor", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--primary-red);
+  z-index: 20;
+}
+
+.calendar-date-cell.sunday {
+  color: var(--dark-neutral);
+}
+
+.calendar-date-cell:not(.sunday) {
+  color: var(--primary-red);
+}
+
+.calendar-date-cell.today {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--hover-red);
+}
+
+.calendar-date-cell.empty {
+  visibility: hidden;
+}
+
+/* Past dates appear slightly faded */
+.calendar-date-cell.past {
+  opacity: 0.45;
+}
+
+/* Checked dates behave like a simple checklist */
+.calendar-date-cell.checked {
+  color: var(--dark-neutral);
+  opacity: 1;
+}
+
+.calendar-date-cell.checked::before {
+  content: "✓";
+  margin-right: 0.3em;
+  font-size: 0.65em;
+  letter-spacing: 0;
+}
+
+/* Responsive: stack below 900px */
+@media (max-width: 900px) {
+  .calendar-layout {
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 0 1.5rem;
+  }
+
+  .calendar-month-display {
+    align-items: center;
+  }
+
+  .calendar-month-name {
+    font-size: clamp(4rem, 18vw, 8rem);
+  }
+
+  .calendar-year {
+    font-size: clamp(2rem, 8vw, 4rem);
+    margin-top: 0;
+  }
+
+  .calendar-grid-wrap {
+    max-width: 100%;
+  }
+
+  .nav-right {
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-nav {
+    flex-direction: column;
+    align-items: center;
+    padding: 1.25rem 1.5rem 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .nav-left {
+    align-items: center;
+    text-align: center;
+  }
+
+  .nav-right {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .main-content {
+    padding: 2rem 1rem 2.5rem;
+  }
+
+  .timer-display {
+    font-size: clamp(3.5rem, 22vw, 10rem);
+  }
+
+  .timer-button {
+    font-size: 1rem;
+  }
+
+  .section-label {
+    margin-top: 0.5rem;
+  }
+}
+
+/* Responsive: reduce scale below 600px */
+@media (max-width: 600px) {
+  .clock-time {
+    font-size: 1.35rem;
+  }
+
+  .section-label {
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+  }
+
+  .nav-link {
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+  }
+
+  .calendar-layout {
+    padding: 0 1rem;
+    gap: 1rem;
+  }
+
+  .calendar-month-name {
+    font-size: clamp(3rem, 16vw, 5rem);
+  }
+
+  .calendar-year {
+    font-size: clamp(1.5rem, 7vw, 2.5rem);
+  }
+
+  .calendar-days-row {
+    font-size: clamp(1.2rem, 5vw, 1.8rem);
+  }
+
+  .calendar-dates {
+    font-size: clamp(0.95rem, 4vw, 1.3rem);
+    gap: 0.2rem 0;
+  }
+
+  .calendar-date-cell {
+    min-height: 2em;
+  }
+}
+

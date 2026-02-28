@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets (never commit)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!*.env.example
+
+# Build and tooling
+client/.svelte-kit/
+client/.vercel/
+client/build/
+.vercel/
+dist/
+*.log
+npm-debug.log*
+
+# OS and editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Optional: keep example env files (uncomment to ignore them too)
+# *.env.example
