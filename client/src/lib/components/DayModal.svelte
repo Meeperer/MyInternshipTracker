@@ -186,6 +186,7 @@
       entry = result;
       await progress.fetch();
       toast.success('Hours logged');
+      mode = 'view';
     } catch (err) {
       toast.error(err.message);
     }

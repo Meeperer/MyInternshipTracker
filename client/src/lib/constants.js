@@ -1,2 +1,2 @@
 /** Target internship hours for compliance. Must match server/shared constant and DB. */
-export const TARGET_HOURS = 468;
+export const TARGET_HOURS = 486;
