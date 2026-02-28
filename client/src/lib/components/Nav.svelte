@@ -1,39 +1,39 @@
 <script>
   import { auth } from '$stores/auth.js';
   import { page } from '$app/stores';
+  import { timezone, timezoneOptions, getTimezoneLabel } from '$stores/timezone.js';
 
   function handleLogout() {
     auth.logout();
     window.location.href = '/login';
   }
 
-  const estOptions = { timeZone: 'America/New_York' };
-
-  function clockTime() {
+  function clockTime(tz) {
     return new Date().toLocaleTimeString('en-US', {
-      ...estOptions,
+      timeZone: tz,
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     });
   }
 
-  function clockDate() {
+  function clockDate(tz) {
     return new Date().toLocaleDateString('en-US', {
-      ...estOptions,
+      timeZone: tz,
       weekday: 'long',
       month: 'short',
       day: 'numeric'
     });
   }
 
-  let time = $state(clockTime());
-  let dateLabel = $state(clockDate());
+  let time = $state(clockTime($timezone));
+  let dateLabel = $state(clockDate($timezone));
 
   $effect(() => {
+    const tz = $timezone;
     const interval = setInterval(() => {
-      time = clockTime();
-      dateLabel = clockDate();
+      time = clockTime(tz);
+      dateLabel = clockDate(tz);
     }, 1000);
     return () => clearInterval(interval);
   });
@@ -46,12 +46,25 @@
   ];
 
   const activePath = $derived($page.url.pathname);
+  const timezoneLabel = $derived(getTimezoneLabel($timezone));
 </script>
 
 <nav class="top-nav">
   <div class="nav-left">
     <span class="clock">{time}</span>
     <span class="clock-label">{dateLabel}</span>
+    <label class="timezone-control">
+      <span class="timezone-caption">Time zone</span>
+      <select
+        class="timezone-select"
+        bind:value={$timezone}
+        aria-label="Select time zone"
+      >
+        {#each timezoneOptions as option}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+    </label>
   </div>
 
   <div class="nav-center">
@@ -91,7 +104,7 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.2rem;
+    gap: 0.35rem;
     min-width: 180px;
   }
 
@@ -109,6 +122,45 @@
     text-transform: uppercase;
     letter-spacing: 0.2em;
     color: var(--dark-soft);
+  }
+
+  .timezone-control {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--dark-soft);
+  }
+
+  .timezone-caption {
+    opacity: 0.7;
+  }
+
+  .timezone-select {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-light);
+    background: rgba(255, 255, 255, 0.7);
+    color: var(--dark-soft);
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .timezone-select:hover,
+  .timezone-select:focus-visible {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: var(--border);
+    box-shadow: 0 0 0 1px rgba(190, 53, 25, 0.08);
   }
 
   .nav-center {
@@ -192,6 +244,16 @@
       font-size: 0.7rem;
       letter-spacing: 0.15em;
     }
+    .timezone-control {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+      font-size: 0.7rem;
+    }
+    .timezone-select {
+      width: 100%;
+      max-width: 260px;
+    }
     .nav-link {
       font-size: 0.9rem;
       padding: 0.45rem 0.9rem;
@@ -218,6 +280,13 @@
     }
     .clock-label {
       font-size: 0.6rem;
+    }
+    .timezone-control {
+      width: 100%;
+    }
+    .timezone-select {
+      max-width: 100%;
+      font-size: 0.65rem;
     }
     .nav-link {
       font-size: 0.8rem;
