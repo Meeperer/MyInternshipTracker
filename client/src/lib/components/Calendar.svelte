@@ -23,15 +23,20 @@
     return map;
   });
 
-  let eventsMap = $derived.by(() => {
-    let storeVal;
-    events.subscribe(s => storeVal = s)();
-    return events.getEventsByDate(storeVal.events);
-  });
+  let monthEvents = $state([]);
+
+  let eventsMap = $derived(events.getEventsByDate(monthEvents));
 
   $effect(() => {
     journal.fetchMonth(currentYear, currentMonth);
     events.fetchMonth(currentYear, currentMonth);
+  });
+
+  $effect(() => {
+    const unsub = events.subscribe((s) => {
+      monthEvents = s.events || [];
+    });
+    return unsub;
   });
 
   let hoverVisible = $state(false);
