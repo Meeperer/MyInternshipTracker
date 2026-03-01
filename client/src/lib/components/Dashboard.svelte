@@ -1,8 +1,10 @@
 <script>
   import { progress } from '$stores/progress.js';
+  import { events } from '$stores/events.js';
   import { toast } from '$stores/toast.js';
   import { todayString } from '$utils/date.js';
   import ProgressBar from './ProgressBar.svelte';
+  import { onMount } from 'svelte';
   import { api } from '$utils/api.js';
 
   let { onNavigateToDate = () => {} } = $props();
@@ -10,6 +12,16 @@
   let compilationStatus = $state(null);
   let compiling = $state(false);
   let downloading = $state(false);
+  let todayEvents = $state([]);
+
+  function formatTimeRange(ev) {
+    const s = ev.start_time?.slice(0, 5);
+    const e = ev.end_time?.slice(0, 5);
+    if (s && e) return `${s} – ${e}`;
+    if (s) return s;
+    if (e) return `until ${e}`;
+    return '';
+  }
 
   const QUOTES = [
     { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
@@ -37,6 +49,10 @@
       statusLoaded = true;
       api.get('/compilation/status').then(s => compilationStatus = s).catch(() => {});
     }
+  });
+
+  onMount(() => {
+    events.fetchDate(todayString()).then(list => (todayEvents = list || []));
   });
 
   async function handleCompile() {
@@ -68,15 +84,6 @@
       downloading = false;
     }
   }
-
-  let greetingEmoji = $derived.by(() => {
-    const pct = $progress.percentage;
-    if (pct >= 100) return 'trophy';
-    if (pct >= 75) return 'fire';
-    if (pct >= 50) return 'rocket';
-    if (pct >= 25) return 'chart';
-    return 'wave';
-  });
 
   let greetingLabel = $derived.by(() => {
     const pct = $progress.percentage;
@@ -156,6 +163,25 @@
           {compiling ? 'Compiling...' : 'Compile Final Report'}
         </button>
       {/if}
+    </div>
+  {/if}
+
+  {#if todayEvents.length > 0}
+    <div class="today-events card">
+      <h3>Today's Events</h3>
+      <ul class="today-events-list">
+        {#each todayEvents as ev}
+          <li class="today-event-item">
+            <span class="today-event-title">{ev.title}</span>
+            {#if formatTimeRange(ev)}
+              <span class="today-event-time">{formatTimeRange(ev)}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      <button class="btn btn-sm" onclick={() => onNavigateToDate(todayString())}>
+        Open today in Calendar
+      </button>
     </div>
   {/if}
 
@@ -376,6 +402,52 @@
   .completion-banner .btn {
     padding: 0.85rem 1.75rem;
     font-size: 1rem;
+  }
+
+  .today-events {
+    padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  }
+
+  .today-events h3 {
+    font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+    margin-bottom: 1rem;
+  }
+
+  .today-events-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+  }
+
+  .today-event-item {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-light);
+    font-family: var(--font-body);
+  }
+
+  .today-event-item:last-child {
+    border-bottom: none;
+  }
+
+  .today-event-title {
+    display: block;
+    font-weight: 600;
+    color: var(--dark);
+    font-size: 0.95rem;
+  }
+
+  .today-event-time {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    color: var(--dark-soft);
+    letter-spacing: 0.02em;
+    margin-top: 0.15rem;
+  }
+
+  .today-events .btn {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.85rem;
   }
 
   .quick-access {

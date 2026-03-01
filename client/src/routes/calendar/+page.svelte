@@ -27,6 +27,10 @@
     selectedDate = date;
   }
 
+  function handleQuickAction(date) {
+    selectedDate = date;
+  }
+
   function closeModal() {
     selectedDate = null;
     progress.fetch();
@@ -45,7 +49,7 @@
     <Nav />
 
     <main id="main-content">
-      <Calendar onDateSelect={handleDateSelect} />
+      <Calendar onDateSelect={handleDateSelect} onQuickAction={handleQuickAction} />
     </main>
   </div>
 
@@ -106,4 +110,3 @@
     }
   }
 </style>
-

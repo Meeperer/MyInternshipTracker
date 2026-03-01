@@ -9,6 +9,7 @@ import journalRoutes from './routes/journals.js';
 import progressRoutes from './routes/progress.js';
 import aiRoutes from './routes/ai.js';
 import compilationRoutes from './routes/compilation.js';
+import eventRoutes from './routes/events.js';
 import { supabaseAdmin } from './services/supabase.js';
 
 const app = express();
@@ -39,6 +40,7 @@ app.use('/api/journals', journalRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/compilation', compilationRoutes);
+app.use('/api/events', eventRoutes);
 
 app.get('/api/health', async (_req, res) => {
   try {

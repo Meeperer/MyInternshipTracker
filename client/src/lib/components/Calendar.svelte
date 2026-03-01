@@ -1,9 +1,11 @@
 <script>
   import { journal } from '$stores/journal.js';
   import { progress } from '$stores/progress.js';
+  import { events } from '$stores/events.js';
   import { getDaysInMonth, getFirstDayOfMonth, isToday, isPast } from '$utils/date.js';
+  import HoverPreview from './HoverPreview.svelte';
 
-  let { onDateSelect = () => {} } = $props();
+  let { onDateSelect = () => {}, onQuickAction = () => {} } = $props();
 
   let currentYear = $state(new Date().getFullYear());
   let currentMonth = $state(new Date().getMonth() + 1);
@@ -21,9 +23,71 @@
     return map;
   });
 
+  let eventsMap = $derived.by(() => {
+    let storeVal;
+    events.subscribe(s => storeVal = s)();
+    return events.getEventsByDate(storeVal.events);
+  });
+
   $effect(() => {
     journal.fetchMonth(currentYear, currentMonth);
+    events.fetchMonth(currentYear, currentMonth);
   });
+
+  let hoverVisible = $state(false);
+  let hoverX = $state(0);
+  let hoverY = $state(0);
+  let hoverDate = $state('');
+  let hoverHours = $state(0);
+  let hoverEventCount = $state(0);
+  let hoverDayEvents = $state([]);
+  let hoverJournalStatus = $state('');
+  let hoverTimeoutId = $state(null);
+
+  function handleCellMouseEnter(e, cell) {
+    if (hoverTimeoutId) {
+      clearTimeout(hoverTimeoutId);
+      hoverTimeoutId = null;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    let x = rect.right + 8;
+    let y = rect.top;
+    if (x + 220 > window.innerWidth) x = rect.left - 228;
+    if (y + 200 > window.innerHeight) y = window.innerHeight - 210;
+    if (y < 8) y = 8;
+    hoverX = x;
+    hoverY = y;
+    hoverDate = cell.date;
+    const entry = entries[cell.date];
+    hoverHours = entry ? Number(entry.hours) || 0 : 0;
+    hoverDayEvents = eventsMap[cell.date] || [];
+    hoverEventCount = hoverDayEvents.length;
+    hoverJournalStatus = entry?.status || '';
+    hoverVisible = true;
+  }
+
+  function handleCellMouseLeave() {
+    hoverTimeoutId = setTimeout(() => {
+      hoverVisible = false;
+      hoverTimeoutId = null;
+    }, 150);
+  }
+
+  function handlePreviewEnter() {
+    if (hoverTimeoutId) {
+      clearTimeout(hoverTimeoutId);
+      hoverTimeoutId = null;
+    }
+  }
+
+  function handlePreviewLeave() {
+    hoverVisible = false;
+  }
+
+  function handleQuickActionClick() {
+    hoverVisible = false;
+    onQuickAction(hoverDate);
+  }
 
   function shiftMonth(delta) {
     let m = currentMonth + delta;
@@ -120,6 +184,8 @@
             type="button"
             class={cellClasses(cell).join(' ')}
             onclick={() => onDateSelect(cell.date)}
+            onmouseenter={(e) => handleCellMouseEnter(e, cell)}
+            onmouseleave={handleCellMouseLeave}
             aria-label="{cell.date}"
           >
             {String(cell.day).padStart(2, '0')}
@@ -142,6 +208,22 @@
     </div>
   </div>
 </div>
+
+<HoverPreview
+  visible={hoverVisible}
+  x={hoverX}
+  y={hoverY}
+  date={hoverDate}
+  hours={hoverHours}
+  eventCount={hoverEventCount}
+  dayEvents={hoverDayEvents}
+  journalStatus={hoverJournalStatus}
+    onLogHours={handleQuickActionClick}
+    onAddEvent={handleQuickActionClick}
+    onJournalEntry={handleQuickActionClick}
+  onMouseEnter={handlePreviewEnter}
+  onMouseLeave={handlePreviewLeave}
+/>
 
 <style>
   .calendar-view-old {

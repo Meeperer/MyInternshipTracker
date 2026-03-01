@@ -1,17 +1,22 @@
 <script>
   import { journal } from '$stores/journal.js';
   import { progress } from '$stores/progress.js';
+  import { events } from '$stores/events.js';
   import { toast } from '$stores/toast.js';
   import { formatDateLong } from '$utils/date.js';
+  import EventForm from './EventForm.svelte';
 
   let { date = '', onClose = () => {} } = $props();
 
   let entry = $state(null);
+  let dayEvents = $state([]);
   let loading = $state(true);
   let mode = $state('view');
   let confirmingFinish = $state(false);
   let confirmingUnsaved = $state(false);
   let pendingAction = $state(null); // 'close' | 'view'
+  let showEventForm = $state(false);
+  let editingEvent = $state(null);
 
   let hours = $state('');
   let contentRaw = $state('');
@@ -47,7 +52,10 @@
     if (first) first.focus();
     function onKeydown(e) {
       if (e.key === 'Escape') {
-        if (confirmingFinish) {
+        if (showEventForm) {
+          showEventForm = false;
+          editingEvent = null;
+        } else if (confirmingFinish) {
           confirmingFinish = false;
         } else if (confirmingUnsaved) {
           confirmingUnsaved = false;
@@ -119,6 +127,9 @@
   async function loadEntry() {
     loading = true;
     entry = await journal.fetchDate(date);
+    dayEvents = await events.fetchDate(date);
+    showEventForm = false;
+    editingEvent = null;
     if (entry) {
       hours = String(entry.hours || '');
       contentRaw = entry.content_raw || '';
@@ -252,6 +263,10 @@
     }
   }
 
+  async function loadEventsList() {
+    dayEvents = await events.fetchDate(date);
+  }
+
   let isFinished = $derived(entry?.status === 'finished');
   let statusText = $derived(
     !entry ? 'Not Started' : entry.status === 'finished' ? 'Finished' : 'In Progress'
@@ -308,6 +323,25 @@
             <button class="btn btn-primary" onclick={confirmDiscard}>Discard</button>
           </div>
         </div>
+      {:else if showEventForm}
+        <EventForm
+          {date}
+          event={editingEvent}
+          onSave={() => {
+            showEventForm = false;
+            editingEvent = null;
+            loadEventsList();
+          }}
+          onCancel={() => {
+            showEventForm = false;
+            editingEvent = null;
+          }}
+          onDelete={() => {
+            showEventForm = false;
+            editingEvent = null;
+            loadEventsList();
+          }}
+        />
       {:else if confirmingFinish}
         <div class="confirm-dialog" role="alertdialog" aria-label="Confirm finish day">
           <div class="confirm-icon" aria-hidden="true">
@@ -330,6 +364,9 @@
             </button>
             <button class="btn btn-sm" onclick={enterLogHoursMode}>
               Log Hours
+            </button>
+            <button class="btn btn-sm" onclick={() => { showEventForm = true; editingEvent = null; }}>
+              Add Event
             </button>
             {#if entry && entry.hours > 0}
               <button class="btn btn-sm btn-primary" onclick={finishDay} disabled={finishing}>
@@ -402,6 +439,35 @@
             </button>
           </div>
         {/if}
+
+        <div class="section events-section">
+          <h4>Events</h4>
+          {#if dayEvents.length > 0}
+            <div class="events-list">
+              {#each dayEvents as ev}
+                <div class="event-item">
+                  <div class="event-item-header">
+                    <span class="event-tag event-tag-{ev.type}">{ev.type}</span>
+                    <span class="event-title">{ev.title}</span>
+                    {#if !isFinished}
+                      <button class="event-edit-btn" onclick={() => { editingEvent = ev; showEventForm = true; }}>Edit</button>
+                    {/if}
+                  </div>
+                  {#if ev.start_time || ev.end_time}
+                    <span class="event-time">
+                      {ev.start_time?.slice(0, 5) || '–'} – {ev.end_time?.slice(0, 5) || '–'}
+                    </span>
+                  {/if}
+                  {#if ev.description}
+                    <p class="event-desc">{ev.description}</p>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="no-events-text">No events scheduled</p>
+          {/if}
+        </div>
 
       {:else if mode === 'edit'}
         <div class="editor">
@@ -572,6 +638,81 @@
     letter-spacing: 0.08em;
     color: var(--dark-soft);
     margin-bottom: 0.5rem;
+  }
+
+  .events-section {
+    border-top: 1px solid var(--border-light);
+    padding-top: 1rem;
+  }
+  .events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .event-item {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .event-item:last-child {
+    border-bottom: none;
+  }
+  .event-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .event-tag {
+    font-family: var(--font-ui);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.15rem 0.4rem;
+    flex-shrink: 0;
+  }
+  .event-tag-meeting { background: var(--red); color: var(--bg); }
+  .event-tag-deadline { background: var(--dark); color: var(--bg); }
+  .event-tag-reminder { background: var(--warning); color: var(--bg); }
+  .event-tag-personal { background: rgba(190, 53, 25, 0.12); color: var(--red); }
+  .event-title {
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--dark);
+    flex: 1;
+  }
+  .event-edit-btn {
+    font-family: var(--font-ui);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--dark-soft);
+    padding: 0.15rem 0.5rem;
+    cursor: pointer;
+  }
+  .event-edit-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .event-time {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    color: var(--dark-soft);
+    margin-top: 0.15rem;
+  }
+  .event-desc {
+    font-size: 0.8rem;
+    color: var(--dark-soft);
+    margin-top: 0.25rem;
+    line-height: 1.5;
+  }
+  .no-events-text {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--dark-soft);
+    font-style: italic;
   }
 
   .entry-content {

@@ -99,5 +99,12 @@ export const api = {
     body: JSON.stringify(body)
   }).then(r => r.json()),
 
+  put: (path, body) => request(path, {
+    method: 'PUT',
+    body: JSON.stringify(body)
+  }).then(r => r.json()),
+
+  del: (path) => request(path, { method: 'DELETE' }).then(r => r.json()),
+
   getBlob: (path) => request(path).then(r => r.blob()),
 };
