@@ -41,6 +41,7 @@
   });
 
   let hasActivity = $derived(hours > 0 || eventCount > 0 || journalStatus);
+  let isFinished = $derived(journalStatus === 'finished');
 </script>
 
 {#if visible}
@@ -82,7 +83,7 @@
         {/if}
         <div class="stat-row">
           <span class="stat-label">Journal</span>
-          <span class="stat-value">{statusLabel}</span>
+          <span class="stat-value" class:finished={isFinished}>{statusLabel}</span>
         </div>
       </div>
     {:else}
@@ -90,9 +91,13 @@
     {/if}
 
     <div class="preview-actions">
-      <button type="button" class="quick-btn" onclick={onLogHours}>Log Hours</button>
-      <button type="button" class="quick-btn" onclick={onAddEvent}>Add Event</button>
-      <button type="button" class="quick-btn" onclick={onJournalEntry}>Journal</button>
+      {#if isFinished}
+        <button type="button" class="quick-btn" onclick={onJournalEntry}>View Entry</button>
+      {:else}
+        <button type="button" class="quick-btn" onclick={onLogHours}>Log Hours</button>
+        <button type="button" class="quick-btn" onclick={onAddEvent}>Add Event</button>
+        <button type="button" class="quick-btn" onclick={onJournalEntry}>Journal</button>
+      {/if}
     </div>
   </div>
 {/if}
@@ -143,6 +148,10 @@
   .stat-value {
     font-weight: 600;
     color: var(--dark);
+  }
+
+  .stat-value.finished {
+    color: var(--success);
   }
 
   .preview-empty {

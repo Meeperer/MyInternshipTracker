@@ -17,7 +17,6 @@
 
   const CURRENT_MONTH = new Date().getMonth() + 1;
   const CURRENT_YEAR = new Date().getFullYear();
-  const MONTH_LABEL = new Date().toLocaleString('en-US', { month: 'long' });
 
   let monthStats = $derived.by(() => {
     const entries = $journal.entries || [];
@@ -138,36 +137,9 @@
       <span class="stat-value">{$progress.days_completed}</span>
       <span class="stat-label">Days Completed</span>
     </div>
-    <div class="stat-card streak-card">
-      <span class="stat-value">{$progress.current_streak}</span>
-      <span class="stat-label">Day Streak</span>
-      {#if $progress.current_streak >= 3}
-        <span class="streak-flame" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--red)" stroke="none">
-            <path d="M12 23c-3.6 0-8-2.6-8-8.5C4 9 8 4 12 1c4 3 8 8 8 13.5 0 5.9-4.4 8.5-8 8.5zm0-19C9.2 7.2 6 11.1 6 14.5 6 18.6 8.9 21 12 21s6-2.4 6-6.5C18 11.1 14.8 7.2 12 4z"/>
-          </svg>
-        </span>
-      {/if}
-    </div>
-  </div>
-
-  <div class="month-summary card">
-    <h3 class="month-summary-title">{MONTH_LABEL}</h3>
-    <div class="month-summary-stats">
-      <div class="month-stat-item">
-        <span class="month-stat-value">{monthStats.count}</span>
-        <span class="month-stat-label">Entries</span>
-      </div>
-      <div class="month-stat-divider" aria-hidden="true"></div>
-      <div class="month-stat-item">
-        <span class="month-stat-value">{monthStats.hours}</span>
-        <span class="month-stat-label">Hours Logged</span>
-      </div>
-      <div class="month-stat-divider" aria-hidden="true"></div>
-      <div class="month-stat-item">
-        <span class="month-stat-value">{monthStats.finished}</span>
-        <span class="month-stat-label">Days Finished</span>
-      </div>
+    <div class="stat-card">
+      <span class="stat-value">{monthStats.count}</span>
+      <span class="stat-label">Entries</span>
     </div>
   </div>
 
@@ -312,22 +284,6 @@
     border-color: var(--border);
   }
 
-  .streak-card {
-    overflow: visible;
-  }
-
-  .streak-flame {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    animation: flicker 1.5s ease-in-out infinite alternate;
-  }
-
-  @keyframes flicker {
-    0% { opacity: 0.7; transform: scale(1) rotate(-3deg); }
-    100% { opacity: 1; transform: scale(1.15) rotate(3deg); }
-  }
-
   .stat-value {
     display: block;
     font-family: var(--font-display);
@@ -344,56 +300,6 @@
     letter-spacing: 0.1em;
     color: var(--dark-soft);
     margin-top: 0.5rem;
-  }
-
-  .month-summary {
-    padding: 1.5rem 2rem;
-  }
-
-  .month-summary-title {
-    font-family: var(--font-ui);
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--dark-soft);
-    margin-bottom: 1rem;
-    text-align: center;
-  }
-
-  .month-summary-stats {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 2rem;
-  }
-
-  .month-stat-item {
-    text-align: center;
-  }
-
-  .month-stat-value {
-    display: block;
-    font-family: var(--font-display);
-    font-size: clamp(1.5rem, 2.5vw, 2rem);
-    color: var(--red);
-    line-height: 1.2;
-  }
-
-  .month-stat-label {
-    display: block;
-    font-family: var(--font-ui);
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--dark-soft);
-    margin-top: 0.3rem;
-  }
-
-  .month-stat-divider {
-    width: 1px;
-    height: 2.5rem;
-    background: var(--border-light);
-    flex-shrink: 0;
   }
 
   .milestone-badge {
@@ -591,9 +497,6 @@
       grid-template-columns: repeat(2, 1fr);
       gap: 1rem;
     }
-    .month-summary { padding: 1.25rem 1rem; }
-    .month-summary-stats { gap: 1.25rem; }
-    .month-stat-divider { height: 2rem; }
     .dash-header h1 { font-size: 2rem; }
     .stat-value { font-size: 2rem; }
     .stat-card { padding: 1.25rem; }

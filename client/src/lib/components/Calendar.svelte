@@ -209,9 +209,6 @@
           <span class="month-stat-sep" aria-hidden="true">·</span>
           <span class="month-stat">{monthStats.finished} finished</span>
         </div>
-        <div class="calendar-total" class:milestone={$progress.total_hours >= ($progress.target_hours ?? 468)}>
-          TOTAL: {$progress.total_hours} HOURS
-        </div>
       </div>
 
       <div class="calendar-nav" aria-label="Month navigation">
@@ -441,25 +438,24 @@
     color: var(--success);
     opacity: 1;
     background: rgba(45, 122, 58, 0.1);
+    text-decoration: none;
   }
   .calendar-date-cell.checked::before {
     content: "✓";
-    margin-right: 0.2em;
-    font-size: 0.6em;
+    margin-right: 0.15em;
+    font-size: 0.55em;
     letter-spacing: 0;
     color: var(--success);
+    vertical-align: 0.05em;
   }
 
-  .calendar-date-cell.has-hours {
+  .calendar-date-cell.has-hours:not(.checked) {
     text-decoration: underline;
     text-underline-offset: 0.25em;
     text-decoration-thickness: 1px;
     text-decoration-color: var(--red);
   }
-  .calendar-date-cell.checked.has-hours {
-    text-decoration-color: var(--success);
-  }
-  .calendar-date-cell.has-hours.today {
+  .calendar-date-cell.has-hours.today:not(.checked) {
     text-decoration-thickness: 2px;
     text-decoration-color: var(--red-hover);
   }
@@ -487,17 +483,6 @@
     user-select: none;
   }
 
-  .calendar-total {
-    font-family: var(--font-body);
-    font-size: 1rem;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--dark-soft);
-    flex-shrink: 0;
-  }
-  .calendar-total.milestone {
-    color: var(--red);
-  }
 
   .celebration-banner {
     position: fixed;
@@ -623,9 +608,6 @@
       align-items: center;
       gap: 0.5rem;
     }
-    .calendar-total {
-      font-size: 0.9rem;
-    }
   }
 
   @media (max-width: 768px) {
@@ -693,9 +675,6 @@
     .calendar-month-stats {
       font-size: 0.7rem;
       gap: 0.35rem;
-    }
-    .calendar-total {
-      font-size: 0.8rem;
     }
     .calendar-nav {
       bottom: 1rem;
