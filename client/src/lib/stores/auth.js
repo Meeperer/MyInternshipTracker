@@ -47,7 +47,12 @@ function createAuthStore() {
       await api.post('/auth/register', { email, password, full_name });
     },
 
-    logout() {
+    async logout() {
+      try {
+        await api.post('/auth/logout', {});
+      } catch {
+        // Best-effort
+      }
       localStorage.removeItem('session');
       set({ user: null, profile: null, loading: false });
     }

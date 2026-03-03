@@ -11,7 +11,7 @@ create table public.profiles (
   email text unique not null,
   full_name text,
   internship_company text,
-  target_hours numeric default 468,
+  target_hours numeric default 486,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -213,8 +213,8 @@ begin
       days_completed = v_days,
       current_streak = v_streak,
       longest_streak = v_longest,
-      is_completed = (v_total >= 468),
-      completed_at = case when v_total >= 468 then coalesce(completed_at, now()) else completed_at end,
+      is_completed = (v_total >= 486),
+      completed_at = case when v_total >= 486 then coalesce(completed_at, now()) else completed_at end,
       updated_at = now()
   where user_id = coalesce(new.user_id, old.user_id);
 

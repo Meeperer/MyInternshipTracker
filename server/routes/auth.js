@@ -137,7 +137,12 @@ router.post('/refresh', refreshLimiter, async (req, res) => {
   }
 });
 
-router.post('/logout', requireAuth, async (_req, res) => {
+router.post('/logout', requireAuth, async (req, res) => {
+  try {
+    await supabaseAdmin.auth.admin.signOut(req.accessToken, 'global');
+  } catch {
+    // Best-effort server-side invalidation
+  }
   res.json({ message: 'Logged out' });
 });
 

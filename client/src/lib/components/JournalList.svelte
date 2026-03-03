@@ -17,11 +17,8 @@
     return [hrs, mins, secs].map((n) => String(n).padStart(2, '0')).join(':');
   }
 
-  let storeVal = $state({ entries: [], loading: false });
   let searchQuery = $state('');
   let hasFetched = false;
-
-  journal.subscribe(v => storeVal = v);
 
   $effect(() => {
     if (!hasFetched) {
@@ -32,9 +29,9 @@
   });
 
   let filtered = $derived.by(() => {
-    if (!searchQuery.trim()) return storeVal.entries;
+    if (!searchQuery.trim()) return $journal.entries;
     const q = searchQuery.toLowerCase();
-    return storeVal.entries.filter(e =>
+    return $journal.entries.filter(e =>
       (e.content_raw || '').toLowerCase().includes(q) ||
       (e.date || '').includes(q)
     );
@@ -142,12 +139,12 @@
   </div>
 
   <div class="entries-list" aria-live="polite">
-    {#if storeVal.loading}
+    {#if $journal.loading}
       <div class="empty-state">
         <div class="spinner"></div>
         <p>Loading entries...</p>
       </div>
-    {:else if storeVal.entries.length === 0}
+    {:else if $journal.entries.length === 0}
       <div class="empty-state">
         <div class="empty-icon" aria-hidden="true">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">

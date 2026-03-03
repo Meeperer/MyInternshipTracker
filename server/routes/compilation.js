@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { supabaseAdmin } from '../services/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
 import { generateCompiledPDF } from '../services/pdf.js';
@@ -6,6 +7,15 @@ import { TARGET_HOURS } from '../../shared/constants.js';
 
 const router = Router();
 router.use(requireAuth);
+
+const compileLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many compilation requests. Please wait before trying again.' }
+});
 
 router.get('/status', async (req, res) => {
   try {
@@ -36,7 +46,7 @@ router.get('/status', async (req, res) => {
   }
 });
 
-router.post('/compile', async (req, res) => {
+router.post('/compile', compileLimiter, async (req, res) => {
   try {
     const { data: progress } = await supabaseAdmin
       .from('internship_progress')

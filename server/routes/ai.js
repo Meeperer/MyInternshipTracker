@@ -1,10 +1,22 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { supabaseAdmin } from '../services/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
 import { refineJournal, generateARAS } from '../services/groq.js';
 
 const router = Router();
 router.use(requireAuth);
+
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many AI requests. Please wait before trying again.' }
+});
+
+router.use(aiLimiter);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_AI_CONTENT = 20_000;

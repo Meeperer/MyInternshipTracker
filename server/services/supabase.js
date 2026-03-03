@@ -24,9 +24,24 @@ export const supabaseAdmin = new Proxy({}, {
   }
 });
 
+const _userClients = new Map();
+const MAX_CACHED_CLIENTS = 50;
+
 export function createUserClient(accessToken) {
   if (!supabaseUrl || !supabaseAnonKey) throw new Error('Supabase not configured');
-  return createClient(supabaseUrl, supabaseAnonKey, {
+
+  if (_userClients.has(accessToken)) {
+    return _userClients.get(accessToken);
+  }
+
+  if (_userClients.size >= MAX_CACHED_CLIENTS) {
+    const oldest = _userClients.keys().next().value;
+    _userClients.delete(oldest);
+  }
+
+  const client = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } }
   });
+  _userClients.set(accessToken, client);
+  return client;
 }

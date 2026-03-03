@@ -2,7 +2,7 @@
   import { journal } from '$stores/journal.js';
   import { progress } from '$stores/progress.js';
   import { events } from '$stores/events.js';
-  import { getDaysInMonth, getFirstDayOfMonth, isToday, isPast } from '$utils/date.js';
+  import { getDaysInMonth, getFirstDayOfMonth, isToday, isPast, todayString } from '$utils/date.js';
   import HoverPreview from './HoverPreview.svelte';
 
   let { onDateSelect = () => {}, onQuickAction = () => {} } = $props();
@@ -209,6 +209,25 @@
           <span class="month-stat-sep" aria-hidden="true">·</span>
           <span class="month-stat">{monthStats.finished} finished</span>
         </div>
+        {#if $progress.current_streak > 0}
+          <div class="streak-badge" title="Current streak: {$progress.current_streak} days">
+            <span class="streak-flame" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M8 1.5C8.8 3 9.2 4.1 9.2 5.1c0 .7-.2 1.2-.5 1.6.3-.1.6-.2.9-.2 1.5 0 2.7 1.2 2.7 2.8 0 2.1-1.7 3.7-4.3 3.7S3.7 11.4 3.7 9.3c0-1.9 1.2-3.2 2.4-4.4.5-.5.9-1 1.1-1.7.1-.4.2-.9.2-1.7Z"
+                  fill="currentColor"
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </span>
+            <span class="streak-count">{$progress.current_streak}</span>
+            <span class="streak-text">day streak</span>
+            {#if $progress.current_streak >= $progress.longest_streak && $progress.current_streak > 1}
+              <span class="streak-best">Best!</span>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       <div class="calendar-nav" aria-label="Month navigation">
@@ -483,6 +502,50 @@
     user-select: none;
   }
 
+  .streak-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--red);
+    animation: streakPulse 2s ease-in-out infinite;
+  }
+
+  .streak-flame {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .streak-count {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--red);
+  }
+
+  .streak-text {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dark-soft);
+  }
+
+  .streak-best {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--red);
+    color: var(--bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+
+  @keyframes streakPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+  }
 
   .celebration-banner {
     position: fixed;

@@ -27,11 +27,38 @@
   let initialContentOnEdit = $state('');
   let modalContentEl = $state(null);
   let previousActiveElement = $state(null);
+  let autoSaveStatus = $state('');
+  let autoSaveTimer = $state(null);
 
   const isDirty = $derived(
     (mode === 'edit' && (hours !== initialHoursOnEdit || contentRaw !== initialContentOnEdit)) ||
     (mode === 'log-hours' && hours !== initialHoursOnEdit)
   );
+
+  $effect(() => {
+    if (mode === 'edit' && isDirty && entry) {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveStatus = 'unsaved';
+      autoSaveTimer = setTimeout(async () => {
+        try {
+          autoSaveStatus = 'saving';
+          const result = await journal.save({
+            date,
+            hours: parseFloat(hours) || 0,
+            content_raw: contentRaw
+          });
+          entry = result;
+          initialHoursOnEdit = hours;
+          initialContentOnEdit = contentRaw;
+          autoSaveStatus = 'saved';
+          setTimeout(() => { if (autoSaveStatus === 'saved') autoSaveStatus = ''; }, 2000);
+        } catch {
+          autoSaveStatus = 'error';
+        }
+      }, 5000);
+    }
+    return () => { if (autoSaveTimer) clearTimeout(autoSaveTimer); };
+  });
 
   $effect(() => {
     if (date) {
@@ -499,9 +526,20 @@
             ></textarea>
             <p class="field-hint">Optional. Add notes for AI refine and ARAS.</p>
           </div>
-          <div class="editor-actions">
-            <button class="btn btn-primary" onclick={saveEntry}>Save</button>
-            <button class="btn" onclick={requestModeView}>Cancel</button>
+          <div class="editor-footer">
+            {#if autoSaveStatus}
+              <span class="autosave-status" class:saving={autoSaveStatus === 'saving'} class:saved={autoSaveStatus === 'saved'} class:error={autoSaveStatus === 'error'}>
+                {#if autoSaveStatus === 'unsaved'}Unsaved changes
+                {:else if autoSaveStatus === 'saving'}Auto-saving...
+                {:else if autoSaveStatus === 'saved'}Draft saved
+                {:else if autoSaveStatus === 'error'}Save failed
+                {/if}
+              </span>
+            {/if}
+            <div class="editor-actions">
+              <button class="btn btn-primary" onclick={saveEntry}>Save</button>
+              <button class="btn" onclick={requestModeView}>Cancel</button>
+            </div>
           </div>
         </div>
 
@@ -788,11 +826,39 @@
     flex-direction: column;
   }
 
+  .editor-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    gap: 1rem;
+  }
+
+  .autosave-status {
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dark-soft);
+    transition: color 0.2s ease;
+  }
+
+  .autosave-status.saving {
+    color: var(--warning);
+  }
+
+  .autosave-status.saved {
+    color: var(--success);
+  }
+
+  .autosave-status.error {
+    color: var(--red);
+  }
+
   .editor-actions {
     display: flex;
     gap: 0.5rem;
     justify-content: flex-end;
-    margin-top: 0.5rem;
   }
 
   .loading-text {

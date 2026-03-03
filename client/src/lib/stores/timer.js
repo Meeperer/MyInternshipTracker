@@ -51,17 +51,13 @@ function createTimerStore() {
     const clamped = Math.max(1, Math.min(180, minutes));
     const seconds = clamped * 60;
     baseDuration.set(seconds);
-    let currentState;
-    state.subscribe(s => currentState = s)();
-    if (currentState === 'stopped') {
+    if (get(state) === 'stopped') {
       remaining.set(seconds);
     }
   }
 
   function adjustDuration(delta) {
-    let current;
-    baseDuration.subscribe(d => current = d)();
-    setDuration(Math.round(current / 60) + delta);
+    setDuration(Math.round(get(baseDuration) / 60) + delta);
   }
 
   return {

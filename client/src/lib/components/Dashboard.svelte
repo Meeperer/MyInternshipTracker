@@ -17,6 +17,7 @@
 
   const CURRENT_MONTH = new Date().getMonth() + 1;
   const CURRENT_YEAR = new Date().getFullYear();
+  const NOW = new Date();
 
   let monthStats = $derived.by(() => {
     const entries = $journal.entries || [];
@@ -29,6 +30,74 @@
     const finished = relevant.filter(e => e.status === 'finished').length;
     const hours = relevant.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
     return { count, finished, hours: Math.round(hours * 10) / 10 };
+  });
+
+  let weeklyInsights = $derived.by(() => {
+    const entries = $journal.entries || [];
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - dayOfWeek);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const prevWeekStart = new Date(weekStart);
+    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+
+    let thisWeekHours = 0;
+    let thisWeekDays = 0;
+    let prevWeekHours = 0;
+
+    for (const e of entries) {
+      const d = new Date(e.date + 'T00:00:00');
+      const h = Number(e.hours) || 0;
+      if (d >= weekStart) {
+        thisWeekHours += h;
+        if (h > 0) thisWeekDays++;
+      } else if (d >= prevWeekStart && d < weekStart) {
+        prevWeekHours += h;
+      }
+    }
+
+    const trend = prevWeekHours > 0
+      ? Math.round(((thisWeekHours - prevWeekHours) / prevWeekHours) * 100)
+      : thisWeekHours > 0 ? 100 : 0;
+
+    const remaining = $progress.remaining_hours;
+    const avgDaily = $progress.days_completed > 0
+      ? $progress.total_hours / $progress.days_completed
+      : 8;
+
+    // Compute how many working days (Mon–Fri) you still need,
+    // then convert that to a calendar date by skipping weekends.
+    const workingDaysNeeded = avgDaily > 0 ? Math.ceil(remaining / avgDaily) : 0;
+    let projectedDate = 'Complete!';
+
+    if (workingDaysNeeded > 0) {
+      let date = new Date();
+      let remainingWorkDays = workingDaysNeeded;
+      // Walk forward counting only Mon–Fri as working days
+      while (remainingWorkDays > 0) {
+        date.setDate(date.getDate() + 1);
+        const dow = date.getDay(); // 0 = Sun, 6 = Sat
+        if (dow !== 0 && dow !== 6) {
+          remainingWorkDays--;
+        }
+      }
+      projectedDate = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+
+    return {
+      thisWeekHours: Math.round(thisWeekHours * 10) / 10,
+      thisWeekDays,
+      trend,
+      avgDaily: Math.round(avgDaily * 10) / 10,
+      projectedCompletion: projectedDate,
+      daysNeeded: workingDaysNeeded
+    };
   });
 
   function formatTimeRange(ev) {
@@ -60,15 +129,8 @@
     return QUOTES[dayOfYear % QUOTES.length];
   });
 
-  let statusLoaded = false;
-  $effect(() => {
-    if (!statusLoaded) {
-      statusLoaded = true;
-      api.get('/compilation/status').then(s => compilationStatus = s).catch(() => {});
-    }
-  });
-
   onMount(() => {
+    api.get('/compilation/status').then(s => compilationStatus = s).catch(() => {});
     journal.fetchMonth(CURRENT_YEAR, CURRENT_MONTH);
     events.fetchDate(todayString()).then(list => (todayEvents = list || []));
   });
@@ -138,8 +200,8 @@
       <span class="stat-label">Days Completed</span>
     </div>
     <div class="stat-card">
-      <span class="stat-value">{monthStats.count}</span>
-      <span class="stat-label">Entries</span>
+      <span class="stat-value">{$progress.current_streak}</span>
+      <span class="stat-label">Day Streak</span>
     </div>
   </div>
 
@@ -149,6 +211,37 @@
       <span class="milestone-fill" style="width: {Math.min($progress.percentage, 100)}%"></span>
     </span>
     <span class="milestone-pct">{$progress.percentage}%</span>
+  </div>
+
+  <div class="insights-card card">
+    <h3>Weekly Insights</h3>
+    <div class="insights-grid">
+      <div class="insight">
+        <span class="insight-value">{weeklyInsights.thisWeekHours}h</span>
+        <span class="insight-label">This Week</span>
+      </div>
+      <div class="insight">
+        <span class="insight-value">{weeklyInsights.thisWeekDays}</span>
+        <span class="insight-label">Days Active</span>
+      </div>
+      <div class="insight">
+        <span class="insight-value" class:trend-up={weeklyInsights.trend > 0} class:trend-down={weeklyInsights.trend < 0}>
+          {weeklyInsights.trend > 0 ? '+' : ''}{weeklyInsights.trend}%
+        </span>
+        <span class="insight-label">vs Last Week</span>
+      </div>
+      <div class="insight">
+        <span class="insight-value">{weeklyInsights.avgDaily}h</span>
+        <span class="insight-label">Avg / Day</span>
+      </div>
+    </div>
+    {#if !$progress.is_completed}
+      <div class="projection">
+        <span class="projection-label">Projected completion</span>
+        <span class="projection-value">{weeklyInsights.projectedCompletion}</span>
+        <span class="projection-detail">({weeklyInsights.daysNeeded} working days remaining)</span>
+      </div>
+    {/if}
   </div>
 
   <div class="progress-section card">
@@ -445,6 +538,86 @@
     font-size: 0.85rem;
   }
 
+  .insights-card {
+    padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  }
+
+  .insights-card h3 {
+    font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+    margin-bottom: 1.25rem;
+  }
+
+  .insights-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .insight {
+    text-align: center;
+    padding: 0.75rem 0.5rem;
+    background: rgba(190, 53, 25, 0.03);
+    border-radius: var(--radius);
+  }
+
+  .insight-value {
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2vw, 1.75rem);
+    color: var(--red);
+    line-height: 1.3;
+    font-weight: 700;
+  }
+
+  .insight-value.trend-up {
+    color: var(--success);
+  }
+
+  .insight-value.trend-down {
+    color: var(--warning);
+  }
+
+  .insight-label {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--dark-soft);
+    margin-top: 0.25rem;
+  }
+
+  .projection {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-light);
+    flex-wrap: wrap;
+  }
+
+  .projection-label {
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--dark-soft);
+  }
+
+  .projection-value {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .projection-detail {
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    color: var(--dark-soft);
+  }
+
   .quick-access {
     display: flex;
     flex-direction: column;
@@ -493,7 +666,8 @@
       padding: 1.75rem 1.25rem 2rem;
       gap: 1.25rem;
     }
-    .stats-grid {
+    .stats-grid,
+    .insights-grid {
       grid-template-columns: repeat(2, 1fr);
       gap: 1rem;
     }

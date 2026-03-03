@@ -18,6 +18,7 @@
   let reminderEnabled = $state(event?.reminder_enabled || false);
   let saving = $state(false);
   let deleting = $state(false);
+  let confirmingDelete = $state(false);
 
   const isEditing = !!event;
   const EVENT_TYPES = [
@@ -63,8 +64,12 @@
     }
   }
 
-  async function handleDelete() {
-    if (!confirm('Delete this event?')) return;
+  function handleDelete() {
+    confirmingDelete = true;
+  }
+
+  async function confirmDeleteEvent() {
+    confirmingDelete = false;
     deleting = true;
     try {
       await events.deleteEvent(event.id);
@@ -79,6 +84,18 @@
 </script>
 
 <div class="event-form">
+  {#if confirmingDelete}
+    <div class="delete-confirm">
+      <h4 class="form-title">Delete Event?</h4>
+      <p class="delete-warn">This action cannot be undone.</p>
+      <div class="form-actions">
+        <button class="btn btn-danger" onclick={confirmDeleteEvent} disabled={deleting}>
+          {deleting ? 'Deleting...' : 'Delete'}
+        </button>
+        <button class="btn" onclick={() => (confirmingDelete = false)}>Cancel</button>
+      </div>
+    </div>
+  {:else}
   <h4 class="form-title">{isEditing ? 'Edit Event' : 'New Event'}</h4>
 
   <div class="field">
@@ -132,6 +149,7 @@
     {/if}
     <button class="btn" onclick={onCancel}>Cancel</button>
   </div>
+  {/if}
 </div>
 
 <style>
@@ -195,6 +213,17 @@
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+  }
+  .delete-confirm {
+    text-align: center;
+    padding: 1rem 0;
+    animation: fadeIn 0.2s var(--ease-out);
+  }
+  .delete-warn {
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    color: var(--dark-soft);
+    margin-bottom: 1.25rem;
   }
   .btn-danger {
     background: none;
