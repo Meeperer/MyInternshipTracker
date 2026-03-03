@@ -1,6 +1,7 @@
 <script>
-  import { auth, isAuthenticated, isLoading } from '$stores/auth.js';
+  import { isAuthenticated, isLoading } from '$stores/auth.js';
   import { progress } from '$stores/progress.js';
+  import { journal } from '$stores/journal.js';
   import { goto } from '$app/navigation';
   import Nav from '$components/Nav.svelte';
   import Dashboard from '$components/Dashboard.svelte';
@@ -15,7 +16,9 @@
   $effect(() => {
     if ($isAuthenticated && !fetched) {
       fetched = true;
+      const now = new Date();
       progress.fetch();
+      journal.fetchMonth(now.getFullYear(), now.getMonth() + 1);
     }
   });
 

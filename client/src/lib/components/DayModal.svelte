@@ -1,6 +1,5 @@
 <script>
   import { journal } from '$stores/journal.js';
-  import { progress } from '$stores/progress.js';
   import { events } from '$stores/events.js';
   import { toast } from '$stores/toast.js';
   import { formatDateLong } from '$utils/date.js';
@@ -195,7 +194,6 @@
     try {
       const result = await journal.logHours(date, parseFloat(hours));
       entry = result;
-      await progress.fetch();
       toast.success('Hours logged');
       mode = 'view';
     } catch (err) {
@@ -213,7 +211,6 @@
     try {
       const result = await journal.finishDay(date);
       entry = result;
-      await progress.fetch();
       toast.success('Day finished and locked');
     } catch (err) {
       toast.error(err.message);

@@ -1,5 +1,6 @@
 <script>
   import { progress } from '$stores/progress.js';
+  import { journal } from '$stores/journal.js';
   import { events } from '$stores/events.js';
   import { toast } from '$stores/toast.js';
   import { todayString } from '$utils/date.js';
@@ -13,6 +14,23 @@
   let compiling = $state(false);
   let downloading = $state(false);
   let todayEvents = $state([]);
+
+  const CURRENT_MONTH = new Date().getMonth() + 1;
+  const CURRENT_YEAR = new Date().getFullYear();
+  const MONTH_LABEL = new Date().toLocaleString('en-US', { month: 'long' });
+
+  let monthStats = $derived.by(() => {
+    const entries = $journal.entries || [];
+    const relevant = entries.filter(e => {
+      const y = parseInt(e.date.slice(0, 4));
+      const m = parseInt(e.date.slice(5, 7));
+      return y === CURRENT_YEAR && m === CURRENT_MONTH;
+    });
+    const count = relevant.length;
+    const finished = relevant.filter(e => e.status === 'finished').length;
+    const hours = relevant.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+    return { count, finished, hours: Math.round(hours * 10) / 10 };
+  });
 
   function formatTimeRange(ev) {
     const s = ev.start_time?.slice(0, 5);
@@ -52,6 +70,7 @@
   });
 
   onMount(() => {
+    journal.fetchMonth(CURRENT_YEAR, CURRENT_MONTH);
     events.fetchDate(todayString()).then(list => (todayEvents = list || []));
   });
 
@@ -129,6 +148,26 @@
           </svg>
         </span>
       {/if}
+    </div>
+  </div>
+
+  <div class="month-summary card">
+    <h3 class="month-summary-title">{MONTH_LABEL}</h3>
+    <div class="month-summary-stats">
+      <div class="month-stat-item">
+        <span class="month-stat-value">{monthStats.count}</span>
+        <span class="month-stat-label">Entries</span>
+      </div>
+      <div class="month-stat-divider" aria-hidden="true"></div>
+      <div class="month-stat-item">
+        <span class="month-stat-value">{monthStats.hours}</span>
+        <span class="month-stat-label">Hours Logged</span>
+      </div>
+      <div class="month-stat-divider" aria-hidden="true"></div>
+      <div class="month-stat-item">
+        <span class="month-stat-value">{monthStats.finished}</span>
+        <span class="month-stat-label">Days Finished</span>
+      </div>
     </div>
   </div>
 
@@ -305,6 +344,56 @@
     letter-spacing: 0.1em;
     color: var(--dark-soft);
     margin-top: 0.5rem;
+  }
+
+  .month-summary {
+    padding: 1.5rem 2rem;
+  }
+
+  .month-summary-title {
+    font-family: var(--font-ui);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--dark-soft);
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .month-summary-stats {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+  }
+
+  .month-stat-item {
+    text-align: center;
+  }
+
+  .month-stat-value {
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 2.5vw, 2rem);
+    color: var(--red);
+    line-height: 1.2;
+  }
+
+  .month-stat-label {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--dark-soft);
+    margin-top: 0.3rem;
+  }
+
+  .month-stat-divider {
+    width: 1px;
+    height: 2.5rem;
+    background: var(--border-light);
+    flex-shrink: 0;
   }
 
   .milestone-badge {
@@ -502,6 +591,9 @@
       grid-template-columns: repeat(2, 1fr);
       gap: 1rem;
     }
+    .month-summary { padding: 1.25rem 1rem; }
+    .month-summary-stats { gap: 1.25rem; }
+    .month-stat-divider { height: 2rem; }
     .dash-header h1 { font-size: 2rem; }
     .stat-value { font-size: 2rem; }
     .stat-card { padding: 1.25rem; }

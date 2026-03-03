@@ -14,29 +14,32 @@
   const DAY_HEADERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   let entries = $derived.by(() => {
-    let map = {};
-    let storeVal;
-    journal.subscribe(s => storeVal = s)();
-    for (const e of storeVal.entries) {
+    const map = {};
+    for (const e of $journal.entries) {
       map[e.date] = e;
     }
     return map;
   });
 
-  let monthEvents = $state([]);
+  let eventsMap = $derived(events.getEventsByDate($events.events || []));
 
-  let eventsMap = $derived(events.getEventsByDate(monthEvents));
+  let monthStats = $derived.by(() => {
+    const all = Object.values(entries);
+    const currentMonthEntries = all.filter(e => {
+      const d = e.date;
+      const y = parseInt(d.slice(0, 4));
+      const m = parseInt(d.slice(5, 7));
+      return y === currentYear && m === currentMonth;
+    });
+    const count = currentMonthEntries.length;
+    const finished = currentMonthEntries.filter(e => e.status === 'finished').length;
+    const hours = currentMonthEntries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+    return { count, finished, hours: Math.round(hours * 10) / 10 };
+  });
 
   $effect(() => {
     journal.fetchMonth(currentYear, currentMonth);
     events.fetchMonth(currentYear, currentMonth);
-  });
-
-  $effect(() => {
-    const unsub = events.subscribe((s) => {
-      monthEvents = s.events || [];
-    });
-    return unsub;
   });
 
   let hoverVisible = $state(false);
@@ -198,8 +201,17 @@
         {/each}
       </div>
 
-      <div class="calendar-total" class:milestone={$progress.total_hours >= ($progress.target_hours ?? 468)}>
-        TOTAL: {$progress.total_hours} HOURS
+      <div class="calendar-footer">
+        <div class="calendar-month-stats">
+          <span class="month-stat">{monthStats.count} {monthStats.count === 1 ? 'entry' : 'entries'}</span>
+          <span class="month-stat-sep" aria-hidden="true">·</span>
+          <span class="month-stat">{monthStats.hours}h logged</span>
+          <span class="month-stat-sep" aria-hidden="true">·</span>
+          <span class="month-stat">{monthStats.finished} finished</span>
+        </div>
+        <div class="calendar-total" class:milestone={$progress.total_hours >= ($progress.target_hours ?? 468)}>
+          TOTAL: {$progress.total_hours} HOURS
+        </div>
       </div>
 
       <div class="calendar-nav" aria-label="Month navigation">
@@ -413,7 +425,7 @@
     background: rgba(190, 53, 25, 0.06);
   }
   .calendar-date-cell.has-content {
-    background: rgba(190, 53, 25, 0.12);
+    background: rgba(184, 134, 11, 0.08);
   }
 
   .calendar-date-cell.today {
@@ -426,15 +438,16 @@
     opacity: 0.7;
   }
   .calendar-date-cell.checked {
-    color: var(--dark);
+    color: var(--success);
     opacity: 1;
-    background: rgba(190, 53, 25, 0.14);
+    background: rgba(45, 122, 58, 0.1);
   }
   .calendar-date-cell.checked::before {
     content: "✓";
     margin-right: 0.2em;
     font-size: 0.6em;
     letter-spacing: 0;
+    color: var(--success);
   }
 
   .calendar-date-cell.has-hours {
@@ -443,19 +456,44 @@
     text-decoration-thickness: 1px;
     text-decoration-color: var(--red);
   }
+  .calendar-date-cell.checked.has-hours {
+    text-decoration-color: var(--success);
+  }
   .calendar-date-cell.has-hours.today {
     text-decoration-thickness: 2px;
     text-decoration-color: var(--red-hover);
   }
 
-  .calendar-total {
-    align-self: flex-end;
+  .calendar-footer {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
     margin-top: 1rem;
+    gap: 1.5rem;
+  }
+
+  .calendar-month-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--dark-soft);
+    letter-spacing: 0.04em;
+  }
+
+  .month-stat-sep {
+    color: var(--border);
+    user-select: none;
+  }
+
+  .calendar-total {
     font-family: var(--font-body);
     font-size: 1rem;
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--dark-soft);
+    flex-shrink: 0;
   }
   .calendar-total.milestone {
     color: var(--red);
@@ -580,6 +618,11 @@
       font-size: clamp(1.2rem, 4vw, 1.65rem);
       min-height: 2.5rem;
     }
+    .calendar-footer {
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
     .calendar-total {
       font-size: 0.9rem;
     }
@@ -644,9 +687,15 @@
     .calendar-date-cell.checked::before {
       font-size: 0.55em;
     }
+    .calendar-footer {
+      gap: 0.35rem;
+    }
+    .calendar-month-stats {
+      font-size: 0.7rem;
+      gap: 0.35rem;
+    }
     .calendar-total {
       font-size: 0.8rem;
-      margin-top: 0.75rem;
     }
     .calendar-nav {
       bottom: 1rem;

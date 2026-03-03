@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import { api } from '$utils/api.js';
+import { progress } from '$stores/progress.js';
 
 function createJournalStore() {
   const { subscribe, set, update } = writable({
@@ -7,6 +8,10 @@ function createJournalStore() {
     currentEntry: null,
     loading: false
   });
+
+  function syncProgress() {
+    progress.fetch().catch(() => {});
+  }
 
   return {
     subscribe,
@@ -22,7 +27,6 @@ function createJournalStore() {
       }
     },
 
-    /** Fetch all journal entries for the current account only (export). */
     async fetchAll() {
       const entries = await api.get('/journals/export');
       return entries;
@@ -53,6 +57,7 @@ function createJournalStore() {
         }
         return { ...s, entries, currentEntry: result };
       });
+      syncProgress();
       return result;
     },
 
@@ -69,6 +74,7 @@ function createJournalStore() {
         }
         return { ...s, entries, currentEntry: result };
       });
+      syncProgress();
       return result;
     },
 
@@ -78,6 +84,7 @@ function createJournalStore() {
         const entries = s.entries.map(e => e.date === date ? result : e);
         return { ...s, entries, currentEntry: result };
       });
+      syncProgress();
       return result;
     },
 

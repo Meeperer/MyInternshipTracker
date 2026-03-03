@@ -1,7 +1,6 @@
 <script>
-  import { auth, isAuthenticated, isLoading } from '$stores/auth.js';
+  import { isAuthenticated, isLoading } from '$stores/auth.js';
   import { progress } from '$stores/progress.js';
-  import { journal } from '$stores/journal.js';
   import { goto } from '$app/navigation';
   import Nav from '$components/Nav.svelte';
   import Calendar from '$components/Calendar.svelte';
@@ -33,9 +32,6 @@
 
   function closeModal() {
     selectedDate = null;
-    progress.fetch();
-    const now = new Date();
-    journal.fetchMonth(now.getFullYear(), now.getMonth() + 1);
   }
 </script>
 
