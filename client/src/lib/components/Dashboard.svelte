@@ -1,5 +1,5 @@
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import { progress } from '$stores/progress.js';
   import { journal } from '$stores/journal.js';
   import { events } from '$stores/events.js';
@@ -19,11 +19,6 @@
   let todayEvents = $state([]);
   let eventsLoading = $state(true);
   let celebration = $state(null);
-  let activePanel = $state(null);
-
-  let dashboardDialog;
-  let dashboardCloseButton;
-  let lastPanelTrigger = null;
 
   const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
@@ -107,43 +102,6 @@
     } finally {
       downloading = false;
     }
-  }
-
-  async function openPanel(panel, event) {
-    activePanel = panel;
-
-    if (typeof HTMLElement !== 'undefined' && event?.currentTarget instanceof HTMLElement) {
-      lastPanelTrigger = event.currentTarget;
-    }
-
-    await tick();
-
-    if (dashboardDialog && !dashboardDialog.open) {
-      dashboardDialog.showModal();
-    }
-
-    dashboardCloseButton?.focus();
-  }
-
-  function closePanel() {
-    dashboardDialog?.close();
-  }
-
-  function handleDialogClose() {
-    activePanel = null;
-
-    /* Returning focus to the trigger keeps the dialog flow predictable for
-       keyboard users and matches WCAG 2.2 focus-order expectations. */
-    if (lastPanelTrigger?.focus) {
-      lastPanelTrigger.focus();
-    }
-
-    lastPanelTrigger = null;
-  }
-
-  function handleDialogCancel(event) {
-    event.preventDefault();
-    closePanel();
   }
 
   let targetHours = $derived($progress.target_hours || 486);
@@ -260,75 +218,6 @@
     return `${todayEvents.length} event${todayEvents.length === 1 ? '' : 's'} scheduled today`;
   });
 
-  let reachedMilestones = $derived.by(() => milestoneCards.filter((milestone) => milestone.reached).length);
-
-  let panelCards = $derived.by(() => {
-    const cards = [
-      {
-        id: 'progress',
-        title: 'Progress',
-        value: `${$progress.total_hours}h`,
-        note: nextMilestone ? `${nextMilestone.remaining}h until ${nextMilestone.hours}h` : 'Target reached',
-        meta: `${$progress.percentage}% of ${targetHours}h goal`
-      },
-      {
-        id: 'month',
-        title: dashboardMonthLabel,
-        value: formatHours(monthStats.hours),
-        note: `${monthStats.count} entries in view`,
-        meta: `${monthInsights.activeDays} active days`
-      },
-      {
-        id: 'milestones',
-        title: 'Milestones',
-        value: `${reachedMilestones}/${milestoneCards.length}`,
-        note: nextMilestone ? `Next: ${nextMilestone.hours}h` : 'All hour markers reached',
-        meta: `${$progress.current_streak}-day streak`
-      },
-      {
-        id: 'today',
-        title: 'Today',
-        value: eventsLoading ? '...' : todayEvents.length > 0 ? `${todayEvents.length}` : 'Free',
-        note: eventsLoading
-          ? 'Checking today'
-          : todayEvents.length > 0
-            ? todayEvents[0].title
-            : 'No scheduled events',
-        meta: 'Open schedule'
-      }
-    ];
-
-    if ($progress.is_completed) {
-      cards.push({
-        id: 'report',
-        title: 'Final report',
-        value: compilationStatus?.has_report ? 'Ready' : 'Compile',
-        note: compilationStatus?.has_report ? 'Download the PDF report' : 'Generate the final PDF',
-        meta: 'Open report actions'
-      });
-    }
-
-    return cards;
-  });
-
-  let panelTitle = $derived.by(() => {
-    if (activePanel === 'progress') return 'Progress details';
-    if (activePanel === 'month') return `${dashboardMonthLabel} details`;
-    if (activePanel === 'milestones') return 'Milestones';
-    if (activePanel === 'today') return 'Today';
-    if (activePanel === 'report') return 'Final report';
-    return 'Dashboard details';
-  });
-
-  let panelDescription = $derived.by(() => {
-    if (activePanel === 'progress') return 'Current totals, projection, and pace.';
-    if (activePanel === 'month') return 'The selected month broken down a little further.';
-    if (activePanel === 'milestones') return 'Progress against the long-term hour markers and streaks.';
-    if (activePanel === 'today') return 'Everything scheduled for today.';
-    if (activePanel === 'report') return 'Compile or download the final internship PDF.';
-    return '';
-  });
-
   $effect(() => {
     if (!$selectedMonth) {
       selectedMonth.init();
@@ -410,7 +299,7 @@
     </div>
   </header>
 
-  <section class="summary-panel card animate-rise rise-2" aria-labelledby="dashboard-summary-title">
+  <section class="summary-band card animate-rise rise-2" aria-labelledby="dashboard-summary-title">
     <div class="summary-copy">
       <h2 id="dashboard-summary-title">{greetingLabel}</h2>
       <p>{summaryLine}</p>
@@ -418,271 +307,321 @@
     </div>
 
     {#if dashboardBusy}
-      <div class="summary-inline summary-inline-loading" aria-hidden="true">
-        {#each Array.from({ length: 3 }) as _}
-          <div class="summary-chip">
+      <div class="summary-stats summary-stats-loading" aria-hidden="true">
+        {#each Array.from({ length: 4 }) as _}
+          <div class="summary-stat">
             <span class="skeleton-line short"></span>
             <span class="skeleton-line medium"></span>
           </div>
         {/each}
       </div>
     {:else}
-      <dl class="summary-inline">
-        <div class="summary-chip">
+      <dl class="summary-stats">
+        <div class="summary-stat">
           <dt>Total logged</dt>
-          <dd>{$progress.total_hours}h</dd>
+          <dd>{$progress.total_hours}</dd>
         </div>
-        <div class="summary-chip">
+        <div class="summary-stat">
           <dt>Remaining</dt>
-          <dd>{$progress.remaining_hours}h</dd>
+          <dd>{$progress.remaining_hours}</dd>
         </div>
-        <div class="summary-chip">
+        <div class="summary-stat">
           <dt>This month</dt>
           <dd>{formatHours(monthStats.hours)}</dd>
+        </div>
+        <div class="summary-stat">
+          <dt>Current streak</dt>
+          <dd>{$progress.current_streak}d</dd>
         </div>
       </dl>
     {/if}
   </section>
 
-  <section class="section-grid animate-rise rise-3" aria-label="Dashboard sections">
-    {#if dashboardBusy}
-      {#each Array.from({ length: 4 }) as _}
-        <div class="section-card card section-card-loading" aria-hidden="true">
-          <span class="skeleton-line short"></span>
-          <span class="skeleton-line medium"></span>
-          <span class="skeleton-line long"></span>
+  <section class="dashboard-grid animate-rise rise-3" aria-label="Progress and month overview">
+    <article class="trajectory-panel card" aria-labelledby="trajectory-title">
+      <header class="panel-head panel-head-split">
+        <div>
+          <h2 id="trajectory-title">Trajectory</h2>
+          <p>
+            {#if nextMilestone}
+              {nextMilestone.remaining} hours until the {nextMilestone.hours}-hour milestone.
+            {:else}
+              Every milestone is already complete.
+            {/if}
+          </p>
         </div>
-      {/each}
-    {:else}
-      {#each panelCards as card}
-        <button
-          type="button"
-          class="section-card card"
-          aria-haspopup="dialog"
-          onclick={(event) => openPanel(card.id, event)}
-        >
-          <span class="section-card-head">
-            <span class="section-card-title">{card.title}</span>
-            <span class="section-card-link">View details</span>
-          </span>
-          <strong class="section-card-value">{card.value}</strong>
-          <span class="section-card-note">{card.note}</span>
-          <span class="section-card-meta">{card.meta}</span>
+
+        {#if dashboardBusy}
+          <div class="headline-skeleton" aria-hidden="true">
+            <span class="skeleton-line short"></span>
+            <span class="skeleton-line medium"></span>
+          </div>
+        {:else}
+          <div class="headline-metric">
+            <span class="headline-value">{$progress.total_hours}</span>
+            <span class="headline-label">Hours logged</span>
+          </div>
+        {/if}
+      </header>
+
+      {#if dashboardBusy}
+        <div class="panel-loading" aria-hidden="true">
+          <div class="skeleton-block track-skeleton"></div>
+          <div class="skeleton-line long"></div>
+          <div class="detail-grid detail-grid-loading">
+            {#each Array.from({ length: 4 }) as _}
+              <div class="detail-card">
+                <span class="skeleton-line short"></span>
+                <span class="skeleton-line medium"></span>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {:else}
+        <div class="trajectory-progress">
+          <div class="trajectory-track" aria-hidden="true">
+            <span class="trajectory-fill" style={`width: ${Math.min($progress.percentage, 100)}%`}></span>
+          </div>
+          <div class="trajectory-scale">
+            <span>0h</span>
+            <span>{nextMilestone ? `${nextMilestone.hours}h next` : 'Target reached'}</span>
+            <span>{targetHours}h</span>
+          </div>
+        </div>
+
+        <dl class="detail-grid">
+          <div class="detail-card">
+            <dt>Current status</dt>
+            <dd>{greetingLabel}</dd>
+          </div>
+          <div class="detail-card">
+            <dt>Projected finish</dt>
+            <dd>{monthInsights.projectedCompletion}</dd>
+          </div>
+          <div class="detail-card">
+            <dt>Average active day</dt>
+            <dd>{formatHours(monthInsights.averagePerActiveDay)}</dd>
+          </div>
+          <div class="detail-card">
+            <dt>Current streak</dt>
+            <dd>{$progress.current_streak} days</dd>
+          </div>
+        </dl>
+      {/if}
+    </article>
+
+    <article class="month-panel card" aria-labelledby="month-panel-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="month-panel-title">{dashboardMonthLabel}</h2>
+          <p>{monthStats.count} entries currently in view.</p>
+        </div>
+      </header>
+
+      {#if dashboardBusy}
+        <div class="detail-grid detail-grid-loading" aria-hidden="true">
+          {#each Array.from({ length: 4 }) as _}
+            <div class="detail-card">
+              <span class="skeleton-line short"></span>
+              <span class="skeleton-line medium"></span>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <dl class="detail-grid detail-grid-compact">
+          <div class="detail-card">
+            <dt>Hours this month</dt>
+            <dd>{formatHours(monthStats.hours)}</dd>
+          </div>
+          <div class="detail-card">
+            <dt>Finished days</dt>
+            <dd>{monthStats.finished}</dd>
+          </div>
+          <div class="detail-card">
+            <dt>Active days</dt>
+            <dd>{monthInsights.activeDays}</dd>
+          </div>
+          <div class="detail-card">
+            <dt>Month share of goal</dt>
+            <dd>{monthShare}%</dd>
+          </div>
+        </dl>
+      {/if}
+
+      <p class="panel-note">
+        {#if monthStats.count > 0}
+          {completionRate}% of this month&apos;s entries are finished and already counting toward the target.
+        {:else}
+          Nothing in this month is contributing yet.
+        {/if}
+      </p>
+    </article>
+  </section>
+
+  <section class="dashboard-grid dashboard-grid-secondary animate-rise rise-4" aria-label="Milestones and today">
+    <article class="milestones-panel card" aria-labelledby="milestones-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="milestones-title">Milestones</h2>
+          <p>Hours markers and streak progress in one clean line of sight.</p>
+        </div>
+        <p class="panel-meta">{$progress.current_streak}-day streak. {$progress.longest_streak}-day best.</p>
+      </header>
+
+      <div class="milestone-list">
+        {#each milestoneCards as milestone}
+          <article class:reached={milestone.reached} class="milestone-card">
+            <h3>{milestone.hours} hours</h3>
+            <p class="milestone-status">
+              {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
+            </p>
+            <p class="milestone-note">
+              {#if milestone.reached}
+                This marker is already locked into the record.
+              {:else if milestone.remaining <= 24}
+                Close enough to plan around now.
+              {:else}
+                Still ahead, but clearly visible from here.
+              {/if}
+            </p>
+          </article>
+        {/each}
+      </div>
+    </article>
+
+    <aside class="today-panel card" aria-labelledby="today-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="today-title">Today</h2>
+          <p>{todaySummary}</p>
+        </div>
+      </header>
+
+      {#if eventsLoading}
+        <div class="panel-loading" aria-hidden="true">
+          <div class="skeleton-line long"></div>
+          <div class="skeleton-line medium"></div>
+          <div class="skeleton-line long"></div>
+        </div>
+      {:else if todayEvents.length > 0}
+        <ul class="today-events">
+          {#each todayEvents as ev}
+            <li class="today-event">
+              <div>
+                <span class="today-event-title">{ev.title}</span>
+                {#if ev.description}
+                  <span class="today-event-description">{ev.description}</span>
+                {/if}
+              </div>
+              {#if formatTimeRange(ev)}
+                <span class="today-event-time">{formatTimeRange(ev)}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="today-empty">No scheduled events today. Open the calendar or journal when you want to anchor the day.</p>
+      {/if}
+
+      <div class="today-actions">
+        <button class="btn btn-primary" onclick={() => onNavigateToDate(todayString())}>
+          Open today in calendar
         </button>
-      {/each}
+      </div>
+    </aside>
+  </section>
+
+  <section class="snapshot-panel card animate-rise rise-5" aria-labelledby="snapshot-title">
+    <header class="panel-head">
+      <div>
+        <h2 id="snapshot-title">Month snapshot</h2>
+        <p>Selected month contribution, cadence, and completion forecast.</p>
+      </div>
+    </header>
+
+    {#if dashboardBusy}
+      <div class="detail-grid detail-grid-loading" aria-hidden="true">
+        {#each Array.from({ length: 4 }) as _}
+          <div class="detail-card">
+            <span class="skeleton-line short"></span>
+            <span class="skeleton-line medium"></span>
+          </div>
+        {/each}
+      </div>
+      <div class="panel-loading" aria-hidden="true">
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-block track-skeleton"></div>
+        <div class="skeleton-line long"></div>
+      </div>
+    {:else}
+      <dl class="detail-grid">
+        <div class="detail-card">
+          <dt>Hours logged</dt>
+          <dd>{formatHours(monthInsights.totalHours)}</dd>
+        </div>
+        <div class="detail-card">
+          <dt>Days active</dt>
+          <dd>{monthInsights.activeDays}</dd>
+        </div>
+        <div class="detail-card">
+          <dt>Days finished</dt>
+          <dd>{monthInsights.finishedDays}</dd>
+        </div>
+        <div class="detail-card">
+          <dt>Current cadence</dt>
+          <dd>{cadenceLabel}</dd>
+        </div>
+      </dl>
+
+      <div class="snapshot-progress">
+        <div class="snapshot-progress-head">
+          <span>This month contributes {monthShare}% of the internship goal.</span>
+          <span>{formatHours(monthInsights.totalHours)}</span>
+        </div>
+        <div class="snapshot-track" aria-hidden="true">
+          <span class="snapshot-fill" style={`width: ${monthShare}%`}></span>
+        </div>
+        <p class="panel-note">
+          {#if !$progress.is_completed}
+            At your current pace, the projected finish lands around {monthInsights.projectedCompletion}.
+          {:else}
+            The target is complete, so this month is now part of the final record.
+          {/if}
+        </p>
+      </div>
     {/if}
   </section>
 
-  <!-- A native dialog gives screen readers and keyboard users the expected
-       modal behavior without recreating those semantics by hand. -->
-  <dialog
-    bind:this={dashboardDialog}
-    class="dashboard-dialog"
-    aria-labelledby="dashboard-panel-title"
-    onclose={handleDialogClose}
-    oncancel={handleDialogCancel}
-  >
-    <div class="dialog-panel">
-      <header class="dialog-head">
+  {#if $progress.is_completed}
+    <section class="report-panel card animate-rise rise-6" aria-labelledby="report-title">
+      <header class="panel-head">
         <div>
-          <h2 id="dashboard-panel-title">{panelTitle}</h2>
-          {#if panelDescription}
-            <p>{panelDescription}</p>
-          {/if}
+          <h2 id="report-title">Final report</h2>
+          <p>The internship requirement is complete. Compile or download the PDF report from here.</p>
         </div>
-
-        <button bind:this={dashboardCloseButton} type="button" class="btn btn-sm" onclick={closePanel}>
-          Close
-        </button>
       </header>
 
-      <div class="dialog-body">
-        {#if activePanel === 'progress'}
-          {#if dashboardBusy}
-            <div class="panel-loading" aria-hidden="true">
-              <div class="skeleton-block track-skeleton"></div>
-              <div class="detail-grid detail-grid-loading">
-                {#each Array.from({ length: 4 }) as _}
-                  <div class="detail-card">
-                    <span class="skeleton-line short"></span>
-                    <span class="skeleton-line medium"></span>
-                  </div>
-                {/each}
-              </div>
-            </div>
+      <div class="report-actions">
+        <p class="panel-note">
+          {#if compilationStatus?.has_report}
+            A compiled report is ready to download.
           {:else}
-            <div class="dialog-stack">
-              <div class="progress-block">
-                <div class="progress-block-head">
-                  <strong>{$progress.total_hours} hours logged</strong>
-                  <span>{$progress.percentage}% complete</span>
-                </div>
-                <div class="trajectory-track" aria-hidden="true">
-                  <span class="trajectory-fill" style={`width: ${Math.min($progress.percentage, 100)}%`}></span>
-                </div>
-                <div class="trajectory-scale">
-                  <span>0h</span>
-                  <span>{nextMilestone ? `${nextMilestone.hours}h next` : 'Goal complete'}</span>
-                  <span>{targetHours}h</span>
-                </div>
-              </div>
-
-              <dl class="detail-grid">
-                <div class="detail-card">
-                  <dt>Status</dt>
-                  <dd>{greetingLabel}</dd>
-                </div>
-                <div class="detail-card">
-                  <dt>Projected finish</dt>
-                  <dd>{monthInsights.projectedCompletion}</dd>
-                </div>
-                <div class="detail-card">
-                  <dt>Average active day</dt>
-                  <dd>{formatHours(monthInsights.averagePerActiveDay)}</dd>
-                </div>
-                <div class="detail-card">
-                  <dt>Current streak</dt>
-                  <dd>{$progress.current_streak} days</dd>
-                </div>
-              </dl>
-            </div>
+            The report has not been compiled yet.
           {/if}
-        {:else if activePanel === 'month'}
-          {#if dashboardBusy}
-            <div class="detail-grid detail-grid-loading" aria-hidden="true">
-              {#each Array.from({ length: 4 }) as _}
-                <div class="detail-card">
-                  <span class="skeleton-line short"></span>
-                  <span class="skeleton-line medium"></span>
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <div class="dialog-stack">
-              <dl class="detail-grid">
-                <div class="detail-card">
-                  <dt>Hours this month</dt>
-                  <dd>{formatHours(monthInsights.totalHours)}</dd>
-                </div>
-                <div class="detail-card">
-                  <dt>Entries</dt>
-                  <dd>{monthStats.count}</dd>
-                </div>
-                <div class="detail-card">
-                  <dt>Finished days</dt>
-                  <dd>{monthInsights.finishedDays}</dd>
-                </div>
-                <div class="detail-card">
-                  <dt>Active days</dt>
-                  <dd>{monthInsights.activeDays}</dd>
-                </div>
-                <div class="detail-card">
-                  <dt>Month share</dt>
-                  <dd>{monthShare}%</dd>
-                </div>
-                <div class="detail-card">
-                  <dt>Cadence</dt>
-                  <dd>{cadenceLabel}</dd>
-                </div>
-              </dl>
+        </p>
 
-              <p class="dialog-note">
-                {#if monthStats.count > 0}
-                  {completionRate}% of this month&apos;s entries are finished and already contributing to the target.
-                {:else}
-                  This month has not started contributing yet.
-                {/if}
-              </p>
-            </div>
-          {/if}
-        {:else if activePanel === 'milestones'}
-          <div class="dialog-stack">
-            <div class="milestone-summary">
-              <span>{reachedMilestones} of {milestoneCards.length} hour markers reached</span>
-              <span>{$progress.current_streak}-day current streak</span>
-              <span>{$progress.longest_streak}-day best streak</span>
-            </div>
-
-            <div class="milestone-list">
-              {#each milestoneCards as milestone}
-                <article class:reached={milestone.reached} class="milestone-card">
-                  <h3>{milestone.hours} hours</h3>
-                  <p class="milestone-status">
-                    {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
-                  </p>
-                  <p class="milestone-note">
-                    {#if milestone.reached}
-                      This marker is already locked into the record.
-                    {:else if milestone.remaining <= 24}
-                      Close enough to plan around now.
-                    {:else}
-                      Still ahead, but clearly visible from here.
-                    {/if}
-                  </p>
-                </article>
-              {/each}
-            </div>
-          </div>
-        {:else if activePanel === 'today'}
-          <div class="dialog-stack">
-            {#if eventsLoading}
-              <div class="panel-loading" aria-hidden="true">
-                <div class="skeleton-line long"></div>
-                <div class="skeleton-line medium"></div>
-                <div class="skeleton-line long"></div>
-              </div>
-            {:else if todayEvents.length > 0}
-              <ul class="today-events">
-                {#each todayEvents as ev}
-                  <li class="today-event">
-                    <div>
-                      <span class="today-event-title">{ev.title}</span>
-                      {#if ev.description}
-                        <span class="today-event-description">{ev.description}</span>
-                      {/if}
-                    </div>
-                    {#if formatTimeRange(ev)}
-                      <span class="today-event-time">{formatTimeRange(ev)}</span>
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            {:else}
-              <p class="today-empty">No scheduled events today. Open the calendar or journal when you want to anchor the day.</p>
-            {/if}
-
-            <div class="today-actions">
-              <button class="btn btn-primary" onclick={() => onNavigateToDate(todayString())}>
-                Open today in calendar
-              </button>
-            </div>
-          </div>
-        {:else if activePanel === 'report' && $progress.is_completed}
-          <div class="dialog-stack">
-            <p class="dialog-note">
-              {#if compilationStatus?.has_report}
-                A compiled report is ready to download.
-              {:else}
-                The report has not been compiled yet.
-              {/if}
-            </p>
-
-            <div class="report-actions">
-              {#if compilationStatus?.has_report}
-                <button class="btn btn-primary" onclick={handleDownload} disabled={downloading}>
-                  {downloading ? 'Downloading...' : 'Download report'}
-                </button>
-              {:else}
-                <button class="btn btn-primary" onclick={handleCompile} disabled={compiling}>
-                  {compiling ? 'Compiling...' : 'Compile final report'}
-                </button>
-              {/if}
-            </div>
-          </div>
+        {#if compilationStatus?.has_report}
+          <button class="btn btn-primary" onclick={handleDownload} disabled={downloading}>
+            {downloading ? 'Downloading...' : 'Download report'}
+          </button>
+        {:else}
+          <button class="btn btn-primary" onclick={handleCompile} disabled={compiling}>
+            {compiling ? 'Compiling...' : 'Compile final report'}
+          </button>
         {/if}
       </div>
-    </div>
-  </dialog>
+    </section>
+  {/if}
 
   {#if celebration}
     <div class="modal-overlay celebration-overlay" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
@@ -697,23 +636,30 @@
 
 <style>
   .dashboard {
-    width: min(1100px, calc(100vw - 2rem));
+    width: min(1240px, calc(100vw - 2rem));
     margin: 0 auto;
-    padding: clamp(1.1rem, 2vw, 1.7rem) clamp(1rem, 1.8vw, 1.4rem) clamp(2rem, 3vw, 2.8rem);
-    display: grid;
+    padding: clamp(1.1rem, 2vw, 1.7rem) clamp(1rem, 1.8vw, 1.5rem) clamp(2.2rem, 4vw, 3rem);
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
     background: transparent;
   }
 
   .dashboard :global(.card) {
     border-radius: 12px;
-    border: 1px solid rgba(190, 53, 25, 0.08);
+    border-color: rgba(190, 53, 25, 0.08);
     background: rgba(255, 252, 246, 0.98);
     box-shadow: none;
+    padding: 1.2rem;
   }
 
   .dashboard :global(.card)::before {
     display: none;
+  }
+
+  .dashboard :global(.card:hover) {
+    box-shadow: none;
+    border-color: rgba(190, 53, 25, 0.12);
   }
 
   .dashboard-header {
@@ -725,7 +671,7 @@
 
   .dashboard-header-copy h1 {
     margin: 0;
-    font-size: clamp(1.9rem, 3vw, 2.4rem);
+    font-size: clamp(1.9rem, 3vw, 2.7rem);
   }
 
   .dashboard-header-copy p {
@@ -747,8 +693,8 @@
   }
 
   .month-picker-label,
-  .summary-chip dt,
-  .detail-card dt {
+  .detail-card dt,
+  .summary-stat dt {
     font-family: var(--font-ui);
     font-size: 0.72rem;
     font-weight: 600;
@@ -775,32 +721,35 @@
     box-shadow: 0 0 0 3px rgba(190, 53, 25, 0.12);
   }
 
-  .summary-panel {
+  .summary-band,
+  .dashboard-grid,
+  .dashboard-grid-secondary {
+    position: relative;
+  }
+
+  .summary-band {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(16rem, auto);
+    grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.95fr);
     gap: 1rem;
     align-items: start;
-    padding: 1.1rem 1.15rem;
   }
 
   .summary-copy {
     display: grid;
-    gap: 0.35rem;
+    gap: 0.4rem;
   }
 
   .summary-copy h2,
-  .dialog-head h2 {
+  .panel-head h2 {
     margin: 0;
-    font-size: clamp(1.25rem, 2vw, 1.75rem);
+    font-size: clamp(1.35rem, 2vw, 1.9rem);
   }
 
   .summary-copy p,
-  .dialog-head p,
-  .dialog-note,
+  .panel-head p,
+  .panel-note,
   .today-empty,
-  .milestone-note,
-  .milestone-status,
-  .today-event-description {
+  .panel-meta {
     font-family: var(--font-ui);
     font-size: 0.88rem;
     line-height: 1.55;
@@ -811,182 +760,92 @@
     color: var(--dark-muted);
   }
 
-  .summary-inline {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.7rem;
-  }
-
-  .summary-chip {
-    padding: 0.8rem 0.9rem;
-    border: 1px solid rgba(190, 53, 25, 0.08);
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.72);
-  }
-
-  .summary-inline-loading .summary-chip,
-  .detail-grid-loading .detail-card {
-    display: grid;
-    gap: 0.45rem;
-  }
-
-  .summary-chip dd,
-  .detail-card dd {
-    margin-top: 0.28rem;
-    font-family: var(--font-display);
-    font-size: clamp(1.2rem, 1.9vw, 1.65rem);
-    line-height: 1.08;
-    color: var(--red);
-  }
-
-  .section-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-  }
-
-  .section-card {
-    width: 100%;
-    display: grid;
-    gap: 0.45rem;
-    padding: 1rem 1.05rem;
-    text-align: left;
-    cursor: pointer;
-    transition: border-color 160ms ease, background-color 160ms ease;
-  }
-
-  .section-card:hover,
-  .section-card:focus-visible {
-    border-color: rgba(190, 53, 25, 0.18);
-    background: rgba(255, 255, 255, 1);
-    outline: none;
-  }
-
-  .section-card-loading {
-    min-height: 11.5rem;
-    align-content: start;
-  }
-
-  .section-card-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    align-items: baseline;
-  }
-
-  .section-card-title {
-    font-weight: 600;
-    color: var(--dark);
-  }
-
-  .section-card-link,
-  .section-card-meta,
-  .trajectory-scale,
-  .progress-block-head,
-  .milestone-summary,
-  .today-event-time {
-    font-family: var(--font-ui);
-    font-size: 0.8rem;
-    color: var(--dark-muted);
-  }
-
-  .section-card-value {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 4vw, 2.75rem);
-    line-height: 0.95;
-    color: var(--red);
-  }
-
-  .section-card-note {
-    font-family: var(--font-ui);
-    font-size: 0.9rem;
-    color: var(--dark-soft);
-    line-height: 1.45;
-  }
-
-  .dashboard-dialog {
-    width: min(760px, calc(100vw - 1.5rem));
-    padding: 0;
-    border: none;
-    background: transparent;
-  }
-
-  .dashboard-dialog::backdrop {
-    background: rgba(28, 20, 7, 0.42);
-  }
-
-  .dialog-panel {
-    border: 1px solid rgba(190, 53, 25, 0.12);
-    border-radius: 14px;
-    background: rgba(255, 252, 246, 1);
-    padding: 1.1rem 1.15rem 1.2rem;
-  }
-
-  .dialog-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: start;
-  }
-
-  .dialog-body {
-    margin-top: 1rem;
-    max-height: min(68vh, 46rem);
-    overflow: auto;
-    padding-right: 0.15rem;
-  }
-
-  .dialog-stack,
-  .panel-loading {
-    display: grid;
-    gap: 0.9rem;
-  }
-
+  .summary-stats,
   .detail-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
 
+  .summary-stat,
   .detail-card,
   .milestone-card {
     padding: 0.9rem 0.95rem;
     border: 1px solid rgba(190, 53, 25, 0.08);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.7);
   }
 
-  .progress-block {
+  .summary-stats-loading .summary-stat,
+  .detail-grid-loading .detail-card {
     display: grid;
-    gap: 0.55rem;
+    gap: 0.45rem;
   }
 
-  .progress-block-head,
-  .trajectory-scale,
-  .milestone-summary {
+  .summary-stat dd,
+  .detail-card dd {
+    margin-top: 0.3rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2vw, 1.8rem);
+    line-height: 1.08;
+    color: var(--red);
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.95fr);
+    gap: 1rem;
+  }
+
+  .dashboard-grid-secondary {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.85fr);
+    gap: 1rem;
+  }
+
+  .panel-head {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
-    flex-wrap: wrap;
+    align-items: start;
   }
 
-  .progress-block-head strong {
-    color: var(--dark);
+  .panel-head-split {
+    align-items: end;
   }
 
-  .trajectory-track {
-    height: 0.8rem;
-    border-radius: 999px;
-    background: rgba(190, 53, 25, 0.08);
-    overflow: hidden;
+  .headline-metric {
+    display: grid;
+    justify-items: end;
+    min-width: 8rem;
   }
 
-  .trajectory-fill {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: var(--red);
-    transition: width 0.45s var(--ease-out);
+  .headline-value {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 6vw, 5rem);
+    line-height: 0.88;
+    color: var(--red);
+  }
+
+  .headline-label {
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dark-muted);
+  }
+
+  .headline-skeleton {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 8rem;
+    justify-items: end;
+  }
+
+  .panel-loading {
+    display: grid;
+    gap: 0.7rem;
+    margin-top: 1rem;
   }
 
   .track-skeleton {
@@ -994,52 +853,107 @@
     border-radius: 999px;
   }
 
+  .trajectory-progress {
+    margin-top: 1rem;
+  }
+
+  .trajectory-track,
+  .snapshot-track {
+    height: 0.8rem;
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.08);
+    overflow: hidden;
+  }
+
+  .trajectory-fill,
+  .snapshot-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--red);
+    transition: width 0.45s var(--ease-out);
+  }
+
+  .trajectory-scale,
+  .snapshot-progress-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--dark-soft);
+  }
+
+  .detail-grid {
+    margin-top: 1rem;
+  }
+
+  .detail-grid-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-note {
+    margin-top: 0.85rem;
+  }
+
+  .panel-meta {
+    text-align: right;
+  }
+
   .milestone-list {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
     gap: 0.75rem;
+    margin-top: 1rem;
   }
 
   .milestone-card.reached {
     background: rgba(190, 53, 25, 0.07);
-    border-color: rgba(190, 53, 25, 0.15);
+    border-color: rgba(190, 53, 25, 0.16);
   }
 
   .milestone-card h3 {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 1.12rem;
   }
 
   .milestone-status {
-    margin-top: 0.3rem;
-    color: var(--red);
+    margin-top: 0.35rem;
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
     font-weight: 600;
+    color: var(--red);
   }
 
   .milestone-note {
-    margin-top: 0.35rem;
+    margin-top: 0.4rem;
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--dark-soft);
   }
 
   .today-events {
     list-style: none;
-    margin: 0;
+    margin: 1rem 0 0;
     padding: 0;
     display: grid;
-    gap: 0.75rem;
+    gap: 0.65rem;
   }
 
   .today-event {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.85rem;
+    gap: 0.8rem;
     align-items: start;
-    padding-bottom: 0.7rem;
+    padding-bottom: 0.65rem;
     border-bottom: 1px solid rgba(190, 53, 25, 0.08);
   }
 
   .today-event:last-child {
-    padding-bottom: 0;
     border-bottom: none;
+    padding-bottom: 0;
   }
 
   .today-event-title {
@@ -1048,17 +962,32 @@
     color: var(--dark);
   }
 
+  .today-event-description {
+    display: block;
+    margin-top: 0.16rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--dark-soft);
+  }
+
   .today-event-time {
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
     color: var(--red);
     white-space: nowrap;
   }
 
   .today-actions,
   .report-actions {
+    margin-top: 1rem;
     display: flex;
     flex-wrap: wrap;
     gap: 0.65rem;
     align-items: center;
+  }
+
+  .report-actions {
+    justify-content: space-between;
   }
 
   .celebration-overlay {
@@ -1085,27 +1014,70 @@
     color: var(--dark-soft);
   }
 
-  @media (max-width: 820px) {
+  @media (max-width: 1100px) {
+    .summary-band,
+    .dashboard-grid,
+    .dashboard-grid-secondary {
+      grid-template-columns: 1fr;
+    }
+
+    .panel-meta {
+      text-align: left;
+    }
+  }
+
+  @media (max-width: 760px) {
     .dashboard {
       width: calc(100vw - 1rem);
       padding-inline: 0.75rem;
     }
 
-    .dashboard-header,
-    .summary-panel {
+    .dashboard-header {
       grid-template-columns: 1fr;
+      align-items: start;
     }
 
-    .dashboard-controls,
-    .dialog-head {
+    .dashboard-controls {
       flex-wrap: wrap;
       align-items: start;
     }
+
+    .panel-head,
+    .panel-head-split {
+      flex-direction: column;
+      align-items: start;
+    }
+
+    .headline-metric,
+    .headline-skeleton {
+      justify-items: start;
+    }
+
+    .summary-stats,
+    .detail-grid,
+    .detail-grid-compact {
+      grid-template-columns: 1fr 1fr;
+    }
   }
 
-  @media (max-width: 640px) {
-    .summary-inline,
-    .detail-grid {
+  @media (max-width: 560px) {
+    .dashboard-header-copy h1 {
+      font-size: 1.7rem;
+    }
+
+    .month-picker,
+    .month-input {
+      width: 100%;
+    }
+
+    .dashboard-controls .btn {
+      min-width: 5.25rem;
+      justify-content: center;
+    }
+
+    .summary-stats,
+    .detail-grid,
+    .detail-grid-compact {
       grid-template-columns: 1fr;
     }
 
@@ -1124,21 +1096,15 @@
     }
 
     .today-actions .btn,
-    .report-actions .btn,
-    .dialog-head .btn {
+    .report-actions .btn {
       width: 100%;
       justify-content: center;
-    }
-
-    .month-picker,
-    .month-input {
-      width: 100%;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .section-card,
-    .trajectory-fill {
+    .trajectory-fill,
+    .snapshot-fill {
       transition: none;
     }
   }
