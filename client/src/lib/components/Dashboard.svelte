@@ -1086,10 +1086,15 @@
   .dashboard-dialog {
     width: min(52rem, calc(100vw - 2rem));
     max-width: 52rem;
+    max-height: calc(100dvh - 2rem);
+    margin: auto;
+    inset: 0;
+    position: fixed;
     padding: 0;
     border: none;
     background: transparent;
     color: inherit;
+    overflow: visible;
   }
 
   .dashboard-dialog::backdrop {
