@@ -51,14 +51,31 @@
   }
 
   .progress-fill {
+    position: relative;
     height: 100%;
     background: var(--red);
     border-radius: 5px;
     transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease;
+    overflow: hidden;
+  }
+
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: translateX(-100%);
+    animation: progressShimmer 1.8s linear infinite;
   }
 
   .progress-fill.completed {
     background: var(--success);
+  }
+
+  @keyframes progressShimmer {
+    100% {
+      transform: translateX(100%);
+    }
   }
 
   @media (max-width: 768px) {

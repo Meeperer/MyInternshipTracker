@@ -1,7 +1,7 @@
 <script>
   import { timer } from '$stores/timer.js';
 
-  const { display, state: timerState, baseMinutes } = timer;
+  const { display, state: timerState, baseMinutes, remaining, baseDuration } = timer;
 
   let durationInput = $state(25);
 
@@ -31,6 +31,16 @@
   }
 
   const displayChars = $derived(($display || '00:00:00').split(''));
+  const progressPct = $derived.by(() => {
+    const total = Number($baseDuration) || 1;
+    const left = Number($remaining) || 0;
+    return Math.max(0, Math.min(100, Math.round(((total - left) / total) * 100)));
+  });
+  const sessionLabel = $derived.by(() => {
+    if ($timerState === 'running') return 'In focus';
+    if ($timerState === 'paused') return 'Paused';
+    return 'Ready';
+  });
 
   /** Arc: center chars higher, ends lower – stronger curve to match reference image. */
   function arcOffset(i, total) {
@@ -42,11 +52,22 @@
 </script>
 
 <div class="pomodoro-view-old">
+  <div class="timer-status animate-rise rise-1">
+    <div class="timer-status-copy">
+      <span class="timer-status-label">{sessionLabel}</span>
+      <span class="timer-status-detail">{progressPct}% of this session elapsed</span>
+    </div>
+    <div class="timer-status-track" aria-hidden="true">
+      <span class="timer-status-fill" style={`width: ${progressPct}%`}></span>
+    </div>
+  </div>
+
   <div class="timer-display-wrap">
     {#each displayChars as char, i}
       <span
         class="timer-char"
         class:colon={char === ':'}
+        class:running={$timerState === 'running'}
         style="transform: translateY({arcOffset(i, displayChars.length)}em)"
       >{char}</span>
     {/each}
@@ -117,6 +138,50 @@
     min-height: 0;
   }
 
+  .timer-status {
+    width: min(32rem, 100%);
+    display: grid;
+    gap: 0.65rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .timer-status-copy {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: baseline;
+    font-family: var(--font-ui);
+  }
+
+  .timer-status-label {
+    color: var(--red);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .timer-status-detail {
+    color: var(--dark-soft);
+    font-size: 0.8rem;
+  }
+
+  .timer-status-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(212, 212, 200, 0.7);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .timer-status-fill {
+    display: block;
+    height: 100%;
+    background: var(--red);
+    border-radius: inherit;
+    transition: width 0.6s var(--ease-out);
+  }
+
   .timer-display-wrap {
     font-family: var(--font-display);
     display: inline-flex;
@@ -130,6 +195,11 @@
 
   .timer-char {
     display: inline-block;
+    transition: color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .timer-char.running {
+    animation: timerPulse 1s ease-in-out infinite;
   }
   .timer-char.colon {
     font-size: 0.4em;
@@ -240,6 +310,15 @@
     color: var(--dark-soft);
   }
 
+  @keyframes timerPulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.78;
+    }
+  }
+
   @media (max-width: 992px) {
     .pomodoro-view-old {
       padding: 2.5rem 1.75rem 3rem;
@@ -264,6 +343,15 @@
   @media (max-width: 768px) {
     .pomodoro-view-old {
       padding: 2rem 1.5rem 2.5rem;
+    }
+    .timer-status {
+      width: 100%;
+      margin-bottom: 1.15rem;
+    }
+    .timer-status-copy {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
     }
     .timer-display-wrap {
       font-size: clamp(4rem, 24vw, 12rem);
@@ -297,6 +385,10 @@
     }
     .timer-display-wrap {
       font-size: clamp(3.5rem, 22vw, 10rem);
+    }
+    .timer-status-label,
+    .timer-status-detail {
+      font-size: 0.72rem;
     }
     .timer-buttons {
       flex-direction: column;

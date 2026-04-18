@@ -12,6 +12,7 @@
   const DAY_HEADERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   let currentYear = $derived.by(() => Number(($selectedMonth || '').slice(0, 4)));
   let currentMonth = $derived.by(() => Number(($selectedMonth || '').slice(5, 7)));
+  let calendarBusy = $derived($journal.loading || $events.loading);
 
   let entries = $derived.by(() => {
     const map = {};
@@ -173,7 +174,7 @@
   }
 </script>
 
-<div class="calendar-view-old">
+<div class="calendar-view-old animate-rise rise-1" aria-busy={calendarBusy}>
   {#if $progress.total_hours >= ($progress.target_hours ?? 468)}
     <div class="celebration-banner">468 HOURS REACHED – AMAZING FOCUS</div>
   {/if}
@@ -193,20 +194,29 @@
         {/each}
       </div>
 
-      <div class="calendar-dates" role="grid" aria-label="Calendar">
-        {#each calendarDays as cell}
-          <button
-            type="button"
-            class={cellClasses(cell).join(' ')}
-            onclick={() => openDate(cell.date)}
-            onmouseenter={(e) => handleCellMouseEnter(e, cell)}
-            onmouseleave={handleCellMouseLeave}
-            aria-label="{cell.date}"
-          >
-            {String(cell.day).padStart(2, '0')}
-          </button>
-        {/each}
-      </div>
+      {#if calendarBusy}
+        <div class="calendar-dates calendar-dates-skeleton" aria-hidden="true">
+          {#each Array.from({ length: TOTAL_CELLS }) as _, index}
+            <div class="calendar-skeleton-cell skeleton-block" style={`animation-delay: ${index * 12}ms;`}></div>
+          {/each}
+        </div>
+      {:else}
+        <div class="calendar-dates" role="grid" aria-label="Calendar">
+          {#each calendarDays as cell, index}
+            <button
+              type="button"
+              class={cellClasses(cell).join(' ')}
+              style={`animation-delay: ${index * 12}ms;`}
+              onclick={() => openDate(cell.date)}
+              onmouseenter={(e) => handleCellMouseEnter(e, cell)}
+              onmouseleave={handleCellMouseLeave}
+              aria-label="{cell.date}"
+            >
+              {String(cell.day).padStart(2, '0')}
+            </button>
+          {/each}
+        </div>
+      {/if}
 
       <div class="calendar-footer">
         <div class="calendar-month-stats">
@@ -426,6 +436,7 @@
     padding: 0;
     transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease,
       transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: calendarCellIn 0.35s var(--ease-out) both;
   }
   .calendar-date-cell:hover {
     opacity: 1;
@@ -484,6 +495,27 @@
   .calendar-date-cell.has-hours.today:not(.checked) {
     text-decoration-thickness: 2px;
     text-decoration-color: var(--red-hover);
+  }
+
+  .calendar-dates-skeleton {
+    align-items: stretch;
+  }
+
+  .calendar-skeleton-cell {
+    min-height: 0;
+    opacity: 0.9;
+    animation: calendarCellIn 0.35s var(--ease-out) both;
+  }
+
+  @keyframes calendarCellIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .calendar-footer {

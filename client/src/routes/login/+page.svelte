@@ -50,8 +50,8 @@
   }
 </script>
 
-<div class="auth-page">
-  <div class="auth-container">
+<main id="main-content" class="auth-page page-enter">
+  <div class="auth-container animate-rise rise-2">
     <h1>Internship Tracker</h1>
     <p class="auth-subtitle">Sign in to your account</p>
 
@@ -89,7 +89,7 @@
             class="password-toggle"
             onclick={() => (showPassword = !showPassword)}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
-            tabindex="-1"
+            aria-pressed={showPassword}
           >
             {showPassword ? 'Hide' : 'Show'}
           </button>
@@ -110,7 +110,7 @@
       Don't have an account? <a href="/register">Register</a>
     </p>
   </div>
-</div>
+</main>
 
 <style>
   .auth-page {
@@ -125,6 +125,11 @@
     width: 100%;
     max-width: 380px;
     text-align: center;
+    padding: 2rem;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: var(--shadow);
   }
 
   h1 {

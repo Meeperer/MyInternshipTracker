@@ -49,7 +49,7 @@
   const timezoneLabel = $derived(getTimezoneLabel($timezone));
 </script>
 
-<nav class="top-nav">
+<nav class="top-nav animate-rise rise-1">
   <div class="nav-left">
     <span class="clock">{time}</span>
     <span class="clock-label">{dateLabel}</span>
@@ -171,6 +171,7 @@
   }
 
   .nav-link {
+    position: relative;
     display: inline-flex;
     align-items: center;
     padding: 0.6rem 1.35rem;
@@ -187,10 +188,27 @@
     text-decoration: none;
     cursor: pointer;
   }
+
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    right: 1rem;
+    bottom: 0.35rem;
+    height: 2px;
+    background: var(--red);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.18s var(--ease-out);
+  }
   .nav-link:hover {
     color: var(--red);
     background: rgba(190, 53, 25, 0.08);
     transform: translateY(-1px);
+  }
+  .nav-link:hover::after,
+  .nav-link.active::after {
+    transform: scaleX(1);
   }
   .nav-link.active {
     color: var(--red);

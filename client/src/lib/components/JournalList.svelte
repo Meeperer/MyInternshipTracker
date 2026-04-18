@@ -183,6 +183,8 @@
   let summaryResult = $state(null);
   let summaryError = $state('');
   let summaryRequestId = 0;
+  let lastFetchedSummaryKey = $state('');
+  let lastAutoSummaryKey = $state('');
   let currentPage = $state(1);
   let expandedEntryDate = $state('');
 
@@ -225,6 +227,9 @@
       ...getMonthRange($selectedMonth)
     };
   });
+  let activeSummaryKey = $derived.by(() =>
+    activeSummaryRange ? `${summaryMode}:${activeSummaryRange.startDate}:${activeSummaryRange.endDate}` : ''
+  );
 
   let rangeEntries = $derived.by(() => {
     if (!activeSummaryRange) return [];
@@ -280,6 +285,7 @@
       summaryResult = null;
       summaryError = '';
       summaryFetching = false;
+      lastFetchedSummaryKey = '';
       return;
     }
 
@@ -287,10 +293,12 @@
     summaryError = '';
     summaryFetching = true;
     const requestId = ++summaryRequestId;
+    const summaryKey = `${summaryMode}:${range.startDate}:${range.endDate}`;
 
     journal.fetchPeriodSummary(summaryMode, range.startDate, range.endDate)
       .then((saved) => {
         if (requestId !== summaryRequestId) return;
+        lastFetchedSummaryKey = summaryKey;
         summaryResult = saved
           ? {
               ...saved,
@@ -300,6 +308,7 @@
       })
       .catch(() => {
         if (requestId !== summaryRequestId) return;
+        lastFetchedSummaryKey = summaryKey;
         summaryResult = null;
       })
       .finally(() => {
@@ -307,6 +316,17 @@
           summaryFetching = false;
         }
       });
+  });
+
+  $effect(() => {
+    const summaryKey = activeSummaryKey;
+    if (!summaryKey || $journal.loading || summaryFetching || summaryLoading) return;
+    if (lastFetchedSummaryKey !== summaryKey) return;
+    if (summaryResult || summaryError || rangeContentCount === 0) return;
+    if (lastAutoSummaryKey === summaryKey) return;
+
+    lastAutoSummaryKey = summaryKey;
+    handleGenerateSummary({ silent: true });
   });
 
   function openNewEntryForToday() {
@@ -351,12 +371,14 @@
     }
   }
 
-  async function handleGenerateSummary() {
+  async function handleGenerateSummary({ silent = false } = {}) {
     if (!activeSummaryRange) return;
 
     if (rangeContentCount === 0) {
       summaryError = `Add written journal content in this ${summaryMode} before generating a summary.`;
-      toast.error(summaryError);
+      if (!silent) {
+        toast.error(summaryError);
+      }
       return;
     }
 
@@ -375,10 +397,14 @@
         label: activeSummaryRange.label
       };
 
-      toast.success(`${summaryMode === 'week' ? 'Weekly' : 'Monthly'} summary ready`);
+      if (!silent) {
+        toast.success(`${summaryMode === 'week' ? 'Weekly' : 'Monthly'} summary ready`);
+      }
     } catch (err) {
       summaryError = err.message || 'AI summary failed';
-      toast.error(summaryError);
+      if (!silent) {
+        toast.error(summaryError);
+      }
     } finally {
       summaryLoading = false;
     }
@@ -394,8 +420,8 @@
   }
 </script>
 
-<div class="journal-view">
-  <section class="journal-hero">
+<div class="journal-view" aria-busy={$journal.loading || summaryLoading}>
+  <section class="journal-hero animate-rise rise-1">
     <div class="journal-hero-copy">
       <span class="eyebrow">Journal workspace</span>
       <h2>Journal Entries</h2>
@@ -424,7 +450,7 @@
     </div>
   </section>
 
-  <section class="overview-strip">
+  <section class="overview-strip animate-rise rise-2">
     <article class="overview-card">
       <span class="overview-label">Selected month</span>
       <strong>{formatMonthLabel($selectedMonth)}</strong>
@@ -442,7 +468,7 @@
     </article>
   </section>
 
-  <section class="workspace-grid">
+  <section class="workspace-grid animate-rise rise-3">
     <div class="journal-controls card glass-card">
       <div class="panel-header">
         <div>
@@ -478,7 +504,7 @@
       </p>
     </div>
 
-    <div class="summary-panel card glass-card">
+    <div class="summary-panel card glass-card" aria-live="polite">
       <div class="summary-topline">
         <div>
           <span class="panel-kicker">AI summary</span>
@@ -541,6 +567,11 @@
       {:else if summaryFetching}
         <div class="summary-state">
           <strong>Checking saved summaries</strong>
+          <div class="summary-skeleton" aria-hidden="true">
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line long"></div>
+          </div>
           <p>Looking for an existing {summaryMode} summary for this range.</p>
         </div>
       {:else if summaryResult}
@@ -578,7 +609,7 @@
     </div>
   </section>
 
-  <div class="search-shell">
+  <div class="search-shell animate-rise rise-4">
     <input
       class="input search-input"
       type="text"
@@ -588,7 +619,7 @@
     />
   </div>
 
-  <section class="entries-shell card glass-card" aria-live="polite">
+  <section class="entries-shell card glass-card animate-rise rise-5" aria-live="polite">
     <div class="entries-toolbar">
       <div>
         <h3>Entries</h3>
@@ -607,9 +638,17 @@
 
     <div class="entries-list">
       {#if $journal.loading}
-        <div class="empty-state">
-          <div class="spinner"></div>
-          <p>Loading {formatMonthLabel($selectedMonth)} entries...</p>
+        <div class="entries-skeleton" aria-hidden="true">
+          {#each Array.from({ length: PAGE_SIZE }) as _, index}
+            <div class="entry-skeleton-card" style={`animation-delay: ${index * 40}ms;`}>
+              <div class="entry-skeleton-top">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-chip" style="width: 4.5rem; height: 1.2rem;"></div>
+              </div>
+              <div class="skeleton-line long"></div>
+              <div class="skeleton-line medium"></div>
+            </div>
+          {/each}
         </div>
       {:else if $journal.entries.length === 0}
         <div class="empty-state">
@@ -1077,6 +1116,12 @@
     color: var(--dark);
   }
 
+  .summary-skeleton {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0.85rem 0 0.75rem;
+  }
+
   .summary-state-error {
     background: rgba(190, 53, 25, 0.06);
     border-color: rgba(190, 53, 25, 0.18);
@@ -1168,6 +1213,40 @@
     min-height: 0;
     overflow: auto;
     padding-bottom: 0.25rem;
+  }
+
+  .entries-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .entry-skeleton-card {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1.15rem 1.2rem;
+    border-radius: 18px;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    background: rgba(255, 255, 255, 0.84);
+    animation: skeletonLift 0.45s var(--ease-out) both;
+  }
+
+  .entry-skeleton-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  @keyframes skeletonLift {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .accordion-list {
@@ -1382,19 +1461,6 @@
 
   .empty-icon {
     color: var(--border);
-  }
-
-  .spinner {
-    width: 24px;
-    height: 24px;
-    border: 3px solid var(--border);
-    border-top-color: var(--red);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
   }
 
   @media (max-width: 980px) {

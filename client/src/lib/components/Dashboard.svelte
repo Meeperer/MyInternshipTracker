@@ -15,6 +15,7 @@
   let compiling = $state(false);
   let downloading = $state(false);
   let todayEvents = $state([]);
+  let eventsLoading = $state(true);
 
   const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
@@ -51,6 +52,7 @@
   ];
 
   let dashboardMonthLabel = $derived.by(() => formatMonthLabel($selectedMonth || monthValueFromDate()));
+  let dashboardBusy = $derived($progress.loading || $journal.loading);
 
   let monthStats = $derived.by(() => {
     const entries = $journal.entries || [];
@@ -123,7 +125,11 @@
 
   onMount(() => {
     api.get('/compilation/status').then((status) => (compilationStatus = status)).catch(() => {});
-    events.fetchDate(todayString()).then((list) => (todayEvents = list || []));
+    events.fetchDate(todayString())
+      .then((list) => (todayEvents = list || []))
+      .finally(() => {
+        eventsLoading = false;
+      });
   });
 
   $effect(() => {
@@ -171,18 +177,26 @@
   }
 </script>
 
-<div class="dashboard">
-  <header class="dash-header">
+<div class="dashboard" aria-busy={dashboardBusy || eventsLoading}>
+  <header class="dash-header animate-rise rise-1">
     <h1>Internship Tracker</h1>
     <p class="dash-subtitle">{$progress.target_hours}-Hour Compliance System</p>
   </header>
 
-  <div class="quote-card card">
-    <blockquote class="quote-text">"{todayQuote.text}"</blockquote>
-    <cite class="quote-author">- {todayQuote.author}</cite>
+  <div class="quote-card card animate-rise rise-2">
+    {#if dashboardBusy}
+      <div class="quote-skeleton" aria-hidden="true">
+        <div class="skeleton-line long"></div>
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-line short"></div>
+      </div>
+    {:else}
+      <blockquote class="quote-text">"{todayQuote.text}"</blockquote>
+      <cite class="quote-author">- {todayQuote.author}</cite>
+    {/if}
   </div>
 
-  <div class="month-sync card">
+  <div class="month-sync card animate-rise rise-2">
     <div class="month-sync-copy">
       <h3>Selected Month</h3>
       <p class="month-sync-hint">Calendar, dashboard, and journal now follow the same month selection.</p>
@@ -204,26 +218,36 @@
     <p class="month-sync-label">{dashboardMonthLabel} · {monthStats.count} entr{monthStats.count === 1 ? 'y' : 'ies'} · {monthStats.hours} hours</p>
   </div>
 
-  <div class="stats-grid">
-    <div class="stat-card">
-      <span class="stat-value">{$progress.total_hours}</span>
-      <span class="stat-label">Hours Rendered</span>
-    </div>
-    <div class="stat-card">
-      <span class="stat-value">{$progress.remaining_hours}</span>
-      <span class="stat-label">Remaining</span>
-    </div>
-    <div class="stat-card">
-      <span class="stat-value">{$progress.days_completed}</span>
-      <span class="stat-label">Days Completed</span>
-    </div>
-    <div class="stat-card">
-      <span class="stat-value">{$progress.current_streak}</span>
-      <span class="stat-label">Day Streak</span>
-    </div>
+  <div class="stats-grid animate-rise rise-3">
+    {#if dashboardBusy}
+      {#each ['Hours Rendered', 'Remaining', 'Days Completed', 'Day Streak'] as label}
+        <div class="stat-card stat-card-loading" aria-hidden="true">
+          <div class="skeleton-line medium stat-skeleton-value"></div>
+          <div class="skeleton-line short"></div>
+          <span class="sr-only">{label}</span>
+        </div>
+      {/each}
+    {:else}
+      <div class="stat-card">
+        <span class="stat-value">{$progress.total_hours}</span>
+        <span class="stat-label">Hours Rendered</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{$progress.remaining_hours}</span>
+        <span class="stat-label">Remaining</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{$progress.days_completed}</span>
+        <span class="stat-label">Days Completed</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{$progress.current_streak}</span>
+        <span class="stat-label">Day Streak</span>
+      </div>
+    {/if}
   </div>
 
-  <div class="milestone-badge">
+  <div class="milestone-badge animate-rise rise-3">
     <span class="milestone-label">{greetingLabel}</span>
     <span class="milestone-bar">
       <span class="milestone-fill" style="width: {Math.min($progress.percentage, 100)}%"></span>
@@ -231,43 +255,66 @@
     <span class="milestone-pct">{$progress.percentage}%</span>
   </div>
 
-  <div class="insights-card card">
+  <div class="insights-card card animate-rise rise-4">
     <h3>{dashboardMonthLabel} Snapshot</h3>
-    <div class="insights-grid">
-      <div class="insight">
-        <span class="insight-value">{monthInsights.totalHours}h</span>
-        <span class="insight-label">Hours Logged</span>
+    {#if dashboardBusy}
+      <div class="insights-grid" aria-hidden="true">
+        {#each Array.from({ length: 4 }) as _}
+          <div class="insight insight-loading">
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        {/each}
       </div>
-      <div class="insight">
-        <span class="insight-value">{monthInsights.activeDays}</span>
-        <span class="insight-label">Days Active</span>
+      <div class="projection projection-loading" aria-hidden="true">
+        <div class="skeleton-line short"></div>
+        <div class="skeleton-line medium"></div>
       </div>
-      <div class="insight">
-        <span class="insight-value">{monthInsights.finishedDays}</span>
-        <span class="insight-label">Finished Days</span>
+    {:else}
+      <div class="insights-grid">
+        <div class="insight">
+          <span class="insight-value">{monthInsights.totalHours}h</span>
+          <span class="insight-label">Hours Logged</span>
+        </div>
+        <div class="insight">
+          <span class="insight-value">{monthInsights.activeDays}</span>
+          <span class="insight-label">Days Active</span>
+        </div>
+        <div class="insight">
+          <span class="insight-value">{monthInsights.finishedDays}</span>
+          <span class="insight-label">Finished Days</span>
+        </div>
+        <div class="insight">
+          <span class="insight-value">{monthInsights.averagePerActiveDay}h</span>
+          <span class="insight-label">Avg / Active Day</span>
+        </div>
       </div>
-      <div class="insight">
-        <span class="insight-value">{monthInsights.averagePerActiveDay}h</span>
-        <span class="insight-label">Avg / Active Day</span>
-      </div>
-    </div>
-    {#if !$progress.is_completed}
-      <div class="projection">
-        <span class="projection-label">Projected completion</span>
-        <span class="projection-value">{monthInsights.projectedCompletion}</span>
-        <span class="projection-detail">({monthInsights.daysNeeded} working days remaining)</span>
-      </div>
+      {#if !$progress.is_completed}
+        <div class="projection">
+          <span class="projection-label">Projected completion</span>
+          <span class="projection-value">{monthInsights.projectedCompletion}</span>
+          <span class="projection-detail">({monthInsights.daysNeeded} working days remaining)</span>
+        </div>
+      {/if}
     {/if}
   </div>
 
-  <div class="progress-section card">
+  <div class="progress-section card animate-rise rise-4">
     <h3>Progress</h3>
-    <ProgressBar
-      percentage={$progress.percentage}
-      total={$progress.total_hours}
-      target={$progress.target_hours}
-    />
-    <p class="progress-hint">Log hours from the Journal - open a date and use "Log Hours" or "Edit Entry".</p>
+    {#if dashboardBusy}
+      <div class="progress-skeleton" aria-hidden="true">
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-block" style="height: 0.85rem;"></div>
+        <div class="skeleton-line long"></div>
+      </div>
+    {:else}
+      <ProgressBar
+        percentage={$progress.percentage}
+        total={$progress.total_hours}
+        target={$progress.target_hours}
+      />
+      <p class="progress-hint">Log hours from the Journal - open a date and use "Log Hours" or "Edit Entry".</p>
+    {/if}
   </div>
 
   {#if $progress.is_completed}
@@ -286,26 +333,34 @@
     </div>
   {/if}
 
-  {#if todayEvents.length > 0}
-    <div class="today-events card">
+  {#if eventsLoading || todayEvents.length > 0}
+    <div class="today-events card animate-rise rise-5">
       <h3>Today's Events</h3>
-      <ul class="today-events-list">
-        {#each todayEvents as ev}
-          <li class="today-event-item">
-            <span class="today-event-title">{ev.title}</span>
-            {#if formatTimeRange(ev)}
-              <span class="today-event-time">{formatTimeRange(ev)}</span>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-      <button class="btn btn-sm" onclick={() => onNavigateToDate(todayString())}>
-        Open today in Calendar
-      </button>
+      {#if eventsLoading}
+        <div class="today-events-skeleton" aria-hidden="true">
+          <div class="skeleton-line long"></div>
+          <div class="skeleton-line medium"></div>
+          <div class="skeleton-line long"></div>
+        </div>
+      {:else}
+        <ul class="today-events-list">
+          {#each todayEvents as ev}
+            <li class="today-event-item">
+              <span class="today-event-title">{ev.title}</span>
+              {#if formatTimeRange(ev)}
+                <span class="today-event-time">{formatTimeRange(ev)}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        <button class="btn btn-sm" onclick={() => onNavigateToDate(todayString())}>
+          Open today in Calendar
+        </button>
+      {/if}
     </div>
   {/if}
 
-  <div class="quick-access card">
+  <div class="quick-access card animate-rise rise-6">
     <h3>Quick Access</h3>
     <p class="quick-access-hint">Add or edit today's journal and log rendered hours.</p>
     <button class="btn" onclick={() => onNavigateToDate(todayString())}>
@@ -350,6 +405,12 @@
     padding: 1.75rem 2.5rem;
     background: rgba(190, 53, 25, 0.03);
     border: 1px solid rgba(190, 53, 25, 0.1);
+  }
+
+  .quote-skeleton {
+    display: grid;
+    gap: 0.65rem;
+    justify-items: center;
   }
 
   .quote-text {
@@ -452,6 +513,16 @@
     border-color: var(--border);
   }
 
+  .stat-card-loading {
+    gap: 0.75rem;
+    display: grid;
+    justify-items: center;
+  }
+
+  .stat-skeleton-value {
+    min-height: 2.8rem;
+  }
+
   .stat-value {
     display: block;
     font-family: var(--font-display);
@@ -506,6 +577,7 @@
     background: linear-gradient(90deg, var(--red), var(--red-hover));
     border-radius: 3px;
     transition: width 0.7s var(--ease-out);
+    animation: milestoneGlow 1.8s ease-in-out infinite;
   }
 
   .milestone-pct {
@@ -636,6 +708,12 @@
     border-radius: var(--radius);
   }
 
+  .insight-loading {
+    display: grid;
+    gap: 0.5rem;
+    justify-items: center;
+  }
+
   .insight-value {
     display: block;
     font-family: var(--font-display);
@@ -664,6 +742,10 @@
     flex-wrap: wrap;
   }
 
+  .projection-loading {
+    align-items: center;
+  }
+
   .projection-label {
     font-family: var(--font-ui);
     font-size: 0.75rem;
@@ -690,6 +772,23 @@
     flex-direction: column;
     align-items: flex-start;
     padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  }
+
+  .progress-skeleton,
+  .today-events-skeleton {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  @keyframes milestoneGlow {
+    0%, 100% {
+      filter: saturate(1);
+      opacity: 1;
+    }
+    50% {
+      filter: saturate(1.1);
+      opacity: 0.88;
+    }
   }
 
   .quick-access h3 {
