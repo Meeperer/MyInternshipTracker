@@ -23,6 +23,7 @@
     month: 'short',
     day: 'numeric'
   });
+  const PAGE_SIZE = 5;
 
   function formatMonthLabel(monthValue) {
     const { year, month } = parseMonthValue(monthValue);
@@ -75,6 +76,36 @@
     const mins = Math.floor((totalSec % 3600) / 60);
     const secs = totalSec % 60;
     return [hrs, mins, secs].map((n) => String(n).padStart(2, '0')).join(':');
+  }
+
+  function getEntryPreview(entry, maxLength = 200) {
+    const preview = [
+      entry.content_ai_refined,
+      entry.aras_summary,
+      entry.content_raw,
+      entry.aras_action
+    ].find((value) => typeof value === 'string' && value.trim());
+
+    if (!preview) return 'No written content yet.';
+
+    const normalized = preview.trim().replace(/\s+/g, ' ');
+    return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3).trimEnd()}...` : normalized;
+  }
+
+  function buildPageNumbers(totalPages, currentPage, maxVisible = 5) {
+    if (totalPages <= maxVisible) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const halfWindow = Math.floor(maxVisible / 2);
+    let start = Math.max(1, currentPage - halfWindow);
+    let end = Math.min(totalPages, start + maxVisible - 1);
+
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }
 
   function hasSummaryContent(entry) {
@@ -152,16 +183,26 @@
   let summaryResult = $state(null);
   let summaryError = $state('');
   let summaryRequestId = 0;
+  let currentPage = $state(1);
+  let expandedEntryDate = $state('');
 
   let weekOptions = $derived.by(() => getWeekOptions($selectedMonth || monthValueFromDate()));
-  let filtered = $derived.by(() => {
+  let filteredEntries = $derived.by(() => {
     if (!searchQuery.trim()) return $journal.entries;
     const q = searchQuery.toLowerCase();
     return $journal.entries.filter((entry) =>
       (entry.content_raw || '').toLowerCase().includes(q) ||
+      (entry.content_ai_refined || '').toLowerCase().includes(q) ||
+      (entry.aras_summary || '').toLowerCase().includes(q) ||
       (entry.date || '').includes(q)
     );
   });
+  let totalPages = $derived.by(() => Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE)));
+  let paginatedEntries = $derived.by(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredEntries.slice(start, start + PAGE_SIZE);
+  });
+  let visiblePageNumbers = $derived.by(() => buildPageNumbers(totalPages, currentPage));
 
   let monthHours = $derived.by(() =>
     $journal.entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0)
@@ -218,6 +259,18 @@
 
     if (!weekOptions.some((week) => week.key === selectedWeekKey)) {
       selectedWeekKey = weekOptions[0].key;
+    }
+  });
+
+  $effect(() => {
+    `${$selectedMonth}|${searchQuery.trim().toLowerCase()}`;
+    currentPage = 1;
+    expandedEntryDate = '';
+  });
+
+  $effect(() => {
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
     }
   });
 
@@ -329,6 +382,15 @@
     } finally {
       summaryLoading = false;
     }
+  }
+
+  function toggleEntry(entryDate) {
+    expandedEntryDate = expandedEntryDate === entryDate ? '' : entryDate;
+  }
+
+  function goToPage(page) {
+    currentPage = Math.min(totalPages, Math.max(1, page));
+    expandedEntryDate = '';
   }
 </script>
 
@@ -526,52 +588,175 @@
     />
   </div>
 
-  <div class="entries-list" aria-live="polite">
-    {#if $journal.loading}
-      <div class="empty-state">
-        <div class="spinner"></div>
-        <p>Loading {formatMonthLabel($selectedMonth)} entries...</p>
-      </div>
-    {:else if $journal.entries.length === 0}
-      <div class="empty-state card glass-card">
-        <div class="empty-icon" aria-hidden="true">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-          </svg>
-        </div>
-        <p>No journal entries recorded in {formatMonthLabel($selectedMonth)}.</p>
-        <button class="btn btn-sm btn-primary" onclick={openNewEntryForToday}>
-          Create a new entry
-        </button>
-      </div>
-    {:else if filtered.length === 0}
-      <div class="empty-state card glass-card">
-        <p>No entries match "{searchQuery}" in {formatMonthLabel($selectedMonth)}.</p>
-        <button class="btn btn-sm" onclick={() => (searchQuery = '')}>Clear search</button>
-      </div>
-    {:else}
-      {#each filtered as entry}
-        <button class="entry-card" onclick={() => onDateSelect(entry.date)}>
-          <div class="entry-meta">
-            <span class="entry-date">{formatDate(entry.date)}</span>
-            <span class="badge {entry.status === 'finished' ? 'badge-finished' : 'badge-draft'}">
-              {entry.status}
-            </span>
-          </div>
-          <div class="entry-hours">
-            <span class="entry-hours-label">Rendered hours</span>
-            <span class="entry-hours-value">{formatHoursAsHMS(entry.hours)}</span>
-          </div>
-          {#if entry.content_raw}
-            <p class="entry-preview">
-              {entry.content_raw.slice(0, 160)}{entry.content_raw.length > 160 ? '...' : ''}
-            </p>
+  <section class="entries-shell card glass-card" aria-live="polite">
+    <div class="entries-toolbar">
+      <div>
+        <h3>Entries</h3>
+        <p class="entries-summary">
+          {$journal.entries.length} total in {formatMonthLabel($selectedMonth)}
+          {#if !$journal.loading && filteredEntries.length > 0}
+            | Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredEntries.length)} of {filteredEntries.length}
           {/if}
-        </button>
-      {/each}
-    {/if}
-  </div>
+        </p>
+      </div>
+
+      {#if !$journal.loading && filteredEntries.length > 0}
+        <span class="entries-page-indicator">Page {currentPage} of {totalPages}</span>
+      {/if}
+    </div>
+
+    <div class="entries-list">
+      {#if $journal.loading}
+        <div class="empty-state">
+          <div class="spinner"></div>
+          <p>Loading {formatMonthLabel($selectedMonth)} entries...</p>
+        </div>
+      {:else if $journal.entries.length === 0}
+        <div class="empty-state">
+          <div class="empty-icon" aria-hidden="true">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+            </svg>
+          </div>
+          <p>No journal entries recorded in {formatMonthLabel($selectedMonth)}.</p>
+          <button class="btn btn-sm btn-primary" onclick={openNewEntryForToday}>
+            Create a new entry
+          </button>
+        </div>
+      {:else if filteredEntries.length === 0}
+        <div class="empty-state">
+          <p>No entries match "{searchQuery}" in {formatMonthLabel($selectedMonth)}.</p>
+          <button class="btn btn-sm" onclick={() => (searchQuery = '')}>Clear search</button>
+        </div>
+      {:else}
+        <div class="accordion-list">
+          {#each paginatedEntries as entry}
+            <article class:open={expandedEntryDate === entry.date} class="entry-accordion">
+              <button
+                type="button"
+                class="entry-trigger"
+                aria-expanded={expandedEntryDate === entry.date}
+                aria-controls={`journal-entry-${entry.date}`}
+                onclick={() => toggleEntry(entry.date)}
+              >
+                <div class="entry-trigger-main">
+                  <div class="entry-meta">
+                    <span class="entry-date">{formatDate(entry.date)}</span>
+                    <span class="badge {entry.status === 'finished' ? 'badge-finished' : 'badge-draft'}">
+                      {entry.status}
+                    </span>
+                  </div>
+                  <p class="entry-preview">{getEntryPreview(entry)}</p>
+                </div>
+
+                <div class="entry-side">
+                  <div class="entry-hours">
+                    <span class="entry-hours-label">Hours</span>
+                    <span class="entry-hours-value">{formatHoursAsHMS(entry.hours)}</span>
+                  </div>
+                  <span class="entry-expand-icon" aria-hidden="true">
+                    {expandedEntryDate === entry.date ? 'Hide' : 'Open'}
+                  </span>
+                </div>
+              </button>
+
+              {#if expandedEntryDate === entry.date}
+                <div class="entry-panel" id={`journal-entry-${entry.date}`}>
+                  <div class="entry-detail-grid">
+                    {#if entry.content_raw}
+                      <section class="entry-detail-block">
+                        <span class="entry-detail-label">Raw journal</span>
+                        <p>{entry.content_raw}</p>
+                      </section>
+                    {/if}
+
+                    {#if entry.content_ai_refined}
+                      <section class="entry-detail-block">
+                        <span class="entry-detail-label">AI refined</span>
+                        <p>{entry.content_ai_refined}</p>
+                      </section>
+                    {/if}
+                  </div>
+
+                  {#if entry.aras_action || entry.aras_reflection || entry.aras_analysis || entry.aras_summary}
+                    <div class="entry-aras-grid">
+                      {#if entry.aras_action}
+                        <section class="entry-aras-card">
+                          <span class="entry-detail-label">Action</span>
+                          <p>{entry.aras_action}</p>
+                        </section>
+                      {/if}
+                      {#if entry.aras_reflection}
+                        <section class="entry-aras-card">
+                          <span class="entry-detail-label">Reflection</span>
+                          <p>{entry.aras_reflection}</p>
+                        </section>
+                      {/if}
+                      {#if entry.aras_analysis}
+                        <section class="entry-aras-card">
+                          <span class="entry-detail-label">Analysis</span>
+                          <p>{entry.aras_analysis}</p>
+                        </section>
+                      {/if}
+                      {#if entry.aras_summary}
+                        <section class="entry-aras-card">
+                          <span class="entry-detail-label">Summary</span>
+                          <p>{entry.aras_summary}</p>
+                        </section>
+                      {/if}
+                    </div>
+                  {/if}
+
+                  <div class="entry-panel-actions">
+                    <button class="btn btn-sm btn-primary" onclick={() => onDateSelect(entry.date)}>
+                      Open full entry
+                    </button>
+                  </div>
+                </div>
+              {/if}
+            </article>
+          {/each}
+        </div>
+
+        {#if totalPages > 1}
+          <nav class="pagination" aria-label="Journal entry pages">
+            <button
+              type="button"
+              class="pagination-button"
+              onclick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+
+            <div class="pagination-numbers">
+              {#each visiblePageNumbers as page}
+                <button
+                  type="button"
+                  class:active={page === currentPage}
+                  class="pagination-button pagination-number"
+                  onclick={() => goToPage(page)}
+                  aria-current={page === currentPage ? 'page' : undefined}
+                >
+                  {page}
+                </button>
+              {/each}
+            </div>
+
+            <button
+              type="button"
+              class="pagination-button"
+              onclick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </nav>
+        {/if}
+      {/if}
+    </div>
+  </section>
 </div>
 
 <style>
@@ -944,6 +1129,39 @@
     box-shadow: 0 12px 24px rgba(34, 24, 8, 0.04);
   }
 
+  .entries-shell {
+    padding: 1.35rem 1.4rem;
+  }
+
+  .entries-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .entries-toolbar h3 {
+    margin: 0;
+    font-size: 1.35rem;
+  }
+
+  .entries-summary,
+  .entries-page-indicator {
+    margin-top: 0.35rem;
+    font-family: var(--font-ui);
+    font-size: 0.84rem;
+    color: var(--dark-soft);
+  }
+
+  .entries-page-indicator {
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    background: rgba(255, 255, 255, 0.82);
+    white-space: nowrap;
+  }
+
   .entries-list {
     display: flex;
     flex-direction: column;
@@ -954,29 +1172,45 @@
     padding-bottom: 0.25rem;
   }
 
-  .entry-card {
-    display: block;
+  .accordion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .entry-accordion {
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.88);
+    overflow: hidden;
+  }
+
+  .entry-accordion.open {
+    border-color: rgba(190, 53, 25, 0.22);
+    box-shadow: 0 14px 28px rgba(34, 24, 8, 0.06);
+  }
+
+  .entry-trigger {
     width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
     text-align: left;
-    padding: 1.4rem 1.45rem;
-    border-radius: 20px;
-    border: 1px solid rgba(190, 53, 25, 0.1);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 252, 244, 0.86));
-    box-shadow: 0 16px 30px rgba(34, 24, 8, 0.05);
-    cursor: pointer;
-    transition: transform 0.22s var(--ease-out), box-shadow 0.22s var(--ease-out), border-color 0.2s ease;
+    padding: 1.15rem 1.2rem;
+    border: none;
+    background: transparent;
+    color: inherit;
     font-family: inherit;
+    cursor: pointer;
   }
 
-  .entry-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(190, 53, 25, 0.26);
-    box-shadow: 0 22px 40px rgba(190, 53, 25, 0.1);
+  .entry-trigger:hover {
+    background: rgba(255, 247, 240, 0.72);
   }
 
-  .entry-card:active {
-    transform: translateY(0);
+  .entry-trigger-main {
+    min-width: 0;
   }
 
   .entry-meta {
@@ -984,6 +1218,7 @@
     align-items: center;
     gap: 1rem;
     margin-bottom: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .entry-date {
@@ -995,9 +1230,9 @@
 
   .entry-hours {
     display: flex;
-    align-items: baseline;
-    gap: 0.55rem;
-    margin-bottom: 0.55rem;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
     font-family: var(--font-ui);
   }
 
@@ -1014,10 +1249,125 @@
     font-weight: 700;
   }
 
+  .entry-side {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .entry-expand-icon {
+    min-width: 3rem;
+    text-align: right;
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+
   .entry-preview {
+    margin: 0;
     font-size: 0.98rem;
     color: var(--dark-soft);
+    line-height: 1.65;
+  }
+
+  .entry-panel {
+    border-top: 1px solid rgba(190, 53, 25, 0.12);
+    padding: 1.15rem 1.2rem 1.2rem;
+    background: rgba(255, 252, 247, 0.72);
+  }
+
+  .entry-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+  }
+
+  .entry-detail-block,
+  .entry-aras-card {
+    padding: 0.95rem 1rem;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  .entry-detail-block p,
+  .entry-aras-card p {
+    margin: 0;
+    white-space: pre-wrap;
     line-height: 1.7;
+    color: var(--dark);
+  }
+
+  .entry-detail-label {
+    display: inline-block;
+    margin-bottom: 0.55rem;
+    font-family: var(--font-ui);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dark-soft);
+  }
+
+  .entry-aras-grid {
+    margin-top: 0.9rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+  }
+
+  .entry-panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 0.4rem;
+  }
+
+  .pagination-numbers {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .pagination-button {
+    min-height: 40px;
+    padding: 0.55rem 0.9rem;
+    border-radius: 12px;
+    border: 1px solid rgba(190, 53, 25, 0.14);
+    background: rgba(255, 255, 255, 0.84);
+    color: var(--dark);
+    font-family: var(--font-ui);
+    font-size: 0.86rem;
+    font-weight: 600;
+    transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .pagination-button:hover:not(:disabled) {
+    border-color: rgba(190, 53, 25, 0.34);
+    background: white;
+  }
+
+  .pagination-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .pagination-button.active {
+    border-color: var(--red);
+    background: var(--red);
+    color: var(--bg);
   }
 
   .empty-state {
@@ -1080,6 +1430,29 @@
       grid-template-columns: 1fr;
     }
 
+    .entries-toolbar,
+    .pagination {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .entry-trigger {
+      grid-template-columns: 1fr;
+    }
+
+    .entry-side {
+      justify-content: space-between;
+    }
+
+    .entry-hours {
+      align-items: flex-start;
+    }
+
+    .entry-detail-grid,
+    .entry-aras-grid {
+      grid-template-columns: 1fr;
+    }
+
     .journal-hero h2 {
       font-size: 2rem;
     }
@@ -1109,7 +1482,7 @@
       grid-column: 1 / -1;
     }
 
-    .entry-card,
+    .entries-shell,
     .summary-panel,
     .journal-controls {
       padding-left: 1rem;

@@ -94,6 +94,51 @@ function clipText(value, maxLength = 1800) {
     : `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
+function formatRoundedHours(hours) {
+  const normalized = Math.round((Number(hours) || 0) * 10) / 10;
+  return Number.isInteger(normalized) ? String(normalized) : normalized.toFixed(1);
+}
+
+function sanitizeSnippet(value, maxLength = 180) {
+  const normalized = clipText(value, maxLength)
+    .replace(/^Action:\s*/i, '')
+    .replace(/^Reflection:\s*/i, '')
+    .replace(/^Analysis:\s*/i, '')
+    .replace(/^Summary:\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return normalized.replace(/[.;:,!?-]+$/g, '').trim();
+}
+
+function collectUniqueSnippets(candidates, maxItems = 3) {
+  const seen = new Set();
+  const items = [];
+
+  for (const candidate of candidates) {
+    const snippet = sanitizeSnippet(candidate);
+    if (!snippet) continue;
+
+    const key = snippet.toLowerCase();
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    items.push(snippet);
+
+    if (items.length >= maxItems) break;
+  }
+
+  return items;
+}
+
+function joinSnippetList(snippets) {
+  if (snippets.length === 0) return '';
+  if (snippets.length === 1) return `"${snippets[0]}"`;
+  if (snippets.length === 2) return `"${snippets[0]}" and "${snippets[1]}"`;
+  const head = snippets.slice(0, -1).map((snippet) => `"${snippet}"`).join(', ');
+  return `${head}, and "${snippets.at(-1)}"`;
+}
+
 function getEntrySummaryText(entry) {
   const arasParts = [
     entry.aras_action && `Action: ${entry.aras_action}`,
@@ -149,6 +194,36 @@ function buildPeriodSummarySource(entries, maxChars = 16000) {
   };
 }
 
+function buildFallbackPeriodSummary(entries, { startDate, endDate }) {
+  const totalHours = entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
+  const workSnippets = collectUniqueSnippets(entries.map((entry) =>
+    entry.aras_action || entry.aras_summary || entry.content_ai_refined || entry.content_raw
+  ));
+  const learningSnippets = collectUniqueSnippets(entries.map((entry) =>
+    entry.aras_analysis || entry.aras_reflection || entry.aras_summary || entry.content_ai_refined
+  ), 2);
+  const followUpSnippets = collectUniqueSnippets([...entries].reverse().map((entry) =>
+    entry.aras_summary || entry.aras_action || entry.content_ai_refined || entry.content_raw
+  ), 2);
+
+  const firstParagraph = [
+    `From ${startDate} to ${endDate}, ${entries.length} journal entr${entries.length === 1 ? 'y was' : 'ies were'} available with written content, covering ${formatRoundedHours(totalHours)} logged hours.`,
+    workSnippets.length > 0
+      ? `Recorded work in the notes included ${joinSnippetList(workSnippets)}.`
+      : 'The written notes capture the work completed during this period.'
+  ].join(' ');
+
+  const secondParagraph = learningSnippets.length > 0
+    ? `Recurring themes and takeaways mentioned in the entries included ${joinSnippetList(learningSnippets)}.`
+    : 'The entries stay mostly task-focused, with only limited reflection or analysis recorded in the notes.';
+
+  const thirdParagraph = followUpSnippets.length > 0
+    ? `Later entries point toward follow-up work around ${joinSnippetList(followUpSnippets)}.`
+    : 'The available entries do not call out clear blockers or next steps, so the period reads as steady documented progress.';
+
+  return [firstParagraph, secondParagraph, thirdParagraph].join('\n\n');
+}
+
 export async function summarizeJournalPeriod(entries, { period, startDate, endDate }) {
   const { source, usedEntryCount } = buildPeriodSummarySource(entries);
 
@@ -160,12 +235,13 @@ export async function summarizeJournalPeriod(entries, { period, startDate, endDa
     };
   }
 
-  const completion = await withTimeout(groq.chat.completions.create({
-    model: MODEL,
-    messages: [
-      {
-        role: 'system',
-        content: `You are an internship journal summarization assistant.
+  try {
+    const completion = await withTimeout(groq.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You are an internship journal summarization assistant.
 Summarize a user's journal entries for a week or month.
 
 STRICT RULES:
@@ -178,23 +254,33 @@ STRICT RULES:
   2. Key learnings, themes, or patterns
   3. Challenges, follow-up work, or priorities implied by the entries
 - Return ONLY plain text, with no headings or bullet points.`
-      },
-      {
-        role: 'user',
-        content: `Period type: ${period}
+        },
+        {
+          role: 'user',
+          content: `Period type: ${period}
 Date range: ${startDate} to ${endDate}
 
 Journal entries:
 ${source}`
-      }
-    ],
-    temperature: 0.3,
-    max_tokens: 900
-  }));
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 900
+    }));
 
-  return {
-    summary: completion.choices[0].message.content?.trim() || '',
-    tokens: completion.usage?.total_tokens || 0,
-    usedEntryCount
-  };
+    return {
+      summary: completion.choices[0].message.content?.trim() || '',
+      tokens: completion.usage?.total_tokens || 0,
+      usedEntryCount
+    };
+  } catch (error) {
+    console.error('AI period summary fallback:', error);
+
+    return {
+      summary: buildFallbackPeriodSummary(entries, { period, startDate, endDate }),
+      tokens: 0,
+      usedEntryCount,
+      fallback: true
+    };
+  }
 }
