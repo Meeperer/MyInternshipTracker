@@ -27,7 +27,8 @@
     day: 'numeric'
   });
   const PAGE_SIZE = 5;
-  const JOURNAL_PARALLAX_LIMIT = 220;
+  const parallaxTargets = new Map();
+  let scheduleParallaxUpdate = () => {};
 
   function formatMonthLabel(monthValue) {
     const { year, month } = parseMonthValue(monthValue);
@@ -228,8 +229,37 @@
   let searchInputEl = $state(null);
   let summaryLibrarySectionEl = $state(null);
   let summaryLibraryHydrated = $state(false);
-  let journalScrollDepth = $state(0);
-  let journalScrollProgress = $state(0);
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function registerParallax(node, config = {}) {
+    parallaxTargets.set(node, {
+      depth: 1,
+      blur: 0,
+      start: 0.92,
+      ...config
+    });
+
+    queueMicrotask(() => scheduleParallaxUpdate());
+
+    return {
+      update(nextConfig = {}) {
+        parallaxTargets.set(node, {
+          depth: 1,
+          blur: 0,
+          start: 0.92,
+          ...nextConfig
+        });
+        scheduleParallaxUpdate();
+      },
+      destroy() {
+        parallaxTargets.delete(node);
+        scheduleParallaxUpdate();
+      }
+    };
+  }
 
   let weekOptions = $derived.by(() => getWeekOptions($selectedMonth || monthValueFromDate()));
   let filteredEntries = $derived.by(() => {
@@ -475,23 +505,45 @@
     const host = document.querySelector('main#main-content');
     let frame = 0;
 
-    // Respect reduced motion by collapsing the parallax offsets back to zero.
     const updateParallax = () => {
       frame = 0;
 
       if (motionQuery.matches) {
-        journalScrollDepth = 0;
-        journalScrollProgress = 0;
+        for (const node of parallaxTargets.keys()) {
+          node.style.setProperty('--approach-y', '0px');
+          node.style.setProperty('--approach-z', '0px');
+          node.style.setProperty('--approach-scale', '1');
+          node.style.setProperty('--approach-opacity', '1');
+          node.style.setProperty('--approach-blur', '0px');
+        }
         return;
       }
 
-      const scrollTop = host ? host.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0);
-      const maxScroll = host
-        ? Math.max(host.scrollHeight - host.clientHeight, 1)
-        : Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+      const viewportHeight = host ? host.clientHeight : window.innerHeight;
 
-      journalScrollDepth = Math.min(scrollTop, JOURNAL_PARALLAX_LIMIT);
-      journalScrollProgress = Math.min(Math.max(scrollTop / maxScroll, 0), 1);
+      for (const [node, config] of parallaxTargets.entries()) {
+        if (!node.isConnected) {
+          parallaxTargets.delete(node);
+          continue;
+        }
+
+        const rect = node.getBoundingClientRect();
+        const start = viewportHeight * config.start;
+        const end = -Math.min(rect.height * 0.34, viewportHeight * 0.24);
+        const progress = clamp((start - rect.top) / (start - end), 0, 1);
+        const depth = config.depth;
+        const travelY = ((1 - progress) * (24 + depth * 10)) - (depth * 5.5);
+        const travelZ = -16 + (progress * (20 + depth * 6));
+        const scale = 0.978 + (progress * 0.028) + (depth * 0.0025);
+        const opacity = 0.5 + (progress * 0.5);
+        const blur = (1 - progress) * config.blur;
+
+        node.style.setProperty('--approach-y', `${travelY.toFixed(2)}px`);
+        node.style.setProperty('--approach-z', `${travelZ.toFixed(2)}px`);
+        node.style.setProperty('--approach-scale', scale.toFixed(4));
+        node.style.setProperty('--approach-opacity', opacity.toFixed(4));
+        node.style.setProperty('--approach-blur', `${blur.toFixed(2)}px`);
+      }
     };
 
     const queueUpdate = () => {
@@ -499,6 +551,7 @@
       frame = window.requestAnimationFrame(updateParallax);
     };
 
+    scheduleParallaxUpdate = queueUpdate;
     updateParallax();
     host?.addEventListener('scroll', queueUpdate, { passive: true });
     window.addEventListener('resize', queueUpdate, { passive: true });
@@ -512,6 +565,7 @@
     return () => {
       host?.removeEventListener('scroll', queueUpdate);
       window.removeEventListener('resize', queueUpdate);
+      scheduleParallaxUpdate = () => {};
 
       if (typeof motionQuery.removeEventListener === 'function') {
         motionQuery.removeEventListener('change', queueUpdate);
@@ -721,12 +775,11 @@
   }
 </script>
 
-<div
-  class="journal-view"
-  style={`--journal-depth: ${journalScrollDepth}px; --journal-progress: ${journalScrollProgress.toFixed(4)};`}
-  aria-busy={$journal.loading || summaryLoading}
->
-  <section class="journal-hero journal-layer journal-layer-hero animate-rise rise-1">
+<div class="journal-view" aria-busy={$journal.loading || summaryLoading}>
+  <section
+    class="journal-hero journal-parallax animate-rise rise-1"
+    use:registerParallax={{ depth: 0.38, blur: 1.4, start: 0.96 }}
+  >
     <div class="journal-hero-copy">
       <span class="eyebrow">Journal workspace</span>
       <h2>Journal Entries</h2>
@@ -755,26 +808,26 @@
     </div>
   </section>
 
-  <section class="overview-strip journal-layer journal-layer-overview animate-rise rise-2">
-    <article class="overview-card">
+  <section class="overview-strip animate-rise rise-2">
+    <article class="overview-card journal-parallax" use:registerParallax={{ depth: 0.72, blur: 1.1, start: 1 }}>
       <span class="overview-label">Selected month</span>
       <strong>{formatMonthLabel($selectedMonth)}</strong>
       <p>{$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'} tracked</p>
     </article>
-    <article class="overview-card">
+    <article class="overview-card journal-parallax" use:registerParallax={{ depth: 0.88, blur: 1.1, start: 1 }}>
       <span class="overview-label">Hours logged</span>
       <strong>{formatHoursValue(monthHours)}</strong>
       <p>Across the current month</p>
     </article>
-    <article class="overview-card">
+    <article class="overview-card journal-parallax" use:registerParallax={{ depth: 1.04, blur: 1.1, start: 1 }}>
       <span class="overview-label">Finished days</span>
       <strong>{monthFinishedCount}</strong>
       <p>Locked and completed</p>
     </article>
   </section>
 
-  <section class="insights-grid journal-layer journal-layer-insights animate-rise rise-3">
-    <article class="insights-panel card glass-card">
+  <section class="insights-grid animate-rise rise-3">
+    <article class="insights-panel card glass-card journal-parallax" use:registerParallax={{ depth: 0.92, blur: 1.35, start: 0.98 }}>
       <div class="panel-header">
         <div>
           <span class="panel-kicker">Recurring themes</span>
@@ -799,7 +852,7 @@
       {/if}
     </article>
 
-    <article class="insights-panel card glass-card">
+    <article class="insights-panel card glass-card journal-parallax" use:registerParallax={{ depth: 1.05, blur: 1.35, start: 0.98 }}>
       <div class="panel-header">
         <div>
           <span class="panel-kicker">Mood + workload</span>
@@ -830,7 +883,7 @@
       {/if}
     </article>
 
-    <article class="insights-panel card glass-card">
+    <article class="insights-panel card glass-card journal-parallax" use:registerParallax={{ depth: 1.18, blur: 1.45, start: 0.98 }}>
       <div class="panel-header">
         <div>
           <span class="panel-kicker">Top wins</span>
@@ -854,7 +907,7 @@
       {/if}
     </article>
 
-    <article class="insights-panel card glass-card">
+    <article class="insights-panel card glass-card journal-parallax" use:registerParallax={{ depth: 1.28, blur: 1.45, start: 0.98 }}>
       <div class="panel-header">
         <div>
           <span class="panel-kicker">Blockers</span>
@@ -879,7 +932,7 @@
     </article>
   </section>
 
-  <section class="workspace-grid journal-layer journal-layer-workspace animate-rise rise-4">
+  <section class="workspace-grid animate-rise rise-4">
     <div class="journal-controls card glass-card">
       <div class="panel-header">
         <div>
@@ -1030,7 +1083,7 @@
     </div>
   </section>
 
-  <section class="summary-library-shell journal-layer journal-layer-library card glass-card animate-rise rise-5" bind:this={summaryLibrarySectionEl}>
+  <section class="summary-library-shell card glass-card animate-rise rise-5" bind:this={summaryLibrarySectionEl}>
     <div class="summary-library-header">
       <div>
         <span class="panel-kicker">Summary library</span>
@@ -1092,7 +1145,7 @@
     {/if}
   </section>
 
-  <div class="search-shell journal-layer journal-layer-search animate-rise rise-6">
+  <div class="search-shell animate-rise rise-6">
     <input
       bind:this={searchInputEl}
       class="input search-input"
@@ -1103,7 +1156,7 @@
     />
   </div>
 
-  <section class="entries-shell journal-layer journal-layer-entries card glass-card animate-rise rise-6" aria-live="polite">
+  <section class="entries-shell card glass-card animate-rise rise-6" aria-live="polite">
     <div class="entries-toolbar">
       <div>
         <h3>Entries</h3>
@@ -1354,8 +1407,6 @@
 
 <style>
   .journal-view {
-    --journal-depth: 0px;
-    --journal-progress: 0;
     flex: 1;
     min-height: auto;
     max-width: 1120px;
@@ -1366,51 +1417,24 @@
     flex-direction: column;
     gap: 1.1rem;
     overflow: visible;
+    perspective: 1400px;
+    transform-style: preserve-3d;
   }
 
-  .journal-layer {
-    position: relative;
-    will-change: transform;
-    transition: transform 140ms linear;
-  }
-
-  .journal-layer-hero {
-    position: sticky;
-    top: 1rem;
-    z-index: 7;
+  .journal-parallax {
+    --approach-y: 0px;
+    --approach-z: 0px;
+    --approach-scale: 1;
+    --approach-opacity: 1;
+    --approach-blur: 0px;
     transform:
-      translate3d(0, calc(var(--journal-depth) * -0.028), 0)
-      scale(calc(1 - (var(--journal-progress) * 0.015)));
-  }
-
-  .journal-layer-overview {
-    z-index: 6;
-    transform: translate3d(0, calc(var(--journal-depth) * 0.01), 0);
-  }
-
-  .journal-layer-insights {
-    z-index: 5;
-    transform: translate3d(0, calc(var(--journal-depth) * 0.018), 0);
-  }
-
-  .journal-layer-workspace {
-    z-index: 4;
-    transform: translate3d(0, calc(var(--journal-depth) * 0.026), 0);
-  }
-
-  .journal-layer-library {
-    z-index: 3;
-    transform: translate3d(0, calc(var(--journal-depth) * 0.034), 0);
-  }
-
-  .journal-layer-search {
-    z-index: 2;
-    transform: translate3d(0, calc(var(--journal-depth) * 0.042), 0);
-  }
-
-  .journal-layer-entries {
-    z-index: 1;
-    transform: translate3d(0, calc(var(--journal-depth) * 0.05), 0);
+      translate3d(0, var(--approach-y), var(--approach-z))
+      scale(var(--approach-scale));
+    transform-origin: center top;
+    opacity: var(--approach-opacity);
+    filter: blur(var(--approach-blur));
+    will-change: transform, opacity, filter;
+    backface-visibility: hidden;
   }
 
   .journal-hero {
@@ -1514,30 +1538,10 @@
     gap: 1rem;
   }
 
-  .overview-card:nth-child(1) {
-    transform: translate3d(0, calc(var(--journal-depth) * 0.01), 0);
-  }
-
-  .overview-card:nth-child(2) {
-    transform: translate3d(0, calc(var(--journal-depth) * -0.012), 0);
-  }
-
-  .overview-card:nth-child(3) {
-    transform: translate3d(0, calc(var(--journal-depth) * 0.014), 0);
-  }
-
   .insights-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
-  }
-
-  .insights-panel:nth-child(odd) {
-    transform: translate3d(0, calc(var(--journal-depth) * 0.01), 0);
-  }
-
-  .insights-panel:nth-child(even) {
-    transform: translate3d(0, calc(var(--journal-depth) * -0.008), 0);
   }
 
   .insights-panel {
@@ -2455,15 +2459,10 @@
       padding: 2.25rem 1.75rem 3rem;
     }
 
-    .journal-layer,
-    .overview-card,
-    .insights-panel {
+    .journal-parallax {
       transform: none !important;
-    }
-
-    .journal-layer-hero {
-      position: relative;
-      top: auto;
+      filter: none !important;
+      opacity: 1 !important;
     }
 
     .journal-hero,
@@ -2676,10 +2675,10 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .journal-layer,
-    .overview-card,
-    .insights-panel {
+    .journal-parallax {
       transform: none !important;
+      filter: none !important;
+      opacity: 1 !important;
       transition: none;
       will-change: auto;
     }
