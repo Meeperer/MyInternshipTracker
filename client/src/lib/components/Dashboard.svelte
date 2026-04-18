@@ -12,15 +12,6 @@
 
   const HOURS_MILESTONES = [100, 250, 400, 486];
   const STREAK_MILESTONES = [3, 7, 14];
-  const QUOTES = [
-    { text: 'The secret of getting ahead is getting started.', author: 'Mark Twain' },
-    { text: "It always seems impossible until it's done.", author: 'Nelson Mandela' },
-    { text: 'Small daily improvements are the key to staggering long-term results.', author: 'Robin Sharma' },
-    { text: 'Success is the sum of small efforts repeated day in and day out.', author: 'Robert Collier' },
-    { text: 'Discipline is the bridge between goals and accomplishment.', author: 'Jim Rohn' },
-    { text: 'What you do today can improve all your tomorrows.', author: 'Ralph Marston' },
-    { text: 'Start where you are. Use what you have. Do what you can.', author: 'Arthur Ashe' }
-  ];
 
   let compilationStatus = $state(null);
   let compiling = $state(false);
@@ -145,10 +136,6 @@
   let targetHours = $derived($progress.target_hours || 486);
   let dashboardBusy = $derived($progress.loading || $journal.loading);
   let dashboardMonthLabel = $derived.by(() => formatMonthLabel($selectedMonth || monthValueFromDate()));
-  let todayQuote = $derived.by(() => {
-    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
-    return QUOTES[dayOfYear % QUOTES.length];
-  });
 
   let monthStats = $derived.by(() => {
     const entries = $journal.entries || [];
@@ -322,17 +309,7 @@
     </div>
   </header>
 
-  <section class="quote-panel card animate-rise rise-2" aria-labelledby="dashboard-quote-heading">
-    <div class="quote-shell">
-      <h2 id="dashboard-quote-heading" class="quote-heading">Today&apos;s quote</h2>
-      <blockquote id="dashboard-quote-text">
-        <p>{todayQuote.text}</p>
-      </blockquote>
-      <cite>{todayQuote.author}</cite>
-    </div>
-  </section>
-
-  <section class="dashboard-main animate-rise rise-3" aria-label="Progress overview">
+  <section class="dashboard-main animate-rise rise-2" aria-label="Progress overview">
     <article class="trajectory-panel card" aria-labelledby="trajectory-title">
       <header class="panel-head panel-head-split">
         <div>
@@ -406,7 +383,7 @@
     </article>
   </section>
 
-  <section class="support-grid animate-rise rise-4" aria-label="Dashboard details">
+  <section class="support-grid animate-rise rise-3" aria-label="Dashboard details">
     <div class="accordion-stack">
       <article class="accordion-card card">
         <button type="button" class="accordion-trigger" onclick={(event) => openDashboardModal('month', event.currentTarget)}>
@@ -776,53 +753,10 @@
     box-shadow: 0 0 0 3px rgba(190, 53, 25, 0.12);
   }
 
-  .quote-panel,
   .dashboard-main,
   .support-grid {
     position: relative;
   }
-
-  .quote-panel {
-    text-align: center;
-    padding-block: 0.7rem;
-  }
-
-  .quote-shell {
-    display: grid;
-    justify-items: center;
-    gap: 0.28rem;
-    min-height: 5.35rem;
-    align-content: center;
-  }
-
-  .quote-heading {
-    margin: 0;
-    font-family: var(--font-ui);
-    font-size: 0.94rem;
-    font-weight: 600;
-    color: var(--red);
-  }
-
-  .quote-panel blockquote {
-    margin: 0;
-    max-width: 44rem;
-    font-family: var(--font-display);
-    font-size: clamp(1.25rem, 2vw, 1.7rem);
-    line-height: 1.32;
-    color: var(--red);
-  }
-
-  .quote-panel blockquote p {
-    margin: 0;
-  }
-
-  .quote-panel cite {
-    font-family: var(--font-ui);
-    font-size: 0.82rem;
-    font-style: normal;
-    color: var(--dark-muted);
-  }
-
   .panel-head h2,
   .milestone-card h3,
   .dashboard-header-copy h1 {
@@ -1302,12 +1236,6 @@
     to {
       opacity: 1;
       transform: translateY(0);
-    }
-  }
-
-  @media (max-width: 1100px) {
-    .quote-panel blockquote {
-      max-width: 38rem;
     }
   }
 
