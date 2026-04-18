@@ -679,10 +679,10 @@
 
 <style>
   .dashboard {
-    width: min(1240px, calc(100vw - 2rem));
+    width: calc(100% - 0.75rem);
     margin: 0 auto;
     min-height: calc(100dvh - 6rem);
-    padding: clamp(0.95rem, 1.8vw, 1.45rem) clamp(1rem, 1.8vw, 1.5rem) clamp(1.35rem, 3vw, 2rem);
+    padding: clamp(0.9rem, 1.6vw, 1.35rem) clamp(0.85rem, 1.2vw, 1rem) clamp(1.35rem, 3vw, 2rem);
     display: flex;
     flex-direction: column;
     gap: 0.85rem;
@@ -1162,7 +1162,7 @@
 
   @media (max-width: 760px) {
     .dashboard {
-      width: calc(100vw - 1rem);
+      width: calc(100% - 0.75rem);
       padding-inline: 0.75rem;
     }
 
