@@ -214,7 +214,7 @@
               onclick={() => openDate(cell.date)}
               onmouseenter={(e) => handleCellMouseEnter(e, cell)}
               onmouseleave={handleCellMouseLeave}
-              aria-label="{cell.date}"
+              aria-label={cell.date}
             >
               <span class="calendar-day-number">{String(cell.day).padStart(2, '0')}</span>
               <span class="calendar-cell-indicators" aria-hidden="true">
@@ -836,6 +836,237 @@
     }
     .calendar-nav-btn {
       font-size: 2.25rem;
+    }
+  }
+
+  /* Simpler calendar pass */
+  .calendar-layout {
+    align-items: center;
+    gap: 1.5rem;
+    max-width: 76rem;
+    padding: 1.25rem 2rem 2rem;
+  }
+
+  .calendar-month-display {
+    flex: 0 0 18rem;
+    width: 18rem;
+    min-width: 18rem;
+    justify-content: flex-start;
+  }
+
+  .calendar-layout-divider {
+    display: none;
+  }
+
+  .calendar-month-name {
+    font-size: clamp(6rem, 12vw, 9rem);
+    line-height: 0.9;
+  }
+
+  .calendar-year {
+    font-size: clamp(2.4rem, 5vw, 3.6rem);
+    margin-top: 0.1rem;
+  }
+
+  .calendar-grid-wrap {
+    flex: 1 1 auto;
+    width: min(34rem, 100%);
+    min-width: 0;
+    gap: 0.85rem;
+  }
+
+  .calendar-nav {
+    position: static;
+    transform: none;
+    gap: 0.65rem;
+    justify-content: flex-end;
+    margin-top: 0.15rem;
+    font-size: 1rem;
+  }
+
+  .calendar-nav-btn {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    border: 1px solid rgba(190, 53, 25, 0.14);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 1.25rem;
+  }
+
+  .calendar-nav-btn:hover {
+    transform: none;
+    background: rgba(190, 53, 25, 0.06);
+  }
+
+  .calendar-days-row {
+    min-height: 2.3rem;
+    font-size: 1.35rem;
+    letter-spacing: 0.08em;
+  }
+
+  .calendar-dates {
+    height: auto;
+    min-height: 0;
+    gap: 0.25rem;
+    font-size: 1.65rem;
+    letter-spacing: 0;
+  }
+
+  .calendar-date-cell {
+    aspect-ratio: 1 / 0.88;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0.22rem;
+    padding: 0.35rem 0.4rem;
+    background: transparent;
+    border: none;
+    border-radius: 12px;
+    box-shadow: none;
+    transition: background var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+  }
+
+  .calendar-date-cell:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: transparent;
+    background: rgba(190, 53, 25, 0.05);
+  }
+
+  .calendar-date-cell.has-entry,
+  .calendar-date-cell.has-content,
+  .calendar-date-cell.has-events {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .calendar-date-cell.today {
+    background: rgba(190, 53, 25, 0.08);
+    text-decoration: none;
+  }
+
+  .calendar-date-cell.checked {
+    background: rgba(45, 122, 58, 0.08);
+    border-color: transparent;
+  }
+
+  .calendar-date-cell.selected {
+    background: rgba(190, 53, 25, 0.12);
+    box-shadow: none;
+    transform: none;
+  }
+
+  .calendar-date-cell.other-month {
+    opacity: 0.48;
+  }
+
+  .calendar-date-cell.past:not(.selected):not(.today) {
+    opacity: 0.72;
+  }
+
+  .calendar-day-number {
+    font-size: 1em;
+  }
+
+  .calendar-cell-indicators {
+    gap: 0.2rem;
+    min-height: 0.45rem;
+  }
+
+  .calendar-cell-dot {
+    width: 0.28rem;
+    height: 0.28rem;
+    background: rgba(190, 53, 25, 0.44);
+  }
+
+  .calendar-cell-dot-event {
+    background: rgba(184, 134, 11, 0.75);
+  }
+
+  .calendar-footer {
+    margin-top: 0.25rem;
+    align-items: center;
+  }
+
+  .calendar-month-stats {
+    font-size: 0.78rem;
+  }
+
+  .streak-badge {
+    animation: none;
+  }
+
+  @media (max-width: 1100px) {
+    .calendar-layout {
+      padding: 1.15rem 1.5rem 1.75rem;
+    }
+
+    .calendar-month-display {
+      flex-basis: 15rem;
+      width: 15rem;
+      min-width: 15rem;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .calendar-layout {
+      gap: 1rem;
+      padding: 1rem 1.25rem 1.5rem;
+    }
+
+    .calendar-month-display {
+      align-items: flex-start;
+      width: 100%;
+      min-width: 0;
+      flex: 0 0 auto;
+    }
+
+    .calendar-grid-wrap {
+      width: 100%;
+    }
+
+    .calendar-dates {
+      font-size: clamp(1.1rem, 3vw, 1.45rem);
+    }
+
+    .calendar-footer {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.65rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .calendar-layout {
+      padding: 0.9rem 0.9rem 1.25rem;
+    }
+
+    .calendar-month-name {
+      font-size: clamp(4.4rem, 17vw, 6rem);
+    }
+
+    .calendar-year {
+      font-size: clamp(1.6rem, 7vw, 2.2rem);
+    }
+
+    .calendar-days-row {
+      min-height: 1.8rem;
+      font-size: 0.95rem;
+    }
+
+    .calendar-dates {
+      gap: 0.18rem;
+      font-size: clamp(0.92rem, 3.6vw, 1.12rem);
+    }
+
+    .calendar-date-cell {
+      padding: 0.2rem 0.25rem;
+      border-radius: 8px;
+    }
+
+    .calendar-footer {
+      flex-direction: column;
+      align-items: flex-start;
     }
   }
 </style>

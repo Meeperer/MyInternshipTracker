@@ -1298,4 +1298,86 @@
       flex-wrap: wrap;
     }
   }
+
+  /* Flatter dashboard pass */
+  .dashboard {
+    max-width: 1080px;
+    margin: 0 auto;
+    width: 100%;
+    padding: clamp(1.5rem, 2.6vw, 2.35rem) clamp(1.25rem, 2.8vw, 2.2rem) clamp(2rem, 3.5vw, 2.8rem);
+    gap: clamp(1rem, 2vw, 1.55rem);
+  }
+
+  .dash-header h1 {
+    font-size: clamp(2.15rem, 4.2vw, 3.35rem);
+  }
+
+  .quote-card,
+  .month-sync,
+  .progress-orbit,
+  .milestone-shelf,
+  .stat-card,
+  .milestone-badge,
+  .insights-card,
+  .progress-section,
+  .today-events,
+  .quick-access,
+  .celebration-modal {
+    background: rgba(255, 254, 248, 0.96);
+  }
+
+  .quote-card {
+    padding: 1.3rem 1.7rem;
+  }
+
+  .month-sync,
+  .progress-orbit,
+  .milestone-shelf,
+  .insights-card,
+  .progress-section,
+  .today-events,
+  .quick-access {
+    padding: 1.25rem 1.35rem;
+  }
+
+  .progress-hero {
+    gap: 1rem;
+  }
+
+  .progress-orbit,
+  .milestone-shelf {
+    background: rgba(255, 254, 248, 0.96);
+  }
+
+  .progress-ring-shell {
+    width: 156px;
+    height: 156px;
+  }
+
+  .progress-ring-value {
+    filter: none;
+  }
+
+  .milestone-card {
+    border-radius: 14px;
+  }
+
+  .milestone-card.reached {
+    background: rgba(45, 122, 58, 0.07);
+  }
+
+  .milestone-fill {
+    background: var(--red);
+    animation: none;
+  }
+
+  .celebration-modal {
+    background: rgba(255, 254, 248, 0.98);
+  }
+
+  @media (max-width: 992px) {
+    .dashboard {
+      padding: 1.4rem 1.25rem 2.2rem;
+    }
+  }
 </style>

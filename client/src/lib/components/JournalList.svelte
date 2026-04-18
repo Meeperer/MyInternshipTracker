@@ -546,13 +546,14 @@
   }
 
   function openSummaryModal(summary = summaryResult) {
-    if (!summary?.summary) return;
+    const resolvedSummary = summary?.summary ? summary : summaryResult;
+    if (!resolvedSummary?.summary) return;
     summaryModalPreviousFocus = typeof document !== 'undefined' ? document.activeElement : null;
     modalSummary = {
-      ...summary,
-      label: getSummaryLabel(summary)
+      ...resolvedSummary,
+      label: getSummaryLabel(resolvedSummary)
     };
-    typedSummaryText = prefersReducedMotion() ? summary.summary : '';
+    typedSummaryText = prefersReducedMotion() ? resolvedSummary.summary : '';
     summaryTypingActive = !prefersReducedMotion();
     showSummaryModal = true;
   }
@@ -933,7 +934,7 @@
           <button
             type="button"
             class="btn btn-sm btn-primary summary-open-button"
-            onclick={openSummaryModal}
+            onclick={() => openSummaryModal(summaryResult)}
             aria-haspopup="dialog"
           >
             See summarized {formatSummaryPeriodLabel(summaryResult.period)}
@@ -2438,6 +2439,98 @@
     .summary-modal-body {
       min-height: 12rem;
       padding: 1rem;
+    }
+  }
+
+  /* Flatter journal pass */
+  .journal-view {
+    max-width: 1040px;
+    padding-top: 2.1rem;
+    gap: 1rem;
+  }
+
+  .journal-hero {
+    padding: 1.25rem 1.35rem;
+    border-radius: 18px;
+    background: rgba(255, 254, 248, 0.96);
+    box-shadow: 0 10px 20px rgba(34, 24, 8, 0.04);
+  }
+
+  .journal-hero h2 {
+    font-size: clamp(1.9rem, 3vw, 2.45rem);
+  }
+
+  .overview-card,
+  .glass-card,
+  .summary-state,
+  .summary-result,
+  .summary-library-item,
+  .entry-accordion,
+  .entry-panel,
+  .entry-detail-block,
+  .entry-aras-card {
+    background: rgba(255, 254, 248, 0.94);
+  }
+
+  .glass-card {
+    border-radius: 18px;
+    background: rgba(255, 254, 248, 0.96);
+    box-shadow: 0 12px 24px rgba(34, 24, 8, 0.05);
+    backdrop-filter: none;
+  }
+
+  .trend-bar-fill,
+  .period-toggle button.active {
+    background: var(--red);
+    box-shadow: none;
+  }
+
+  .insight-note-win {
+    background: rgba(45, 122, 58, 0.07);
+  }
+
+  .insight-note-blocker {
+    background: rgba(190, 53, 25, 0.05);
+  }
+
+  .summary-library-item.pinned {
+    background: rgba(184, 134, 11, 0.08);
+  }
+
+  .summary-panel,
+  .journal-controls,
+  .entries-shell,
+  .summary-library-shell {
+    padding: 1.15rem 1.2rem;
+  }
+
+  .summary-open-button {
+    min-height: 44px;
+  }
+
+  .summary-modal-overlay {
+    padding: 0.85rem;
+  }
+
+  .summary-modal {
+    width: min(760px, calc(100vw - 1.7rem));
+    max-height: calc(100vh - 1.7rem);
+    border-radius: 18px;
+  }
+
+  .summary-modal-body {
+    max-height: min(52vh, 28rem);
+    min-height: 11rem;
+  }
+
+  @media (max-width: 768px) {
+    .journal-view {
+      padding-top: 1.6rem;
+    }
+
+    .summary-modal {
+      width: min(100vw - 1rem, 100%);
+      padding: 1.2rem;
     }
   }
 </style>
