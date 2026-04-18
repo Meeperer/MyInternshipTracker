@@ -410,10 +410,13 @@
   .calendar-view-old {
     width: 100%;
     flex: 1;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
-    height: 100%;
+    height: calc(100dvh - 8.6rem);
+    min-height: calc(100dvh - 8.6rem);
     overflow: hidden;
-    padding: clamp(0.9rem, 1.7vw, 1.5rem);
+    padding: clamp(0.65rem, 1.2vw, 1rem);
   }
 
   .calendar-layout {
@@ -422,6 +425,7 @@
     gap: clamp(0.6rem, 1.1vw, 1rem);
     width: 100%;
     height: 100%;
+    flex: 1;
     min-height: 0;
   }
 
@@ -505,6 +509,7 @@
 
   .calendar-grid-wrap {
     min-height: 0;
+    height: 100%;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     animation: calendarGridIn 0.55s 0.1s var(--ease-out) both;
@@ -544,6 +549,7 @@
 
   .calendar-dates {
     min-height: 0;
+    height: 100%;
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     grid-template-rows: repeat(6, minmax(0, 1fr));
@@ -573,7 +579,7 @@
     align-items: stretch;
     justify-content: space-between;
     gap: 0.25rem;
-    padding: 0.36rem 0.45rem 0.4rem;
+    padding: 0.42rem 0.5rem 0.5rem;
     background: transparent;
     color: var(--red);
     text-align: left;
@@ -622,7 +628,7 @@
   }
 
   .calendar-cell-meta {
-    max-width: 11ch;
+    max-width: 14ch;
     font-family: var(--font-body);
     font-size: clamp(0.62rem, 0.9vw, 0.78rem);
     line-height: 1.35;
@@ -675,7 +681,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    min-height: 2rem;
+    min-height: 2.2rem;
     animation: calendarGridIn 0.55s 0.16s var(--ease-out) both;
   }
 
@@ -772,7 +778,9 @@
 
   @media (max-width: 920px) {
     .calendar-view-old {
-      padding: 0.8rem;
+      height: calc(100dvh - 9.4rem);
+      min-height: calc(100dvh - 9.4rem);
+      padding: 0.7rem;
     }
 
     .calendar-month-name {
@@ -791,6 +799,11 @@
   }
 
   @media (max-width: 720px) {
+    .calendar-view-old {
+      height: calc(100dvh - 10rem);
+      min-height: calc(100dvh - 10rem);
+    }
+
     .calendar-layout {
       gap: 0.5rem;
     }
@@ -827,7 +840,9 @@
 
   @media (max-width: 560px) {
     .calendar-view-old {
-      padding: 0.65rem;
+      height: calc(100dvh - 10.6rem);
+      min-height: calc(100dvh - 10.6rem);
+      padding: 0.55rem;
     }
 
     .calendar-month-display {
