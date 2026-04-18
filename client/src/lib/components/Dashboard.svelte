@@ -1,14 +1,14 @@
 <script>
+  import { goto } from '$app/navigation';
   import { onMount, tick } from 'svelte';
   import { progress } from '$stores/progress.js';
   import { journal } from '$stores/journal.js';
   import { events } from '$stores/events.js';
+  import { appCommands } from '$stores/appCommands.js';
   import { selectedMonth } from '$stores/selectedMonth.js';
   import { toast } from '$stores/toast.js';
   import { monthValueFromDate, parseMonthValue, todayString } from '$utils/date.js';
   import { api } from '$utils/api.js';
-
-  let { onNavigateToDate = () => {} } = $props();
 
   const HOURS_MILESTONES = [100, 250, 400, 486];
   const STREAK_MILESTONES = [3, 7, 14];
@@ -40,15 +40,6 @@
   function formatMonthLabel(monthValue) {
     const { year, month } = parseMonthValue(monthValue);
     return MONTH_LABEL_FORMATTER.format(new Date(year, (month || 1) - 1, 1));
-  }
-
-  function formatTimeRange(ev) {
-    const start = ev.start_time?.slice(0, 5);
-    const end = ev.end_time?.slice(0, 5);
-    if (start && end) return `${start} - ${end}`;
-    if (start) return start;
-    if (end) return `until ${end}`;
-    return '';
   }
 
   function formatHours(value) {
@@ -84,6 +75,17 @@
 
   function shiftSelectedMonth(delta) {
     selectedMonth.shift(delta);
+  }
+
+  async function openTodayJournalEntry() {
+    const today = todayString();
+    selectedMonth.setFromDate(today);
+    appCommands.queue({
+      id: `open-journal-date-${Date.now()}`,
+      type: 'open-journal-date',
+      date: today
+    });
+    await goto('/journal');
   }
 
   async function openDashboardModal(panel, trigger) {
@@ -296,7 +298,7 @@
 <div class="dashboard" aria-busy={dashboardBusy || eventsLoading}>
   <header class="dashboard-header animate-rise rise-1">
     <div class="dashboard-header-copy">
-      <h1 class="sr-only">Dashboard</h1>
+      <h1>Dashboard</h1>
       <p>{dashboardMonthLabel}. {$progress.total_hours} of {targetHours} hours logged, {$progress.remaining_hours} remaining.</p>
     </div>
 
@@ -439,19 +441,18 @@
         </button>
       </article>
 
-      <article class="accordion-card card">
-        <button type="button" class="accordion-trigger" onclick={(event) => openDashboardModal('today', event.currentTarget)}>
-          <span class="accordion-main">
-            <span class="accordion-index" aria-hidden="true">03</span>
-            <span class="accordion-copy">
-              <strong>Today</strong>
-              <span class="accordion-subtitle">{todaySummary}</span>
-            </span>
-          </span>
-          <span class="accordion-side">
-            <span class="accordion-meta">{todayEvents.length > 0 ? 'Scheduled' : 'Open'}</span>
-            <span class="accordion-indicator" aria-hidden="true">+</span>
-          </span>
+      <article class="today-action-card card">
+        <div class="today-action-copy">
+          <span class="accordion-index" aria-hidden="true">03</span>
+          <div class="today-action-text">
+            <strong>Today's journal</strong>
+            <p>{todaySummary}</p>
+            <span>Write today's entry and log hours in one place.</span>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary today-action-button" onclick={openTodayJournalEntry}>
+          Write today's journal entry
         </button>
       </article>
 
@@ -504,8 +505,6 @@
                 Month overview
               {:else if activeDashboardPanel === 'milestones'}
                 Progress markers
-              {:else if activeDashboardPanel === 'today'}
-                Daily focus
               {:else}
                 Final report
               {/if}
@@ -515,8 +514,6 @@
                 {dashboardMonthLabel}
               {:else if activeDashboardPanel === 'milestones'}
                 Milestones
-              {:else if activeDashboardPanel === 'today'}
-                Today
               {:else}
                 Final report
               {/if}
@@ -526,8 +523,6 @@
                 {formatHours(monthInsights.totalHours)} across {monthInsights.activeDays} active days in this month.
               {:else if activeDashboardPanel === 'milestones'}
                 {reachedMilestones} of {milestoneCards.length} hour markers are already reached.
-              {:else if activeDashboardPanel === 'today'}
-                {todaySummary}
               {:else}
                 {#if compilationStatus?.has_report}
                   A compiled report is ready to download.
@@ -616,38 +611,6 @@
                 </article>
               {/each}
             </div>
-          {:else if activeDashboardPanel === 'today'}
-            {#if eventsLoading}
-              <div class="panel-loading" aria-hidden="true">
-                <div class="skeleton-line long"></div>
-                <div class="skeleton-line medium"></div>
-                <div class="skeleton-line long"></div>
-              </div>
-            {:else if todayEvents.length > 0}
-              <ul class="today-events">
-                {#each todayEvents as ev}
-                  <li class="today-event">
-                    <div>
-                      <span class="today-event-title">{ev.title}</span>
-                      {#if ev.description}
-                        <span class="today-event-description">{ev.description}</span>
-                      {/if}
-                    </div>
-                    {#if formatTimeRange(ev)}
-                      <span class="today-event-time">{formatTimeRange(ev)}</span>
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            {:else}
-              <p class="today-empty">No scheduled events today. Open the calendar or journal when you want to anchor the day.</p>
-            {/if}
-
-            <div class="today-actions">
-              <button class="btn btn-primary" onclick={() => onNavigateToDate(todayString())}>
-                Open today in calendar
-              </button>
-            </div>
           {:else if activeDashboardPanel === 'report'}
             <div class="report-actions">
               <p class="panel-note">
@@ -727,6 +690,7 @@
   .dashboard-header-copy h1 {
     margin: 0;
     font-size: clamp(1.9rem, 3vw, 2.7rem);
+    color: var(--red);
   }
 
   .dashboard-header-copy p {
@@ -824,8 +788,7 @@
   }
 
   .panel-head p,
-  .panel-note,
-  .today-empty {
+  .panel-note {
     font-family: var(--font-ui);
     font-size: 0.88rem;
     line-height: 1.55;
@@ -1075,6 +1038,47 @@
     border-color: rgba(190, 53, 25, 0.18);
   }
 
+  .today-action-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem 1.1rem;
+  }
+
+  .today-action-copy {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+  }
+
+  .today-action-text {
+    display: grid;
+    gap: 0.18rem;
+    min-width: 0;
+  }
+
+  .today-action-text strong {
+    font-size: 1.08rem;
+    color: var(--red);
+  }
+
+  .today-action-text p,
+  .today-action-text span {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: var(--dark-soft);
+  }
+
+  .today-action-button {
+    flex: 0 0 auto;
+    min-height: 2.8rem;
+    padding-inline: 1rem;
+  }
+
   .dashboard-dialog {
     width: min(52rem, calc(100vw - 2rem));
     max-width: 52rem;
@@ -1202,50 +1206,6 @@
     color: var(--dark-soft);
   }
 
-  .today-events {
-    list-style: none;
-    margin: 1rem 0 0;
-    padding: 0;
-    display: grid;
-    gap: 0.65rem;
-  }
-
-  .today-event {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.8rem;
-    align-items: start;
-    padding-bottom: 0.65rem;
-    border-bottom: 1px solid rgba(190, 53, 25, 0.08);
-  }
-
-  .today-event:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
-  .today-event-title {
-    display: block;
-    font-weight: 600;
-    color: var(--dark);
-  }
-
-  .today-event-description {
-    display: block;
-    margin-top: 0.16rem;
-    font-family: var(--font-ui);
-    font-size: 0.8rem;
-    color: var(--dark-soft);
-  }
-
-  .today-event-time {
-    font-family: var(--font-ui);
-    font-size: 0.78rem;
-    color: var(--red);
-    white-space: nowrap;
-  }
-
-  .today-actions,
   .report-actions {
     margin-top: 1rem;
     display: flex;
@@ -1325,6 +1285,15 @@
       justify-content: space-between;
     }
 
+    .today-action-card {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .today-action-copy {
+      align-items: start;
+    }
+
     .headline-metric,
     .headline-skeleton {
       justify-items: start;
@@ -1360,14 +1329,6 @@
       grid-template-columns: 1fr;
     }
 
-    .today-event {
-      grid-template-columns: 1fr;
-    }
-
-    .today-event-time {
-      white-space: normal;
-    }
-
     .accordion-trigger {
       flex-direction: column;
       align-items: start;
@@ -1390,14 +1351,17 @@
       width: 100%;
     }
 
-    .today-actions,
     .report-actions {
       flex-direction: column;
       align-items: stretch;
     }
 
-    .today-actions .btn,
     .report-actions .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .today-action-button {
       width: 100%;
       justify-content: center;
     }
