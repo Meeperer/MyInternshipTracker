@@ -442,15 +442,6 @@
       </article>
 
       <article class="today-action-card card">
-        <div class="today-action-copy">
-          <span class="accordion-index" aria-hidden="true">03</span>
-          <div class="today-action-text">
-            <strong>Today's journal</strong>
-            <p>{todaySummary}</p>
-            <span>Write today's entry and log hours in one place.</span>
-          </div>
-        </div>
-
         <button type="button" class="btn btn-primary today-action-button" onclick={openTodayJournalEntry}>
           Write today's journal entry
         </button>
@@ -1039,44 +1030,17 @@
   }
 
   .today-action-card {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: center;
-    padding: 1rem 1.1rem;
-  }
-
-  .today-action-copy {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    min-width: 0;
-  }
-
-  .today-action-text {
     display: grid;
-    gap: 0.18rem;
-    min-width: 0;
-  }
-
-  .today-action-text strong {
-    font-size: 1.08rem;
-    color: var(--red);
-  }
-
-  .today-action-text p,
-  .today-action-text span {
-    margin: 0;
-    font-family: var(--font-ui);
-    font-size: 0.84rem;
-    line-height: 1.5;
-    color: var(--dark-soft);
+    place-items: center;
+    padding: 1rem 1.1rem;
   }
 
   .today-action-button {
     flex: 0 0 auto;
     min-height: 2.8rem;
     padding-inline: 1rem;
+    min-width: min(100%, 20rem);
+    justify-content: center;
   }
 
   .dashboard-dialog {
@@ -1283,15 +1247,6 @@
     .accordion-side {
       width: 100%;
       justify-content: space-between;
-    }
-
-    .today-action-card {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .today-action-copy {
-      align-items: start;
     }
 
     .headline-metric,
