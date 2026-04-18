@@ -2,9 +2,7 @@
   import '../app.css';
   import Toast from '$components/Toast.svelte';
   import CommandPalette from '$components/CommandPalette.svelte';
-  import ParallaxBackdrop from '$components/ParallaxBackdrop.svelte';
-  import { page } from '$app/stores';
-  import { auth, isAuthenticated } from '$stores/auth.js';
+  import { auth } from '$stores/auth.js';
   import { appCommands } from '$stores/appCommands.js';
   import { selectedMonth } from '$stores/selectedMonth.js';
   import { goto } from '$app/navigation';
@@ -93,9 +91,6 @@
 </script>
 
 <div class="site-shell">
-  {#if $page.url.pathname !== '/dashboard'}
-    <ParallaxBackdrop />
-  {/if}
   <div class="site-content">
     {@render children()}
   </div>

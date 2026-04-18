@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { journal } from '$stores/journal.js';
   import { toast } from '$stores/toast.js';
   import { selectedMonth } from '$stores/selectedMonth.js';
@@ -26,6 +27,7 @@
     day: 'numeric'
   });
   const PAGE_SIZE = 5;
+  const JOURNAL_PARALLAX_LIMIT = 220;
 
   function formatMonthLabel(monthValue) {
     const { year, month } = parseMonthValue(monthValue);
@@ -226,6 +228,8 @@
   let searchInputEl = $state(null);
   let summaryLibrarySectionEl = $state(null);
   let summaryLibraryHydrated = $state(false);
+  let journalScrollDepth = $state(0);
+  let journalScrollProgress = $state(0);
 
   let weekOptions = $derived.by(() => getWeekOptions($selectedMonth || monthValueFromDate()));
   let filteredEntries = $derived.by(() => {
@@ -464,6 +468,63 @@
     queueMicrotask(() => summaryModalCloseButton?.focus());
   });
 
+  onMount(() => {
+    if (typeof window === 'undefined') return;
+
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const host = document.querySelector('main#main-content');
+    let frame = 0;
+
+    // Respect reduced motion by collapsing the parallax offsets back to zero.
+    const updateParallax = () => {
+      frame = 0;
+
+      if (motionQuery.matches) {
+        journalScrollDepth = 0;
+        journalScrollProgress = 0;
+        return;
+      }
+
+      const scrollTop = host ? host.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0);
+      const maxScroll = host
+        ? Math.max(host.scrollHeight - host.clientHeight, 1)
+        : Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+
+      journalScrollDepth = Math.min(scrollTop, JOURNAL_PARALLAX_LIMIT);
+      journalScrollProgress = Math.min(Math.max(scrollTop / maxScroll, 0), 1);
+    };
+
+    const queueUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateParallax);
+    };
+
+    updateParallax();
+    host?.addEventListener('scroll', queueUpdate, { passive: true });
+    window.addEventListener('resize', queueUpdate, { passive: true });
+
+    if (typeof motionQuery.addEventListener === 'function') {
+      motionQuery.addEventListener('change', queueUpdate);
+    } else {
+      motionQuery.addListener(queueUpdate);
+    }
+
+    return () => {
+      host?.removeEventListener('scroll', queueUpdate);
+      window.removeEventListener('resize', queueUpdate);
+
+      if (typeof motionQuery.removeEventListener === 'function') {
+        motionQuery.removeEventListener('change', queueUpdate);
+      } else {
+        motionQuery.removeListener(queueUpdate);
+      }
+
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+    };
+  });
+
   function openNewEntryForToday() {
     const today = todayString();
     selectedMonth.setFromDate(today);
@@ -660,8 +721,12 @@
   }
 </script>
 
-<div class="journal-view" aria-busy={$journal.loading || summaryLoading}>
-  <section class="journal-hero animate-rise rise-1">
+<div
+  class="journal-view"
+  style={`--journal-depth: ${journalScrollDepth}px; --journal-progress: ${journalScrollProgress.toFixed(4)};`}
+  aria-busy={$journal.loading || summaryLoading}
+>
+  <section class="journal-hero journal-layer journal-layer-hero animate-rise rise-1">
     <div class="journal-hero-copy">
       <span class="eyebrow">Journal workspace</span>
       <h2>Journal Entries</h2>
@@ -690,7 +755,7 @@
     </div>
   </section>
 
-  <section class="overview-strip animate-rise rise-2">
+  <section class="overview-strip journal-layer journal-layer-overview animate-rise rise-2">
     <article class="overview-card">
       <span class="overview-label">Selected month</span>
       <strong>{formatMonthLabel($selectedMonth)}</strong>
@@ -708,7 +773,7 @@
     </article>
   </section>
 
-  <section class="insights-grid animate-rise rise-3">
+  <section class="insights-grid journal-layer journal-layer-insights animate-rise rise-3">
     <article class="insights-panel card glass-card">
       <div class="panel-header">
         <div>
@@ -814,7 +879,7 @@
     </article>
   </section>
 
-  <section class="workspace-grid animate-rise rise-4">
+  <section class="workspace-grid journal-layer journal-layer-workspace animate-rise rise-4">
     <div class="journal-controls card glass-card">
       <div class="panel-header">
         <div>
@@ -965,7 +1030,7 @@
     </div>
   </section>
 
-  <section class="summary-library-shell card glass-card animate-rise rise-5" bind:this={summaryLibrarySectionEl}>
+  <section class="summary-library-shell journal-layer journal-layer-library card glass-card animate-rise rise-5" bind:this={summaryLibrarySectionEl}>
     <div class="summary-library-header">
       <div>
         <span class="panel-kicker">Summary library</span>
@@ -1027,7 +1092,7 @@
     {/if}
   </section>
 
-  <div class="search-shell animate-rise rise-6">
+  <div class="search-shell journal-layer journal-layer-search animate-rise rise-6">
     <input
       bind:this={searchInputEl}
       class="input search-input"
@@ -1038,7 +1103,7 @@
     />
   </div>
 
-  <section class="entries-shell card glass-card animate-rise rise-6" aria-live="polite">
+  <section class="entries-shell journal-layer journal-layer-entries card glass-card animate-rise rise-6" aria-live="polite">
     <div class="entries-toolbar">
       <div>
         <h3>Entries</h3>
@@ -1289,15 +1354,63 @@
 
 <style>
   .journal-view {
+    --journal-depth: 0px;
+    --journal-progress: 0;
     flex: 1;
-    min-height: 0;
-    max-width: 1080px;
+    min-height: auto;
+    max-width: 1120px;
     margin: 0 auto;
-    padding: 2.75rem 2.5rem 4rem;
+    padding: 2rem 2.25rem 5rem;
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1.1rem;
+    overflow: visible;
+  }
+
+  .journal-layer {
+    position: relative;
+    will-change: transform;
+    transition: transform 140ms linear;
+  }
+
+  .journal-layer-hero {
+    position: sticky;
+    top: 1rem;
+    z-index: 7;
+    transform:
+      translate3d(0, calc(var(--journal-depth) * -0.028), 0)
+      scale(calc(1 - (var(--journal-progress) * 0.015)));
+  }
+
+  .journal-layer-overview {
+    z-index: 6;
+    transform: translate3d(0, calc(var(--journal-depth) * 0.01), 0);
+  }
+
+  .journal-layer-insights {
+    z-index: 5;
+    transform: translate3d(0, calc(var(--journal-depth) * 0.018), 0);
+  }
+
+  .journal-layer-workspace {
+    z-index: 4;
+    transform: translate3d(0, calc(var(--journal-depth) * 0.026), 0);
+  }
+
+  .journal-layer-library {
+    z-index: 3;
+    transform: translate3d(0, calc(var(--journal-depth) * 0.034), 0);
+  }
+
+  .journal-layer-search {
+    z-index: 2;
+    transform: translate3d(0, calc(var(--journal-depth) * 0.042), 0);
+  }
+
+  .journal-layer-entries {
+    z-index: 1;
+    transform: translate3d(0, calc(var(--journal-depth) * 0.05), 0);
   }
 
   .journal-hero {
@@ -1305,11 +1418,11 @@
     grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
     gap: 1.25rem;
     align-items: end;
-    padding: 1.5rem 1.7rem;
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.9);
+    padding: 1.35rem 1.45rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.96);
     border: 1px solid rgba(190, 53, 25, 0.14);
-    box-shadow: 0 14px 28px rgba(34, 24, 8, 0.05);
+    box-shadow: 0 10px 22px rgba(34, 24, 8, 0.05);
   }
 
   .eyebrow,
@@ -1401,10 +1514,30 @@
     gap: 1rem;
   }
 
+  .overview-card:nth-child(1) {
+    transform: translate3d(0, calc(var(--journal-depth) * 0.01), 0);
+  }
+
+  .overview-card:nth-child(2) {
+    transform: translate3d(0, calc(var(--journal-depth) * -0.012), 0);
+  }
+
+  .overview-card:nth-child(3) {
+    transform: translate3d(0, calc(var(--journal-depth) * 0.014), 0);
+  }
+
   .insights-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
+  }
+
+  .insights-panel:nth-child(odd) {
+    transform: translate3d(0, calc(var(--journal-depth) * 0.01), 0);
+  }
+
+  .insights-panel:nth-child(even) {
+    transform: translate3d(0, calc(var(--journal-depth) * -0.008), 0);
   }
 
   .insights-panel {
@@ -1480,7 +1613,7 @@
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, rgba(190, 53, 25, 0.72), rgba(190, 53, 25, 0.98));
+    background: rgba(190, 53, 25, 0.88);
   }
 
   .insight-note {
@@ -1498,12 +1631,12 @@
   }
 
   .insight-note-win {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 255, 245, 0.92));
+    background: rgba(249, 252, 247, 0.96);
     border-color: rgba(45, 122, 58, 0.16);
   }
 
   .insight-note-blocker {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 240, 0.94));
+    background: rgba(255, 250, 246, 0.96);
     border-color: rgba(190, 53, 25, 0.14);
   }
 
@@ -1564,12 +1697,11 @@
   }
 
   .glass-card {
-    border-radius: 22px;
+    border-radius: 18px;
     border: 1px solid rgba(190, 53, 25, 0.12);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 253, 245, 0.82));
-    box-shadow: 0 16px 32px rgba(34, 24, 8, 0.06);
-    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 10px 24px rgba(34, 24, 8, 0.05);
+    backdrop-filter: none;
   }
 
   .journal-controls,
@@ -1657,9 +1789,9 @@
   }
 
   .period-toggle button.active {
-    background: linear-gradient(135deg, var(--red), var(--red-hover));
+    background: var(--red);
     color: var(--bg);
-    box-shadow: 0 8px 18px rgba(190, 53, 25, 0.2);
+    box-shadow: none;
   }
 
   .summary-controls {
@@ -1961,7 +2093,7 @@
 
   .summary-library-item.pinned {
     border-color: rgba(184, 134, 11, 0.22);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 251, 236, 0.94));
+    background: rgba(255, 251, 240, 0.96);
   }
 
   .summary-library-copy {
@@ -2066,9 +2198,7 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
+    overflow: visible;
     padding-bottom: 0.25rem;
   }
 
@@ -2325,6 +2455,17 @@
       padding: 2.25rem 1.75rem 3rem;
     }
 
+    .journal-layer,
+    .overview-card,
+    .insights-panel {
+      transform: none !important;
+    }
+
+    .journal-layer-hero {
+      position: relative;
+      top: auto;
+    }
+
     .journal-hero,
     .insights-grid,
     .workspace-grid,
@@ -2444,8 +2585,8 @@
 
   /* Flatter journal pass */
   .journal-view {
-    max-width: 1040px;
-    padding-top: 2.1rem;
+    max-width: 1120px;
+    padding-top: 2rem;
     gap: 1rem;
   }
 
@@ -2531,6 +2672,16 @@
     .summary-modal {
       width: min(100vw - 1rem, 100%);
       padding: 1.2rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .journal-layer,
+    .overview-card,
+    .insights-panel {
+      transform: none !important;
+      transition: none;
+      will-change: auto;
     }
   }
 </style>
