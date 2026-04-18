@@ -12,6 +12,15 @@
 
   const HOURS_MILESTONES = [100, 250, 400, 486];
   const STREAK_MILESTONES = [3, 7, 14];
+  const QUOTES = [
+    { text: 'The secret of getting ahead is getting started.', author: 'Mark Twain' },
+    { text: "It always seems impossible until it's done.", author: 'Nelson Mandela' },
+    { text: 'Small daily improvements are the key to staggering long-term results.', author: 'Robin Sharma' },
+    { text: 'Success is the sum of small efforts repeated day in and day out.', author: 'Robert Collier' },
+    { text: 'Discipline is the bridge between goals and accomplishment.', author: 'Jim Rohn' },
+    { text: 'What you do today can improve all your tomorrows.', author: 'Ralph Marston' },
+    { text: 'Start where you are. Use what you have. Do what you can.', author: 'Arthur Ashe' }
+  ];
 
   let compilationStatus = $state(null);
   let compiling = $state(false);
@@ -107,6 +116,10 @@
   let targetHours = $derived($progress.target_hours || 486);
   let dashboardBusy = $derived($progress.loading || $journal.loading);
   let dashboardMonthLabel = $derived.by(() => formatMonthLabel($selectedMonth || monthValueFromDate()));
+  let todayQuote = $derived.by(() => {
+    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+    return QUOTES[dayOfYear % QUOTES.length];
+  });
 
   let monthStats = $derived.by(() => {
     const entries = $journal.entries || [];
@@ -190,6 +203,7 @@
     }))
   );
 
+  let reachedMilestones = $derived.by(() => milestoneCards.filter((milestone) => milestone.reached).length);
   let nextMilestone = $derived.by(() => milestoneCards.find((milestone) => !milestone.reached) || null);
 
   let summaryLine = $derived.by(() => {
@@ -458,37 +472,7 @@
     </article>
   </section>
 
-  <section class="dashboard-grid dashboard-grid-secondary animate-rise rise-4" aria-label="Milestones and today">
-    <article class="milestones-panel card" aria-labelledby="milestones-title">
-      <header class="panel-head">
-        <div>
-          <h2 id="milestones-title">Milestones</h2>
-          <p>Hours markers and streak progress in one clean line of sight.</p>
-        </div>
-        <p class="panel-meta">{$progress.current_streak}-day streak. {$progress.longest_streak}-day best.</p>
-      </header>
-
-      <div class="milestone-list">
-        {#each milestoneCards as milestone}
-          <article class:reached={milestone.reached} class="milestone-card">
-            <h3>{milestone.hours} hours</h3>
-            <p class="milestone-status">
-              {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
-            </p>
-            <p class="milestone-note">
-              {#if milestone.reached}
-                This marker is already locked into the record.
-              {:else if milestone.remaining <= 24}
-                Close enough to plan around now.
-              {:else}
-                Still ahead, but clearly visible from here.
-              {/if}
-            </p>
-          </article>
-        {/each}
-      </div>
-    </article>
-
+  <section class="dashboard-lower-grid animate-rise rise-4" aria-label="Today, milestones, and month details">
     <aside class="today-panel card" aria-labelledby="today-title">
       <header class="panel-head">
         <div>
@@ -496,6 +480,11 @@
           <p>{todaySummary}</p>
         </div>
       </header>
+
+      <div class="today-quote">
+        <blockquote>{todayQuote.text}</blockquote>
+        <cite>{todayQuote.author}</cite>
+      </div>
 
       {#if eventsLoading}
         <div class="panel-loading" aria-hidden="true">
@@ -529,99 +518,153 @@
         </button>
       </div>
     </aside>
-  </section>
 
-  <section class="snapshot-panel card animate-rise rise-5" aria-labelledby="snapshot-title">
-    <header class="panel-head">
-      <div>
-        <h2 id="snapshot-title">Month snapshot</h2>
-        <p>Selected month contribution, cadence, and completion forecast.</p>
-      </div>
-    </header>
+    <div class="accordion-stack">
+      <!-- Native details/summary keeps the accordion keyboard-friendly and readable
+           without needing custom ARIA or key handling. -->
+      <details class="accordion-card card">
+        <summary class="accordion-summary">
+          <span>
+            <strong>Milestones</strong>
+            <span class="accordion-subtitle">{reachedMilestones} of {milestoneCards.length} hour markers reached</span>
+          </span>
+          <span class="accordion-meta">{$progress.current_streak}-day streak</span>
+        </summary>
 
-    {#if dashboardBusy}
-      <div class="detail-grid detail-grid-loading" aria-hidden="true">
-        {#each Array.from({ length: 4 }) as _}
-          <div class="detail-card">
-            <span class="skeleton-line short"></span>
-            <span class="skeleton-line medium"></span>
+        <div class="accordion-body">
+          <div class="milestone-list">
+            {#each milestoneCards as milestone}
+              <article class:reached={milestone.reached} class="milestone-card">
+                <h3>{milestone.hours} hours</h3>
+                <p class="milestone-status">
+                  {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
+                </p>
+                <p class="milestone-note">
+                  {#if milestone.reached}
+                    This marker is already locked into the record.
+                  {:else if milestone.remaining <= 24}
+                    Close enough to plan around now.
+                  {:else}
+                    Still ahead, but clearly visible from here.
+                  {/if}
+                </p>
+              </article>
+            {/each}
           </div>
-        {/each}
-      </div>
-      <div class="panel-loading" aria-hidden="true">
-        <div class="skeleton-line medium"></div>
-        <div class="skeleton-block track-skeleton"></div>
-        <div class="skeleton-line long"></div>
-      </div>
-    {:else}
-      <dl class="detail-grid">
-        <div class="detail-card">
-          <dt>Hours logged</dt>
-          <dd>{formatHours(monthInsights.totalHours)}</dd>
         </div>
-        <div class="detail-card">
-          <dt>Days active</dt>
-          <dd>{monthInsights.activeDays}</dd>
-        </div>
-        <div class="detail-card">
-          <dt>Days finished</dt>
-          <dd>{monthInsights.finishedDays}</dd>
-        </div>
-        <div class="detail-card">
-          <dt>Current cadence</dt>
-          <dd>{cadenceLabel}</dd>
-        </div>
-      </dl>
+      </details>
 
-      <div class="snapshot-progress">
-        <div class="snapshot-progress-head">
-          <span>This month contributes {monthShare}% of the internship goal.</span>
-          <span>{formatHours(monthInsights.totalHours)}</span>
-        </div>
-        <div class="snapshot-track" aria-hidden="true">
-          <span class="snapshot-fill" style={`width: ${monthShare}%`}></span>
-        </div>
-        <p class="panel-note">
-          {#if !$progress.is_completed}
-            At your current pace, the projected finish lands around {monthInsights.projectedCompletion}.
+      <details class="accordion-card card">
+        <summary class="accordion-summary">
+          <span>
+            <strong>Month snapshot</strong>
+            <span class="accordion-subtitle">{formatHours(monthInsights.totalHours)} across {monthInsights.activeDays} active days</span>
+          </span>
+          <span class="accordion-meta">{monthShare}% of goal</span>
+        </summary>
+
+        <div class="accordion-body">
+          {#if dashboardBusy}
+            <div class="detail-grid detail-grid-loading" aria-hidden="true">
+              {#each Array.from({ length: 4 }) as _}
+                <div class="detail-card">
+                  <span class="skeleton-line short"></span>
+                  <span class="skeleton-line medium"></span>
+                </div>
+              {/each}
+            </div>
+            <div class="panel-loading" aria-hidden="true">
+              <div class="skeleton-line medium"></div>
+              <div class="skeleton-block track-skeleton"></div>
+              <div class="skeleton-line long"></div>
+            </div>
           {:else}
-            The target is complete, so this month is now part of the final record.
+            <dl class="detail-grid">
+              <div class="detail-card">
+                <dt>Hours logged</dt>
+                <dd>{formatHours(monthInsights.totalHours)}</dd>
+              </div>
+              <div class="detail-card">
+                <dt>Days active</dt>
+                <dd>{monthInsights.activeDays}</dd>
+              </div>
+              <div class="detail-card">
+                <dt>Days finished</dt>
+                <dd>{monthInsights.finishedDays}</dd>
+              </div>
+              <div class="detail-card">
+                <dt>Current cadence</dt>
+                <dd>{cadenceLabel}</dd>
+              </div>
+            </dl>
+
+            <div class="snapshot-progress">
+              <div class="snapshot-progress-head">
+                <span>This month contributes {monthShare}% of the internship goal.</span>
+                <span>{formatHours(monthInsights.totalHours)}</span>
+              </div>
+              <div class="snapshot-track" aria-hidden="true">
+                <span class="snapshot-fill" style={`width: ${monthShare}%`}></span>
+              </div>
+              <p class="panel-note">
+                {#if !$progress.is_completed}
+                  At your current pace, the projected finish lands around {monthInsights.projectedCompletion}.
+                {:else}
+                  The target is complete, so this month is now part of the final record.
+                {/if}
+              </p>
+            </div>
           {/if}
-        </p>
-      </div>
-    {/if}
+        </div>
+      </details>
+
+      {#if $progress.is_completed}
+        <details class="accordion-card card">
+          <summary class="accordion-summary">
+            <span>
+              <strong>Final report</strong>
+              <span class="accordion-subtitle">
+                {#if compilationStatus?.has_report}
+                  Report ready to download
+                {:else}
+                  Compile the PDF report
+                {/if}
+              </span>
+            </span>
+            <span class="accordion-meta">
+              {#if compilationStatus?.has_report}
+                Ready
+              {:else}
+                Pending
+              {/if}
+            </span>
+          </summary>
+
+          <div class="accordion-body">
+            <div class="report-actions">
+              <p class="panel-note">
+                {#if compilationStatus?.has_report}
+                  A compiled report is ready to download.
+                {:else}
+                  The report has not been compiled yet.
+                {/if}
+              </p>
+
+              {#if compilationStatus?.has_report}
+                <button class="btn btn-primary" onclick={handleDownload} disabled={downloading}>
+                  {downloading ? 'Downloading...' : 'Download report'}
+                </button>
+              {:else}
+                <button class="btn btn-primary" onclick={handleCompile} disabled={compiling}>
+                  {compiling ? 'Compiling...' : 'Compile final report'}
+                </button>
+              {/if}
+            </div>
+          </div>
+        </details>
+      {/if}
+    </div>
   </section>
-
-  {#if $progress.is_completed}
-    <section class="report-panel card animate-rise rise-6" aria-labelledby="report-title">
-      <header class="panel-head">
-        <div>
-          <h2 id="report-title">Final report</h2>
-          <p>The internship requirement is complete. Compile or download the PDF report from here.</p>
-        </div>
-      </header>
-
-      <div class="report-actions">
-        <p class="panel-note">
-          {#if compilationStatus?.has_report}
-            A compiled report is ready to download.
-          {:else}
-            The report has not been compiled yet.
-          {/if}
-        </p>
-
-        {#if compilationStatus?.has_report}
-          <button class="btn btn-primary" onclick={handleDownload} disabled={downloading}>
-            {downloading ? 'Downloading...' : 'Download report'}
-          </button>
-        {:else}
-          <button class="btn btn-primary" onclick={handleCompile} disabled={compiling}>
-            {compiling ? 'Compiling...' : 'Compile final report'}
-          </button>
-        {/if}
-      </div>
-    </section>
-  {/if}
 
   {#if celebration}
     <div class="modal-overlay celebration-overlay" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
@@ -638,10 +681,11 @@
   .dashboard {
     width: min(1240px, calc(100vw - 2rem));
     margin: 0 auto;
-    padding: clamp(1.1rem, 2vw, 1.7rem) clamp(1rem, 1.8vw, 1.5rem) clamp(2.2rem, 4vw, 3rem);
+    min-height: calc(100dvh - 6rem);
+    padding: clamp(0.95rem, 1.8vw, 1.45rem) clamp(1rem, 1.8vw, 1.5rem) clamp(1.35rem, 3vw, 2rem);
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.85rem;
     background: transparent;
   }
 
@@ -723,7 +767,7 @@
 
   .summary-band,
   .dashboard-grid,
-  .dashboard-grid-secondary {
+  .dashboard-lower-grid {
     position: relative;
   }
 
@@ -748,8 +792,7 @@
   .summary-copy p,
   .panel-head p,
   .panel-note,
-  .today-empty,
-  .panel-meta {
+  .today-empty {
     font-family: var(--font-ui);
     font-size: 0.88rem;
     line-height: 1.55;
@@ -797,10 +840,11 @@
     gap: 1rem;
   }
 
-  .dashboard-grid-secondary {
+  .dashboard-lower-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.85fr);
+    grid-template-columns: minmax(19rem, 0.9fr) minmax(0, 1.1fr);
     gap: 1rem;
+    align-items: start;
   }
 
   .panel-head {
@@ -897,15 +941,109 @@
     margin-top: 0.85rem;
   }
 
-  .panel-meta {
+  .today-panel {
+    display: grid;
+    align-content: start;
+  }
+
+  .today-quote {
+    margin-top: 0.9rem;
+    padding: 0.9rem 0;
+    border-top: 1px solid rgba(190, 53, 25, 0.08);
+    border-bottom: 1px solid rgba(190, 53, 25, 0.08);
+  }
+
+  .today-quote blockquote {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    line-height: 1.45;
+    color: var(--dark);
+  }
+
+  .today-quote cite {
+    display: block;
+    margin-top: 0.42rem;
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    color: var(--dark-muted);
+    font-style: normal;
+  }
+
+  .accordion-stack {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+  }
+
+  .accordion-card {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .accordion-summary {
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.95rem 1.1rem;
+    cursor: pointer;
+  }
+
+  .accordion-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .accordion-summary::marker {
+    content: '';
+  }
+
+  .accordion-summary::after {
+    content: '+';
+    flex: 0 0 auto;
+    font-family: var(--font-ui);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--red);
+  }
+
+  .accordion-card[open] .accordion-summary::after {
+    content: '-';
+  }
+
+  .accordion-summary > span:first-child {
+    display: grid;
+    gap: 0.18rem;
+  }
+
+  .accordion-summary strong {
+    font-size: 1rem;
+    color: var(--dark);
+  }
+
+  .accordion-subtitle,
+  .accordion-meta {
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    color: var(--dark-soft);
+  }
+
+  .accordion-meta {
+    padding-right: 0.4rem;
     text-align: right;
+  }
+
+  .accordion-body {
+    padding: 0 1.1rem 1.05rem;
+    border-top: 1px solid rgba(190, 53, 25, 0.08);
   }
 
   .milestone-list {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
     gap: 0.75rem;
-    margin-top: 1rem;
+    margin-top: 0.85rem;
   }
 
   .milestone-card.reached {
@@ -1017,12 +1155,8 @@
   @media (max-width: 1100px) {
     .summary-band,
     .dashboard-grid,
-    .dashboard-grid-secondary {
+    .dashboard-lower-grid {
       grid-template-columns: 1fr;
-    }
-
-    .panel-meta {
-      text-align: left;
     }
   }
 
@@ -1046,6 +1180,15 @@
     .panel-head-split {
       flex-direction: column;
       align-items: start;
+    }
+
+    .accordion-summary {
+      align-items: start;
+    }
+
+    .accordion-meta {
+      text-align: left;
+      padding-right: 0;
     }
 
     .headline-metric,
@@ -1087,6 +1230,11 @@
 
     .today-event-time {
       white-space: normal;
+    }
+
+    .accordion-summary {
+      flex-direction: column;
+      align-items: start;
     }
 
     .today-actions,
