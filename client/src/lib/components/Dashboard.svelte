@@ -293,9 +293,14 @@
     </div>
   </header>
 
-  <section class="quote-panel animate-rise rise-2" aria-labelledby="dashboard-quote-text">
-    <blockquote id="dashboard-quote-text">{todayQuote.text}</blockquote>
-    <cite>{todayQuote.author}</cite>
+  <section class="quote-panel card animate-rise rise-2" aria-labelledby="dashboard-quote-heading">
+    <div class="quote-shell">
+      <h2 id="dashboard-quote-heading" class="quote-heading">Today&apos;s quote</h2>
+      <blockquote id="dashboard-quote-text">
+        <p>{todayQuote.text}</p>
+      </blockquote>
+      <cite>{todayQuote.author}</cite>
+    </div>
   </section>
 
   <section class="dashboard-main animate-rise rise-3" aria-label="Progress overview">
@@ -376,11 +381,17 @@
     <div class="accordion-stack">
       <details class="accordion-card card">
         <summary class="accordion-summary">
-          <span>
-            <strong>{dashboardMonthLabel}</strong>
-            <span class="accordion-subtitle">{formatHours(monthInsights.totalHours)} across {monthInsights.activeDays} active days</span>
+          <span class="accordion-main">
+            <span class="accordion-index" aria-hidden="true">01</span>
+            <span class="accordion-copy">
+              <strong>{dashboardMonthLabel}</strong>
+              <span class="accordion-subtitle">{formatHours(monthInsights.totalHours)} across {monthInsights.activeDays} active days</span>
+            </span>
           </span>
-          <span class="accordion-meta">{monthShare}% of goal</span>
+          <span class="accordion-side">
+            <span class="accordion-meta">{monthShare}% of goal</span>
+            <span class="accordion-indicator" aria-hidden="true">+</span>
+          </span>
         </summary>
 
         <div class="accordion-body">
@@ -442,11 +453,17 @@
            without needing custom ARIA or key handling. -->
       <details class="accordion-card card">
         <summary class="accordion-summary">
-          <span>
-            <strong>Milestones</strong>
-            <span class="accordion-subtitle">{reachedMilestones} of {milestoneCards.length} hour markers reached</span>
+          <span class="accordion-main">
+            <span class="accordion-index" aria-hidden="true">02</span>
+            <span class="accordion-copy">
+              <strong>Milestones</strong>
+              <span class="accordion-subtitle">{reachedMilestones} of {milestoneCards.length} hour markers reached</span>
+            </span>
           </span>
-          <span class="accordion-meta">{$progress.current_streak}-day streak</span>
+          <span class="accordion-side">
+            <span class="accordion-meta">{$progress.current_streak}-day streak</span>
+            <span class="accordion-indicator" aria-hidden="true">+</span>
+          </span>
         </summary>
 
         <div class="accordion-body">
@@ -474,11 +491,17 @@
 
       <details class="accordion-card card">
         <summary class="accordion-summary">
-          <span>
-            <strong>Today</strong>
-            <span class="accordion-subtitle">{todaySummary}</span>
+          <span class="accordion-main">
+            <span class="accordion-index" aria-hidden="true">03</span>
+            <span class="accordion-copy">
+              <strong>Today</strong>
+              <span class="accordion-subtitle">{todaySummary}</span>
+            </span>
           </span>
-          <span class="accordion-meta">{todayEvents.length > 0 ? 'Scheduled' : 'Open'}</span>
+          <span class="accordion-side">
+            <span class="accordion-meta">{todayEvents.length > 0 ? 'Scheduled' : 'Open'}</span>
+            <span class="accordion-indicator" aria-hidden="true">+</span>
+          </span>
         </summary>
 
         <div class="accordion-body">
@@ -519,22 +542,28 @@
       {#if $progress.is_completed}
         <details class="accordion-card card">
           <summary class="accordion-summary">
-            <span>
-              <strong>Final report</strong>
-              <span class="accordion-subtitle">
+            <span class="accordion-main">
+              <span class="accordion-index" aria-hidden="true">04</span>
+              <span class="accordion-copy">
+                <strong>Final report</strong>
+                <span class="accordion-subtitle">
                 {#if compilationStatus?.has_report}
                   Report ready to download
                 {:else}
                   Compile the PDF report
                 {/if}
+                </span>
               </span>
             </span>
-            <span class="accordion-meta">
-              {#if compilationStatus?.has_report}
-                Ready
-              {:else}
-                Pending
-              {/if}
+            <span class="accordion-side">
+              <span class="accordion-meta">
+                {#if compilationStatus?.has_report}
+                  Ready
+                {:else}
+                  Pending
+                {/if}
+              </span>
+              <span class="accordion-indicator" aria-hidden="true">+</span>
             </span>
           </summary>
 
@@ -669,25 +698,42 @@
   }
 
   .quote-panel {
+    text-align: center;
+    padding-block: 1.05rem;
+  }
+
+  .quote-shell {
     display: grid;
     justify-items: center;
-    gap: 0.35rem;
-    padding: 0.15rem 0 0.35rem;
-    text-align: center;
+    gap: 0.45rem;
+    min-height: 7.25rem;
+    align-content: center;
+  }
+
+  .quote-heading {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 0.94rem;
+    font-weight: 600;
+    color: var(--red);
   }
 
   .quote-panel blockquote {
     margin: 0;
     max-width: 44rem;
     font-family: var(--font-display);
-    font-size: clamp(1.05rem, 1.8vw, 1.32rem);
+    font-size: clamp(1.25rem, 2vw, 1.7rem);
     line-height: 1.45;
-    color: var(--dark);
+    color: var(--red);
+  }
+
+  .quote-panel blockquote p {
+    margin: 0;
   }
 
   .quote-panel cite {
     font-family: var(--font-ui);
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     font-style: normal;
     color: var(--dark-muted);
   }
@@ -844,6 +890,11 @@
   .accordion-card {
     padding: 0;
     overflow: hidden;
+    transition: border-color 160ms ease, background-color 160ms ease;
+  }
+
+  .accordion-card:hover {
+    border-color: rgba(190, 53, 25, 0.16);
   }
 
   .accordion-summary {
@@ -852,8 +903,9 @@
     justify-content: space-between;
     gap: 1rem;
     align-items: center;
-    padding: 0.95rem 1.1rem;
+    padding: 1rem 1.1rem;
     cursor: pointer;
+    transition: background-color 160ms ease;
   }
 
   .accordion-summary::-webkit-details-marker {
@@ -864,44 +916,100 @@
     content: '';
   }
 
-  .accordion-summary::after {
-    content: '+';
+  .accordion-main {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+  }
+
+  .accordion-index {
+    display: grid;
     flex: 0 0 auto;
+    place-items: center;
+    width: 2.3rem;
+    height: 2.3rem;
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    border-radius: 10px;
+    background: rgba(190, 53, 25, 0.05);
     font-family: var(--font-ui);
-    font-size: 1rem;
+    font-size: 0.78rem;
     font-weight: 700;
     color: var(--red);
   }
 
-  .accordion-card[open] .accordion-summary::after {
-    content: '-';
-  }
-
-  .accordion-summary > span:first-child {
+  .accordion-copy {
     display: grid;
-    gap: 0.18rem;
+    gap: 0.2rem;
+    min-width: 0;
   }
 
   .accordion-summary strong {
-    font-size: 1rem;
-    color: var(--dark);
+    font-size: 1.08rem;
+    color: var(--red);
   }
 
   .accordion-subtitle,
   .accordion-meta {
     font-family: var(--font-ui);
-    font-size: 0.82rem;
+    font-size: 0.84rem;
     color: var(--dark-soft);
   }
 
+  .accordion-side {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex: 0 0 auto;
+  }
+
   .accordion-meta {
-    padding-right: 0.4rem;
+    padding: 0.34rem 0.7rem;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.04);
     text-align: right;
+    color: var(--dark);
+  }
+
+  .accordion-indicator {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.85);
+    font-family: var(--font-ui);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--red);
+    transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
   }
 
   .accordion-body {
     padding: 0 1.1rem 1.05rem;
     border-top: 1px solid rgba(190, 53, 25, 0.08);
+  }
+
+  .accordion-card[open] {
+    border-color: rgba(190, 53, 25, 0.18);
+    background: rgba(255, 250, 244, 0.98);
+  }
+
+  .accordion-card[open] .accordion-summary {
+    background: rgba(190, 53, 25, 0.04);
+  }
+
+  .accordion-card[open] .accordion-indicator {
+    transform: rotate(45deg);
+    background: rgba(190, 53, 25, 0.08);
+    border-color: rgba(190, 53, 25, 0.18);
+  }
+
+  .accordion-card[open] .accordion-body {
+    animation: accordion-reveal 180ms ease-out;
   }
 
   .milestone-list {
@@ -1017,6 +1125,18 @@
     color: var(--dark-soft);
   }
 
+  @keyframes accordion-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   @media (max-width: 1100px) {
     .quote-panel blockquote {
       max-width: 38rem;
@@ -1049,9 +1169,9 @@
       align-items: start;
     }
 
-    .accordion-meta {
-      text-align: left;
-      padding-right: 0;
+    .accordion-side {
+      width: 100%;
+      justify-content: space-between;
     }
 
     .headline-metric,
@@ -1096,6 +1216,11 @@
       align-items: start;
     }
 
+    .accordion-main,
+    .accordion-side {
+      width: 100%;
+    }
+
     .today-actions,
     .report-actions {
       flex-direction: column;
@@ -1111,8 +1236,13 @@
 
   @media (prefers-reduced-motion: reduce) {
     .trajectory-fill,
-    .snapshot-fill {
+    .snapshot-fill,
+    .accordion-indicator {
       transition: none;
+    }
+
+    .accordion-card[open] .accordion-body {
+      animation: none;
     }
   }
 </style>
