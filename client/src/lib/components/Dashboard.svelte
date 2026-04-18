@@ -206,26 +206,6 @@
   let reachedMilestones = $derived.by(() => milestoneCards.filter((milestone) => milestone.reached).length);
   let nextMilestone = $derived.by(() => milestoneCards.find((milestone) => !milestone.reached) || null);
 
-  let summaryLine = $derived.by(() => {
-    if (monthStats.count === 0) {
-      return `${dashboardMonthLabel} has no entries yet. Start the month from the journal or calendar.`;
-    }
-
-    return `${dashboardMonthLabel} includes ${monthStats.count} entries, ${formatHours(monthStats.hours)} logged, and ${monthStats.finished} finished days already counting toward the requirement.`;
-  });
-
-  let nextActionLine = $derived.by(() => {
-    if ($progress.is_completed) {
-      return 'The hours requirement is done, so the dashboard can shift from accumulation to final review.';
-    }
-
-    if (nextMilestone) {
-      return `${nextMilestone.remaining} hours remain before the ${nextMilestone.hours}-hour milestone is cleared.`;
-    }
-
-    return 'Every milestone has already been reached.';
-  });
-
   let todaySummary = $derived.by(() => {
     if (eventsLoading) return 'Loading today';
     if (todayEvents.length === 0) return 'No scheduled events today';
@@ -313,45 +293,12 @@
     </div>
   </header>
 
-  <section class="summary-band card animate-rise rise-2" aria-labelledby="dashboard-summary-title">
-    <div class="summary-copy">
-      <h2 id="dashboard-summary-title">{greetingLabel}</h2>
-      <p>{summaryLine}</p>
-      <p class="summary-secondary">{nextActionLine}</p>
-    </div>
-
-    {#if dashboardBusy}
-      <div class="summary-stats summary-stats-loading" aria-hidden="true">
-        {#each Array.from({ length: 4 }) as _}
-          <div class="summary-stat">
-            <span class="skeleton-line short"></span>
-            <span class="skeleton-line medium"></span>
-          </div>
-        {/each}
-      </div>
-    {:else}
-      <dl class="summary-stats">
-        <div class="summary-stat">
-          <dt>Total logged</dt>
-          <dd>{$progress.total_hours}</dd>
-        </div>
-        <div class="summary-stat">
-          <dt>Remaining</dt>
-          <dd>{$progress.remaining_hours}</dd>
-        </div>
-        <div class="summary-stat">
-          <dt>This month</dt>
-          <dd>{formatHours(monthStats.hours)}</dd>
-        </div>
-        <div class="summary-stat">
-          <dt>Current streak</dt>
-          <dd>{$progress.current_streak}d</dd>
-        </div>
-      </dl>
-    {/if}
+  <section class="quote-panel animate-rise rise-2" aria-labelledby="dashboard-quote-text">
+    <blockquote id="dashboard-quote-text">{todayQuote.text}</blockquote>
+    <cite>{todayQuote.author}</cite>
   </section>
 
-  <section class="dashboard-grid animate-rise rise-3" aria-label="Progress and month overview">
+  <section class="dashboard-main animate-rise rise-3" aria-label="Progress overview">
     <article class="trajectory-panel card" aria-labelledby="trajectory-title">
       <header class="panel-head panel-head-split">
         <div>
@@ -423,141 +370,14 @@
         </dl>
       {/if}
     </article>
-
-    <article class="month-panel card" aria-labelledby="month-panel-title">
-      <header class="panel-head">
-        <div>
-          <h2 id="month-panel-title">{dashboardMonthLabel}</h2>
-          <p>{monthStats.count} entries currently in view.</p>
-        </div>
-      </header>
-
-      {#if dashboardBusy}
-        <div class="detail-grid detail-grid-loading" aria-hidden="true">
-          {#each Array.from({ length: 4 }) as _}
-            <div class="detail-card">
-              <span class="skeleton-line short"></span>
-              <span class="skeleton-line medium"></span>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <dl class="detail-grid detail-grid-compact">
-          <div class="detail-card">
-            <dt>Hours this month</dt>
-            <dd>{formatHours(monthStats.hours)}</dd>
-          </div>
-          <div class="detail-card">
-            <dt>Finished days</dt>
-            <dd>{monthStats.finished}</dd>
-          </div>
-          <div class="detail-card">
-            <dt>Active days</dt>
-            <dd>{monthInsights.activeDays}</dd>
-          </div>
-          <div class="detail-card">
-            <dt>Month share of goal</dt>
-            <dd>{monthShare}%</dd>
-          </div>
-        </dl>
-      {/if}
-
-      <p class="panel-note">
-        {#if monthStats.count > 0}
-          {completionRate}% of this month&apos;s entries are finished and already counting toward the target.
-        {:else}
-          Nothing in this month is contributing yet.
-        {/if}
-      </p>
-    </article>
   </section>
 
-  <section class="dashboard-lower-grid animate-rise rise-4" aria-label="Today, milestones, and month details">
-    <aside class="today-panel card" aria-labelledby="today-title">
-      <header class="panel-head">
-        <div>
-          <h2 id="today-title">Today</h2>
-          <p>{todaySummary}</p>
-        </div>
-      </header>
-
-      <div class="today-quote">
-        <blockquote>{todayQuote.text}</blockquote>
-        <cite>{todayQuote.author}</cite>
-      </div>
-
-      {#if eventsLoading}
-        <div class="panel-loading" aria-hidden="true">
-          <div class="skeleton-line long"></div>
-          <div class="skeleton-line medium"></div>
-          <div class="skeleton-line long"></div>
-        </div>
-      {:else if todayEvents.length > 0}
-        <ul class="today-events">
-          {#each todayEvents as ev}
-            <li class="today-event">
-              <div>
-                <span class="today-event-title">{ev.title}</span>
-                {#if ev.description}
-                  <span class="today-event-description">{ev.description}</span>
-                {/if}
-              </div>
-              {#if formatTimeRange(ev)}
-                <span class="today-event-time">{formatTimeRange(ev)}</span>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <p class="today-empty">No scheduled events today. Open the calendar or journal when you want to anchor the day.</p>
-      {/if}
-
-      <div class="today-actions">
-        <button class="btn btn-primary" onclick={() => onNavigateToDate(todayString())}>
-          Open today in calendar
-        </button>
-      </div>
-    </aside>
-
+  <section class="support-grid animate-rise rise-4" aria-label="Dashboard details">
     <div class="accordion-stack">
-      <!-- Native details/summary keeps the accordion keyboard-friendly and readable
-           without needing custom ARIA or key handling. -->
       <details class="accordion-card card">
         <summary class="accordion-summary">
           <span>
-            <strong>Milestones</strong>
-            <span class="accordion-subtitle">{reachedMilestones} of {milestoneCards.length} hour markers reached</span>
-          </span>
-          <span class="accordion-meta">{$progress.current_streak}-day streak</span>
-        </summary>
-
-        <div class="accordion-body">
-          <div class="milestone-list">
-            {#each milestoneCards as milestone}
-              <article class:reached={milestone.reached} class="milestone-card">
-                <h3>{milestone.hours} hours</h3>
-                <p class="milestone-status">
-                  {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
-                </p>
-                <p class="milestone-note">
-                  {#if milestone.reached}
-                    This marker is already locked into the record.
-                  {:else if milestone.remaining <= 24}
-                    Close enough to plan around now.
-                  {:else}
-                    Still ahead, but clearly visible from here.
-                  {/if}
-                </p>
-              </article>
-            {/each}
-          </div>
-        </div>
-      </details>
-
-      <details class="accordion-card card">
-        <summary class="accordion-summary">
-          <span>
-            <strong>Month snapshot</strong>
+            <strong>{dashboardMonthLabel}</strong>
             <span class="accordion-subtitle">{formatHours(monthInsights.totalHours)} across {monthInsights.activeDays} active days</span>
           </span>
           <span class="accordion-meta">{monthShare}% of goal</span>
@@ -615,6 +435,84 @@
               </p>
             </div>
           {/if}
+        </div>
+      </details>
+
+      <!-- Native details/summary keeps the accordion keyboard-friendly and readable
+           without needing custom ARIA or key handling. -->
+      <details class="accordion-card card">
+        <summary class="accordion-summary">
+          <span>
+            <strong>Milestones</strong>
+            <span class="accordion-subtitle">{reachedMilestones} of {milestoneCards.length} hour markers reached</span>
+          </span>
+          <span class="accordion-meta">{$progress.current_streak}-day streak</span>
+        </summary>
+
+        <div class="accordion-body">
+          <div class="milestone-list">
+            {#each milestoneCards as milestone}
+              <article class:reached={milestone.reached} class="milestone-card">
+                <h3>{milestone.hours} hours</h3>
+                <p class="milestone-status">
+                  {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
+                </p>
+                <p class="milestone-note">
+                  {#if milestone.reached}
+                    This marker is already locked into the record.
+                  {:else if milestone.remaining <= 24}
+                    Close enough to plan around now.
+                  {:else}
+                    Still ahead, but clearly visible from here.
+                  {/if}
+                </p>
+              </article>
+            {/each}
+          </div>
+        </div>
+      </details>
+
+      <details class="accordion-card card">
+        <summary class="accordion-summary">
+          <span>
+            <strong>Today</strong>
+            <span class="accordion-subtitle">{todaySummary}</span>
+          </span>
+          <span class="accordion-meta">{todayEvents.length > 0 ? 'Scheduled' : 'Open'}</span>
+        </summary>
+
+        <div class="accordion-body">
+          {#if eventsLoading}
+            <div class="panel-loading" aria-hidden="true">
+              <div class="skeleton-line long"></div>
+              <div class="skeleton-line medium"></div>
+              <div class="skeleton-line long"></div>
+            </div>
+          {:else if todayEvents.length > 0}
+            <ul class="today-events">
+              {#each todayEvents as ev}
+                <li class="today-event">
+                  <div>
+                    <span class="today-event-title">{ev.title}</span>
+                    {#if ev.description}
+                      <span class="today-event-description">{ev.description}</span>
+                    {/if}
+                  </div>
+                  {#if formatTimeRange(ev)}
+                    <span class="today-event-time">{formatTimeRange(ev)}</span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="today-empty">No scheduled events today. Open the calendar or journal when you want to anchor the day.</p>
+          {/if}
+
+          <div class="today-actions">
+            <button class="btn btn-primary" onclick={() => onNavigateToDate(todayString())}>
+              Open today in calendar
+            </button>
+          </div>
         </div>
       </details>
 
@@ -737,8 +635,7 @@
   }
 
   .month-picker-label,
-  .detail-card dt,
-  .summary-stat dt {
+  .detail-card dt {
     font-family: var(--font-ui);
     font-size: 0.72rem;
     font-weight: 600;
@@ -765,31 +662,48 @@
     box-shadow: 0 0 0 3px rgba(190, 53, 25, 0.12);
   }
 
-  .summary-band,
-  .dashboard-grid,
-  .dashboard-lower-grid {
+  .quote-panel,
+  .dashboard-main,
+  .support-grid {
     position: relative;
   }
 
-  .summary-band {
+  .quote-panel {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.95fr);
-    gap: 1rem;
-    align-items: start;
+    justify-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0 0.35rem;
+    text-align: center;
   }
 
-  .summary-copy {
-    display: grid;
-    gap: 0.4rem;
+  .quote-panel blockquote {
+    margin: 0;
+    max-width: 44rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.05rem, 1.8vw, 1.32rem);
+    line-height: 1.45;
+    color: var(--dark);
   }
 
-  .summary-copy h2,
+  .quote-panel cite {
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    font-style: normal;
+    color: var(--dark-muted);
+  }
+
+  .panel-head h2,
+  .accordion-summary strong,
+  .milestone-card h3,
+  .dashboard-header-copy h1 {
+    letter-spacing: -0.02em;
+  }
+
   .panel-head h2 {
     margin: 0;
     font-size: clamp(1.35rem, 2vw, 1.9rem);
   }
 
-  .summary-copy p,
   .panel-head p,
   .panel-note,
   .today-empty {
@@ -799,18 +713,12 @@
     color: var(--dark-soft);
   }
 
-  .summary-secondary {
-    color: var(--dark-muted);
-  }
-
-  .summary-stats,
   .detail-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
 
-  .summary-stat,
   .detail-card,
   .milestone-card {
     padding: 0.9rem 0.95rem;
@@ -819,13 +727,11 @@
     background: rgba(255, 255, 255, 0.7);
   }
 
-  .summary-stats-loading .summary-stat,
   .detail-grid-loading .detail-card {
     display: grid;
     gap: 0.45rem;
   }
 
-  .summary-stat dd,
   .detail-card dd {
     margin-top: 0.3rem;
     font-family: var(--font-display);
@@ -834,17 +740,9 @@
     color: var(--red);
   }
 
-  .dashboard-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.95fr);
-    gap: 1rem;
-  }
-
-  .dashboard-lower-grid {
-    display: grid;
-    grid-template-columns: minmax(19rem, 0.9fr) minmax(0, 1.1fr);
-    gap: 1rem;
-    align-items: start;
+  .dashboard-main,
+  .support-grid {
+    display: block;
   }
 
   .panel-head {
@@ -933,41 +831,8 @@
     margin-top: 1rem;
   }
 
-  .detail-grid-compact {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .panel-note {
     margin-top: 0.85rem;
-  }
-
-  .today-panel {
-    display: grid;
-    align-content: start;
-  }
-
-  .today-quote {
-    margin-top: 0.9rem;
-    padding: 0.9rem 0;
-    border-top: 1px solid rgba(190, 53, 25, 0.08);
-    border-bottom: 1px solid rgba(190, 53, 25, 0.08);
-  }
-
-  .today-quote blockquote {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.02rem;
-    line-height: 1.45;
-    color: var(--dark);
-  }
-
-  .today-quote cite {
-    display: block;
-    margin-top: 0.42rem;
-    font-family: var(--font-ui);
-    font-size: 0.78rem;
-    color: var(--dark-muted);
-    font-style: normal;
   }
 
   .accordion-stack {
@@ -1153,10 +1018,8 @@
   }
 
   @media (max-width: 1100px) {
-    .summary-band,
-    .dashboard-grid,
-    .dashboard-lower-grid {
-      grid-template-columns: 1fr;
+    .quote-panel blockquote {
+      max-width: 38rem;
     }
   }
 
@@ -1196,9 +1059,7 @@
       justify-items: start;
     }
 
-    .summary-stats,
-    .detail-grid,
-    .detail-grid-compact {
+    .detail-grid {
       grid-template-columns: 1fr 1fr;
     }
   }
@@ -1218,9 +1079,7 @@
       justify-content: center;
     }
 
-    .summary-stats,
-    .detail-grid,
-    .detail-grid-compact {
+    .detail-grid {
       grid-template-columns: 1fr;
     }
 
