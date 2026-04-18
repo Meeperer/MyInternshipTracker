@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { progress } from '$stores/progress.js';
   import { journal } from '$stores/journal.js';
   import { events } from '$stores/events.js';
@@ -28,6 +28,9 @@
   let todayEvents = $state([]);
   let eventsLoading = $state(true);
   let celebration = $state(null);
+  let dashboardDialog = $state();
+  let activeDashboardPanel = $state(null);
+  let dashboardDialogTrigger = $state(null);
 
   const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
@@ -81,6 +84,32 @@
 
   function shiftSelectedMonth(delta) {
     selectedMonth.shift(delta);
+  }
+
+  async function openDashboardModal(panel, trigger) {
+    activeDashboardPanel = panel;
+    dashboardDialogTrigger = trigger || null;
+
+    if (dashboardDialog?.open) return;
+
+    await tick();
+    dashboardDialog?.showModal();
+  }
+
+  function requestDashboardDialogClose() {
+    dashboardDialog?.close();
+  }
+
+  function handleDashboardDialogClose() {
+    activeDashboardPanel = null;
+    const trigger = dashboardDialogTrigger;
+    dashboardDialogTrigger = null;
+    trigger?.focus?.();
+  }
+
+  function handleDashboardDialogCancel(event) {
+    event.preventDefault();
+    dashboardDialog?.close();
   }
 
   async function handleCompile() {
@@ -379,8 +408,8 @@
 
   <section class="support-grid animate-rise rise-4" aria-label="Dashboard details">
     <div class="accordion-stack">
-      <details class="accordion-card card">
-        <summary class="accordion-summary">
+      <article class="accordion-card card">
+        <button type="button" class="accordion-trigger" onclick={(event) => openDashboardModal('month', event.currentTarget)}>
           <span class="accordion-main">
             <span class="accordion-index" aria-hidden="true">01</span>
             <span class="accordion-copy">
@@ -392,67 +421,11 @@
             <span class="accordion-meta">{monthShare}% of goal</span>
             <span class="accordion-indicator" aria-hidden="true">+</span>
           </span>
-        </summary>
+        </button>
+      </article>
 
-        <div class="accordion-body">
-          {#if dashboardBusy}
-            <div class="detail-grid detail-grid-loading" aria-hidden="true">
-              {#each Array.from({ length: 4 }) as _}
-                <div class="detail-card">
-                  <span class="skeleton-line short"></span>
-                  <span class="skeleton-line medium"></span>
-                </div>
-              {/each}
-            </div>
-            <div class="panel-loading" aria-hidden="true">
-              <div class="skeleton-line medium"></div>
-              <div class="skeleton-block track-skeleton"></div>
-              <div class="skeleton-line long"></div>
-            </div>
-          {:else}
-            <dl class="detail-grid">
-              <div class="detail-card">
-                <dt>Hours logged</dt>
-                <dd>{formatHours(monthInsights.totalHours)}</dd>
-              </div>
-              <div class="detail-card">
-                <dt>Days active</dt>
-                <dd>{monthInsights.activeDays}</dd>
-              </div>
-              <div class="detail-card">
-                <dt>Days finished</dt>
-                <dd>{monthInsights.finishedDays}</dd>
-              </div>
-              <div class="detail-card">
-                <dt>Current cadence</dt>
-                <dd>{cadenceLabel}</dd>
-              </div>
-            </dl>
-
-            <div class="snapshot-progress">
-              <div class="snapshot-progress-head">
-                <span>This month contributes {monthShare}% of the internship goal.</span>
-                <span>{formatHours(monthInsights.totalHours)}</span>
-              </div>
-              <div class="snapshot-track" aria-hidden="true">
-                <span class="snapshot-fill" style={`width: ${monthShare}%`}></span>
-              </div>
-              <p class="panel-note">
-                {#if !$progress.is_completed}
-                  At your current pace, the projected finish lands around {monthInsights.projectedCompletion}.
-                {:else}
-                  The target is complete, so this month is now part of the final record.
-                {/if}
-              </p>
-            </div>
-          {/if}
-        </div>
-      </details>
-
-      <!-- Native details/summary keeps the accordion keyboard-friendly and readable
-           without needing custom ARIA or key handling. -->
-      <details class="accordion-card card">
-        <summary class="accordion-summary">
+      <article class="accordion-card card">
+        <button type="button" class="accordion-trigger" onclick={(event) => openDashboardModal('milestones', event.currentTarget)}>
           <span class="accordion-main">
             <span class="accordion-index" aria-hidden="true">02</span>
             <span class="accordion-copy">
@@ -464,33 +437,11 @@
             <span class="accordion-meta">{$progress.current_streak}-day streak</span>
             <span class="accordion-indicator" aria-hidden="true">+</span>
           </span>
-        </summary>
+        </button>
+      </article>
 
-        <div class="accordion-body">
-          <div class="milestone-list">
-            {#each milestoneCards as milestone}
-              <article class:reached={milestone.reached} class="milestone-card">
-                <h3>{milestone.hours} hours</h3>
-                <p class="milestone-status">
-                  {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
-                </p>
-                <p class="milestone-note">
-                  {#if milestone.reached}
-                    This marker is already locked into the record.
-                  {:else if milestone.remaining <= 24}
-                    Close enough to plan around now.
-                  {:else}
-                    Still ahead, but clearly visible from here.
-                  {/if}
-                </p>
-              </article>
-            {/each}
-          </div>
-        </div>
-      </details>
-
-      <details class="accordion-card card">
-        <summary class="accordion-summary">
+      <article class="accordion-card card">
+        <button type="button" class="accordion-trigger" onclick={(event) => openDashboardModal('today', event.currentTarget)}>
           <span class="accordion-main">
             <span class="accordion-index" aria-hidden="true">03</span>
             <span class="accordion-copy">
@@ -502,72 +453,203 @@
             <span class="accordion-meta">{todayEvents.length > 0 ? 'Scheduled' : 'Open'}</span>
             <span class="accordion-indicator" aria-hidden="true">+</span>
           </span>
-        </summary>
-
-        <div class="accordion-body">
-          {#if eventsLoading}
-            <div class="panel-loading" aria-hidden="true">
-              <div class="skeleton-line long"></div>
-              <div class="skeleton-line medium"></div>
-              <div class="skeleton-line long"></div>
-            </div>
-          {:else if todayEvents.length > 0}
-            <ul class="today-events">
-              {#each todayEvents as ev}
-                <li class="today-event">
-                  <div>
-                    <span class="today-event-title">{ev.title}</span>
-                    {#if ev.description}
-                      <span class="today-event-description">{ev.description}</span>
-                    {/if}
-                  </div>
-                  {#if formatTimeRange(ev)}
-                    <span class="today-event-time">{formatTimeRange(ev)}</span>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-          {:else}
-            <p class="today-empty">No scheduled events today. Open the calendar or journal when you want to anchor the day.</p>
-          {/if}
-
-          <div class="today-actions">
-            <button class="btn btn-primary" onclick={() => onNavigateToDate(todayString())}>
-              Open today in calendar
-            </button>
-          </div>
-        </div>
-      </details>
+        </button>
+      </article>
 
       {#if $progress.is_completed}
-        <details class="accordion-card card">
-          <summary class="accordion-summary">
+        <article class="accordion-card card">
+          <button type="button" class="accordion-trigger" onclick={(event) => openDashboardModal('report', event.currentTarget)}>
             <span class="accordion-main">
               <span class="accordion-index" aria-hidden="true">04</span>
               <span class="accordion-copy">
                 <strong>Final report</strong>
                 <span class="accordion-subtitle">
-                {#if compilationStatus?.has_report}
-                  Report ready to download
-                {:else}
-                  Compile the PDF report
-                {/if}
+                  {#if compilationStatus?.has_report}
+                    Report ready to download
+                  {:else}
+                    Compile the PDF report
+                  {/if}
                 </span>
               </span>
             </span>
             <span class="accordion-side">
-              <span class="accordion-meta">
-                {#if compilationStatus?.has_report}
-                  Ready
-                {:else}
-                  Pending
-                {/if}
-              </span>
+              {#if compilationStatus?.has_report}
+                <span class="accordion-meta">Ready</span>
+              {:else}
+                <span class="accordion-meta">Pending</span>
+              {/if}
               <span class="accordion-indicator" aria-hidden="true">+</span>
             </span>
-          </summary>
+          </button>
+        </article>
+      {/if}
+    </div>
+  </section>
 
-          <div class="accordion-body">
+  <dialog
+    bind:this={dashboardDialog}
+    class="dashboard-dialog"
+    aria-labelledby="dashboard-dialog-title"
+    onclick={(event) => {
+      if (event.target === event.currentTarget) requestDashboardDialogClose();
+    }}
+    onclose={handleDashboardDialogClose}
+    oncancel={handleDashboardDialogCancel}
+  >
+    {#if activeDashboardPanel}
+      <div class="dashboard-dialog-shell">
+        <header class="dashboard-dialog-head">
+          <div class="dashboard-dialog-copy">
+            <p class="dashboard-dialog-kicker">
+              {#if activeDashboardPanel === 'month'}
+                Month overview
+              {:else if activeDashboardPanel === 'milestones'}
+                Progress markers
+              {:else if activeDashboardPanel === 'today'}
+                Daily focus
+              {:else}
+                Final report
+              {/if}
+            </p>
+            <h2 id="dashboard-dialog-title">
+              {#if activeDashboardPanel === 'month'}
+                {dashboardMonthLabel}
+              {:else if activeDashboardPanel === 'milestones'}
+                Milestones
+              {:else if activeDashboardPanel === 'today'}
+                Today
+              {:else}
+                Final report
+              {/if}
+            </h2>
+            <p class="dashboard-dialog-summary">
+              {#if activeDashboardPanel === 'month'}
+                {formatHours(monthInsights.totalHours)} across {monthInsights.activeDays} active days in this month.
+              {:else if activeDashboardPanel === 'milestones'}
+                {reachedMilestones} of {milestoneCards.length} hour markers are already reached.
+              {:else if activeDashboardPanel === 'today'}
+                {todaySummary}
+              {:else}
+                {#if compilationStatus?.has_report}
+                  A compiled report is ready to download.
+                {:else}
+                  Compile the final internship PDF report when you are ready.
+                {/if}
+              {/if}
+            </p>
+          </div>
+
+          <button type="button" class="dashboard-dialog-close" onclick={requestDashboardDialogClose}>
+            Close
+          </button>
+        </header>
+
+        <div class="dashboard-dialog-body">
+          {#if activeDashboardPanel === 'month'}
+            {#if dashboardBusy}
+              <div class="detail-grid detail-grid-loading" aria-hidden="true">
+                {#each Array.from({ length: 4 }) as _}
+                  <div class="detail-card">
+                    <span class="skeleton-line short"></span>
+                    <span class="skeleton-line medium"></span>
+                  </div>
+                {/each}
+              </div>
+              <div class="panel-loading" aria-hidden="true">
+                <div class="skeleton-line medium"></div>
+                <div class="skeleton-block track-skeleton"></div>
+                <div class="skeleton-line long"></div>
+              </div>
+            {:else}
+              <dl class="detail-grid">
+                <div class="detail-card">
+                  <dt>Hours logged</dt>
+                  <dd>{formatHours(monthInsights.totalHours)}</dd>
+                </div>
+                <div class="detail-card">
+                  <dt>Days active</dt>
+                  <dd>{monthInsights.activeDays}</dd>
+                </div>
+                <div class="detail-card">
+                  <dt>Days finished</dt>
+                  <dd>{monthInsights.finishedDays}</dd>
+                </div>
+                <div class="detail-card">
+                  <dt>Current cadence</dt>
+                  <dd>{cadenceLabel}</dd>
+                </div>
+              </dl>
+
+              <div class="snapshot-progress">
+                <div class="snapshot-progress-head">
+                  <span>This month contributes {monthShare}% of the internship goal.</span>
+                  <span>{formatHours(monthInsights.totalHours)}</span>
+                </div>
+                <div class="snapshot-track" aria-hidden="true">
+                  <span class="snapshot-fill" style={`width: ${monthShare}%`}></span>
+                </div>
+                <p class="panel-note">
+                  {#if !$progress.is_completed}
+                    At your current pace, the projected finish lands around {monthInsights.projectedCompletion}.
+                  {:else}
+                    The target is complete, so this month is now part of the final record.
+                  {/if}
+                </p>
+              </div>
+            {/if}
+          {:else if activeDashboardPanel === 'milestones'}
+            <div class="milestone-list">
+              {#each milestoneCards as milestone}
+                <article class:reached={milestone.reached} class="milestone-card">
+                  <h3>{milestone.hours} hours</h3>
+                  <p class="milestone-status">
+                    {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
+                  </p>
+                  <p class="milestone-note">
+                    {#if milestone.reached}
+                      This marker is already locked into the record.
+                    {:else if milestone.remaining <= 24}
+                      Close enough to plan around now.
+                    {:else}
+                      Still ahead, but clearly visible from here.
+                    {/if}
+                  </p>
+                </article>
+              {/each}
+            </div>
+          {:else if activeDashboardPanel === 'today'}
+            {#if eventsLoading}
+              <div class="panel-loading" aria-hidden="true">
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line medium"></div>
+                <div class="skeleton-line long"></div>
+              </div>
+            {:else if todayEvents.length > 0}
+              <ul class="today-events">
+                {#each todayEvents as ev}
+                  <li class="today-event">
+                    <div>
+                      <span class="today-event-title">{ev.title}</span>
+                      {#if ev.description}
+                        <span class="today-event-description">{ev.description}</span>
+                      {/if}
+                    </div>
+                    {#if formatTimeRange(ev)}
+                      <span class="today-event-time">{formatTimeRange(ev)}</span>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <p class="today-empty">No scheduled events today. Open the calendar or journal when you want to anchor the day.</p>
+            {/if}
+
+            <div class="today-actions">
+              <button class="btn btn-primary" onclick={() => onNavigateToDate(todayString())}>
+                Open today in calendar
+              </button>
+            </div>
+          {:else if activeDashboardPanel === 'report'}
             <div class="report-actions">
               <p class="panel-note">
                 {#if compilationStatus?.has_report}
@@ -587,11 +669,11 @@
                 </button>
               {/if}
             </div>
-          </div>
-        </details>
-      {/if}
-    </div>
-  </section>
+          {/if}
+        </div>
+      </div>
+    {/if}
+  </dialog>
 
   {#if celebration}
     <div class="modal-overlay celebration-overlay" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
@@ -739,7 +821,6 @@
   }
 
   .panel-head h2,
-  .accordion-summary strong,
   .milestone-card h3,
   .dashboard-header-copy h1 {
     letter-spacing: -0.02em;
@@ -893,27 +974,30 @@
     transition: border-color 160ms ease, background-color 160ms ease;
   }
 
-  .accordion-card:hover {
+  .accordion-card:hover,
+  .accordion-card:focus-within {
     border-color: rgba(190, 53, 25, 0.16);
+    background: rgba(255, 250, 244, 0.98);
   }
 
-  .accordion-summary {
-    list-style: none;
+  .accordion-trigger {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
     align-items: center;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
     padding: 1rem 1.1rem;
     cursor: pointer;
     transition: background-color 160ms ease;
   }
 
-  .accordion-summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .accordion-summary::marker {
-    content: '';
+  .accordion-trigger:focus-visible {
+    outline: 2px solid rgba(190, 53, 25, 0.32);
+    outline-offset: -2px;
   }
 
   .accordion-main {
@@ -944,7 +1028,7 @@
     min-width: 0;
   }
 
-  .accordion-summary strong {
+  .accordion-copy strong {
     font-size: 1.08rem;
     color: var(--red);
   }
@@ -988,28 +1072,104 @@
     transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
   }
 
-  .accordion-body {
-    padding: 0 1.1rem 1.05rem;
-    border-top: 1px solid rgba(190, 53, 25, 0.08);
-  }
-
-  .accordion-card[open] {
-    border-color: rgba(190, 53, 25, 0.18);
-    background: rgba(255, 250, 244, 0.98);
-  }
-
-  .accordion-card[open] .accordion-summary {
+  .accordion-card:hover .accordion-trigger,
+  .accordion-card:focus-within .accordion-trigger {
     background: rgba(190, 53, 25, 0.04);
   }
 
-  .accordion-card[open] .accordion-indicator {
-    transform: rotate(45deg);
+  .accordion-card:hover .accordion-indicator,
+  .accordion-card:focus-within .accordion-indicator {
     background: rgba(190, 53, 25, 0.08);
     border-color: rgba(190, 53, 25, 0.18);
   }
 
-  .accordion-card[open] .accordion-body {
-    animation: accordion-reveal 180ms ease-out;
+  .dashboard-dialog {
+    width: min(52rem, calc(100vw - 2rem));
+    max-width: 52rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+  }
+
+  .dashboard-dialog::backdrop {
+    background: rgba(44, 24, 13, 0.24);
+    backdrop-filter: blur(3px);
+  }
+
+  .dashboard-dialog-shell {
+    border: 1px solid rgba(190, 53, 25, 0.14);
+    border-radius: 18px;
+    background: rgba(255, 252, 246, 0.99);
+    box-shadow: 0 18px 50px rgba(63, 24, 8, 0.14);
+    overflow: hidden;
+  }
+
+  .dashboard-dialog-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: start;
+    padding: 1.25rem 1.3rem 1rem;
+    border-bottom: 1px solid rgba(190, 53, 25, 0.08);
+  }
+
+  .dashboard-dialog-copy {
+    display: grid;
+    gap: 0.32rem;
+  }
+
+  .dashboard-dialog-kicker {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--red);
+  }
+
+  .dashboard-dialog-head h2 {
+    margin: 0;
+    font-size: clamp(1.35rem, 2vw, 1.9rem);
+    color: var(--red);
+  }
+
+  .dashboard-dialog-summary {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--dark-soft);
+  }
+
+  .dashboard-dialog-close {
+    min-width: 5.2rem;
+    min-height: 2.5rem;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid rgba(190, 53, 25, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--red);
+    font-family: var(--font-ui);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .dashboard-dialog-close:focus-visible {
+    outline: 2px solid rgba(190, 53, 25, 0.32);
+    outline-offset: 2px;
+  }
+
+  .dashboard-dialog-body {
+    max-height: min(68dvh, 42rem);
+    overflow: auto;
+    padding: 1.1rem 1.3rem 1.35rem;
+  }
+
+  .dashboard-dialog[open] .dashboard-dialog-shell {
+    animation: dashboard-dialog-reveal 180ms ease-out;
   }
 
   .milestone-list {
@@ -1125,10 +1285,10 @@
     color: var(--dark-soft);
   }
 
-  @keyframes accordion-reveal {
+  @keyframes dashboard-dialog-reveal {
     from {
       opacity: 0;
-      transform: translateY(-4px);
+      transform: translateY(6px);
     }
 
     to {
@@ -1165,7 +1325,7 @@
       align-items: start;
     }
 
-    .accordion-summary {
+    .accordion-trigger {
       align-items: start;
     }
 
@@ -1211,13 +1371,25 @@
       white-space: normal;
     }
 
-    .accordion-summary {
+    .accordion-trigger {
       flex-direction: column;
       align-items: start;
     }
 
     .accordion-main,
     .accordion-side {
+      width: 100%;
+    }
+
+    .dashboard-dialog {
+      width: calc(100vw - 1rem);
+    }
+
+    .dashboard-dialog-head {
+      flex-direction: column;
+    }
+
+    .dashboard-dialog-close {
       width: 100%;
     }
 
@@ -1241,7 +1413,7 @@
       transition: none;
     }
 
-    .accordion-card[open] .accordion-body {
+    .dashboard-dialog[open] .dashboard-dialog-shell {
       animation: none;
     }
   }
