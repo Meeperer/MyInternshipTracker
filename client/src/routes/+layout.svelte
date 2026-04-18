@@ -2,6 +2,7 @@
   import '../app.css';
   import Toast from '$components/Toast.svelte';
   import CommandPalette from '$components/CommandPalette.svelte';
+  import ParallaxBackdrop from '$components/ParallaxBackdrop.svelte';
   import { auth, isAuthenticated } from '$stores/auth.js';
   import { appCommands } from '$stores/appCommands.js';
   import { selectedMonth } from '$stores/selectedMonth.js';
@@ -90,6 +91,27 @@
   });
 </script>
 
-{@render children()}
+<div class="site-shell">
+  <ParallaxBackdrop />
+  <div class="site-content">
+    {@render children()}
+  </div>
+</div>
 <CommandPalette />
 <Toast />
+
+<style>
+  .site-shell {
+    position: relative;
+    min-height: 100vh;
+    isolation: isolate;
+    background: var(--bg);
+    overflow-x: clip;
+  }
+
+  .site-content {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+  }
+</style>

@@ -191,8 +191,6 @@
 
   let targetHours = $derived($progress.target_hours || 486);
   let dashboardMonthLabel = $derived.by(() => formatMonthLabel($selectedMonth || monthValueFromDate()));
-  let dashboardMonthWord = $derived.by(() => dashboardMonthLabel.split(' ')[0].toUpperCase());
-  let dashboardYearWord = $derived.by(() => dashboardMonthLabel.split(' ')[1] || '');
   let dashboardBusy = $derived($progress.loading || $journal.loading);
   let todayQuote = $derived.by(() => {
     const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
@@ -301,6 +299,26 @@
     return `${todayEvents.length} event${todayEvents.length === 1 ? '' : 's'} scheduled today`;
   });
 
+  let monthSummaryLine = $derived.by(() => {
+    if (monthStats.count === 0) {
+      return `No entries are logged in ${dashboardMonthLabel} yet.`;
+    }
+
+    return `${dashboardMonthLabel} holds ${formatHours(monthStats.hours)} across ${monthStats.count} entries, with ${monthStats.finished} finished days already counting toward the requirement.`;
+  });
+
+  let nextActionLine = $derived.by(() => {
+    if ($progress.is_completed) {
+      return 'The hours requirement is complete, so the dashboard can shift from chasing totals to reviewing the finished record.';
+    }
+
+    if (nextMilestone) {
+      return `${nextMilestone.remaining} hours remain before the ${nextMilestone.hours}-hour milestone is cleared.`;
+    }
+
+    return 'Every planned milestone is already complete.';
+  });
+
   $effect(() => {
     if (!$selectedMonth) {
       selectedMonth.init();
@@ -364,9 +382,11 @@
 >
   <!-- Decorative parallax layers stay hidden from assistive tech so the reading order remains clean. -->
   <div class="dashboard-parallax" aria-hidden="true">
-    <span class="parallax-month-word">{dashboardMonthWord}</span>
-    <span class="parallax-year-word">{dashboardYearWord}</span>
-    <span class="parallax-target-word">{targetHours}</span>
+    <span class="parallax-sheet parallax-sheet-a"></span>
+    <span class="parallax-sheet parallax-sheet-b"></span>
+    <span class="parallax-sheet parallax-sheet-c"></span>
+    <span class="parallax-orbit parallax-orbit-a"></span>
+    <span class="parallax-orbit parallax-orbit-b"></span>
     <span class="parallax-rule parallax-rule-a"></span>
     <span class="parallax-rule parallax-rule-b"></span>
     <span class="parallax-rule parallax-rule-c"></span>
@@ -399,7 +419,34 @@
     </div>
   </header>
 
-  <section class="dashboard-main-grid animate-rise rise-2" aria-label="Progress overview">
+  <section class="overview-panel card animate-rise rise-2" aria-labelledby="dashboard-overview-title">
+    <div class="overview-copy">
+      <h2 id="dashboard-overview-title">{greetingLabel}</h2>
+      <p>{monthSummaryLine}</p>
+      <p class="overview-secondary">{nextActionLine}</p>
+    </div>
+
+    <dl class="overview-metrics">
+      <div class="overview-metric">
+        <dt>Total logged</dt>
+        <dd>{$progress.total_hours}</dd>
+      </div>
+      <div class="overview-metric">
+        <dt>Remaining</dt>
+        <dd>{$progress.remaining_hours}</dd>
+      </div>
+      <div class="overview-metric">
+        <dt>This month</dt>
+        <dd>{formatHours(monthStats.hours)}</dd>
+      </div>
+      <div class="overview-metric">
+        <dt>Current streak</dt>
+        <dd>{$progress.current_streak}d</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="dashboard-main-grid animate-rise rise-3" aria-label="Progress overview">
     <div class="parallax-plane depth-1">
       <article class="trajectory-panel card">
         <header class="panel-head">
@@ -530,7 +577,7 @@
     </div>
   </section>
 
-  <section class="milestones-panel card animate-rise rise-3" aria-labelledby="dashboard-milestones-title">
+  <section class="milestones-panel card animate-rise rise-4" aria-labelledby="dashboard-milestones-title">
     <header class="section-head">
       <div>
         <h2 id="dashboard-milestones-title">Milestones</h2>
@@ -538,6 +585,24 @@
       </div>
       <p class="section-meta">{$progress.current_streak}-day streak. {$progress.longest_streak}-day best.</p>
     </header>
+
+    {#if !dashboardBusy}
+      <div class="milestones-runway" aria-hidden="true">
+        <span class="milestones-runway-track"></span>
+        <span class="milestones-runway-fill" style={`width: ${Math.min($progress.percentage, 100)}%`}></span>
+
+        {#each progressMarkers as marker}
+          <span
+            class:reached={marker.reached}
+            class="milestones-runway-stop"
+            style={`left: ${marker.left}%`}
+          >
+            <span class="milestones-runway-dot"></span>
+            <span class="milestones-runway-label">{marker.hours}</span>
+          </span>
+        {/each}
+      </div>
+    {/if}
 
     <div class="milestones-grid">
       {#each milestoneCards as milestone}
@@ -552,7 +617,7 @@
     </div>
   </section>
 
-  <section class="dashboard-lower-grid animate-rise rise-4">
+  <section class="dashboard-lower-grid animate-rise rise-5">
     <div class="parallax-plane depth-1">
       <article class="snapshot-panel card" aria-labelledby="dashboard-snapshot-title">
         <header class="section-head">
@@ -666,7 +731,7 @@
   </section>
 
   {#if $progress.is_completed}
-    <section class="report-panel card animate-rise rise-5" aria-labelledby="dashboard-report-title">
+    <section class="report-panel card animate-rise rise-6" aria-labelledby="dashboard-report-title">
       <header class="section-head">
         <div>
           <h2 id="dashboard-report-title">Final report</h2>
@@ -726,37 +791,61 @@
     overflow: hidden;
   }
 
-  .parallax-month-word,
-  .parallax-year-word,
-  .parallax-target-word {
+  .parallax-sheet,
+  .parallax-orbit {
     position: absolute;
-    font-family: var(--font-display);
-    color: rgba(190, 53, 25, 0.06);
-    line-height: 0.82;
-    letter-spacing: -0.05em;
-    text-transform: uppercase;
-    user-select: none;
+    border: 1px solid rgba(190, 53, 25, 0.08);
+    background: rgba(255, 255, 255, 0.26);
   }
 
-  .parallax-month-word {
-    top: -0.25rem;
-    left: clamp(0.3rem, 1vw, 0.8rem);
-    font-size: clamp(4rem, 12vw, 8rem);
-    transform: translate3d(0, calc(var(--parallax-shift) * 0.08), 0);
+  .parallax-sheet {
+    border-radius: 14px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
   }
 
-  .parallax-year-word {
-    top: 4.7rem;
-    left: clamp(0.4rem, 1.2vw, 1rem);
-    font-size: clamp(2.1rem, 5vw, 3.6rem);
-    transform: translate3d(0, calc(var(--parallax-shift) * 0.12), 0);
+  .parallax-sheet-a {
+    top: 4.4rem;
+    left: -6rem;
+    width: min(28rem, 34vw);
+    height: 15rem;
+    transform: translate3d(0, calc(var(--parallax-shift) * 0.045), 0) rotate(-7deg);
   }
 
-  .parallax-target-word {
-    top: 1rem;
-    right: clamp(0.3rem, 1.2vw, 0.8rem);
-    font-size: clamp(4.25rem, 10vw, 7rem);
-    transform: translate3d(0, calc(var(--parallax-shift) * -0.12), 0);
+  .parallax-sheet-b {
+    top: 17rem;
+    right: -7rem;
+    width: min(34rem, 36vw);
+    height: 19rem;
+    transform: translate3d(0, calc(var(--parallax-shift) * -0.055), 0) rotate(8deg);
+  }
+
+  .parallax-sheet-c {
+    bottom: 4rem;
+    left: 18%;
+    width: min(24rem, 28vw);
+    height: 12rem;
+    transform: translate3d(0, calc(var(--parallax-shift) * 0.03), 0) rotate(-5deg);
+  }
+
+  .parallax-orbit {
+    border-radius: 999px;
+    background: transparent;
+  }
+
+  .parallax-orbit-a {
+    top: 7rem;
+    right: 18%;
+    width: 12rem;
+    height: 12rem;
+    transform: translate3d(0, calc(var(--parallax-shift) * -0.08), 0);
+  }
+
+  .parallax-orbit-b {
+    bottom: 8rem;
+    right: -2rem;
+    width: 18rem;
+    height: 18rem;
+    transform: translate3d(0, calc(var(--parallax-shift) * 0.06), 0);
   }
 
   .parallax-rule {
@@ -803,6 +892,66 @@
     background: rgba(255, 252, 246, 0.96);
     border-color: rgba(190, 53, 25, 0.1);
     box-shadow: 0 8px 24px rgba(34, 24, 8, 0.05);
+  }
+
+  .overview-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(19rem, 0.95fr);
+    gap: 1rem;
+    padding: 1.15rem 1.2rem;
+  }
+
+  .overview-copy {
+    display: grid;
+    gap: 0.45rem;
+    align-content: start;
+  }
+
+  .overview-copy h2 {
+    margin: 0;
+    font-size: clamp(1.45rem, 2.4vw, 2rem);
+  }
+
+  .overview-copy p,
+  .overview-secondary {
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--dark-soft);
+  }
+
+  .overview-secondary {
+    color: var(--dark-muted);
+  }
+
+  .overview-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .overview-metric {
+    padding: 0.95rem 1rem;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.64);
+  }
+
+  .overview-metric dt {
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dark-muted);
+  }
+
+  .overview-metric dd {
+    margin-top: 0.32rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2vw, 1.85rem);
+    line-height: 1.05;
+    color: var(--red);
   }
 
   .dashboard-bar {
@@ -932,7 +1081,7 @@
 
   .trajectory-total-value {
     font-family: var(--font-display);
-    font-size: clamp(3.8rem, 8vw, 6.5rem);
+    font-size: clamp(2.9rem, 6.5vw, 5rem);
     line-height: 0.88;
     color: var(--red);
   }
@@ -954,6 +1103,7 @@
 
   .trajectory-rail {
     margin-top: 1rem;
+    padding-bottom: 2rem;
   }
 
   .trajectory-rail-track {
@@ -975,7 +1125,7 @@
 
   .trajectory-marker {
     position: absolute;
-    top: -1.15rem;
+    top: calc(100% + 0.15rem);
     transform: translateX(-50%);
     display: grid;
     justify-items: center;
@@ -985,7 +1135,7 @@
 
   .trajectory-marker-line {
     width: 1px;
-    height: 2.15rem;
+    height: 0.85rem;
     background: currentColor;
   }
 
@@ -1001,9 +1151,9 @@
   }
 
   .trajectory-ledger {
-    margin-top: 1.65rem;
+    margin-top: 0.2rem;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
     gap: 0.75rem;
   }
 
@@ -1054,7 +1204,7 @@
   .snapshot-grid {
     margin-top: 1rem;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
     gap: 0.75rem;
   }
 
@@ -1067,8 +1217,66 @@
   .milestones-grid {
     margin-top: 1rem;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
     gap: 0.75rem;
+  }
+
+  .milestones-panel {
+    overflow: visible;
+  }
+
+  .milestones-runway {
+    position: relative;
+    margin-top: 1rem;
+    margin-bottom: 1.6rem;
+    padding: 0 0 2.2rem;
+  }
+
+  .milestones-runway-track,
+  .milestones-runway-fill {
+    position: absolute;
+    inset: 0 auto auto 0;
+    height: 0.65rem;
+    border-radius: 999px;
+  }
+
+  .milestones-runway-track {
+    width: 100%;
+    background: rgba(190, 53, 25, 0.08);
+  }
+
+  .milestones-runway-fill {
+    background: rgba(190, 53, 25, 0.86);
+    transition: width 0.5s var(--ease-out);
+  }
+
+  .milestones-runway-stop {
+    position: absolute;
+    top: 0.325rem;
+    transform: translate(-50%, -50%);
+    display: grid;
+    justify-items: center;
+    gap: 0.35rem;
+    color: rgba(190, 53, 25, 0.48);
+  }
+
+  .milestones-runway-dot {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 999px;
+    border: 2px solid currentColor;
+    background: var(--bg-soft);
+  }
+
+  .milestones-runway-label {
+    font-family: var(--font-ui);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .milestones-runway-stop.reached {
+    color: var(--red);
   }
 
   .milestone-card {
@@ -1289,6 +1497,7 @@
       width: min(100%, calc(100vw - 1rem));
     }
 
+    .overview-panel,
     .dashboard-main-grid,
     .dashboard-lower-grid,
     .milestones-grid {
@@ -1315,16 +1524,10 @@
       padding-inline: 0.7rem;
     }
 
-    .parallax-month-word {
-      font-size: clamp(3.2rem, 15vw, 5.4rem);
-    }
-
-    .parallax-target-word {
-      font-size: clamp(3.3rem, 14vw, 5.6rem);
-    }
-
-    .parallax-rule-a {
-      top: 7rem;
+    .parallax-sheet-a,
+    .parallax-sheet-b,
+    .parallax-orbit-b {
+      display: none;
     }
 
     .dashboard-bar-controls {
@@ -1341,6 +1544,7 @@
       justify-items: start;
     }
 
+    .overview-metrics,
     .trajectory-ledger,
     .month-panel-grid,
     .snapshot-grid {
@@ -1379,6 +1583,7 @@
       font-size: 3.25rem;
     }
 
+    .overview-metrics,
     .trajectory-ledger,
     .month-panel-grid,
     .snapshot-grid {
@@ -1408,9 +1613,8 @@
 
   @media (prefers-reduced-motion: reduce) {
     .parallax-plane,
-    .parallax-month-word,
-    .parallax-year-word,
-    .parallax-target-word,
+    .parallax-sheet,
+    .parallax-orbit,
     .parallax-rule {
       transform: none !important;
     }
