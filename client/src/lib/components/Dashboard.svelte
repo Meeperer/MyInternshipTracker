@@ -690,12 +690,15 @@
   .dashboard {
     width: calc(100% - 0.75rem);
     margin: 0 auto;
-    min-height: calc(100dvh - 6rem);
+    height: 100%;
+    min-height: 0;
     padding: clamp(0.9rem, 1.6vw, 1.35rem) clamp(0.85rem, 1.2vw, 1rem) clamp(1.35rem, 3vw, 2rem);
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: 0.85rem;
     background: transparent;
+    overflow: hidden;
   }
 
   .dashboard :global(.card) {
