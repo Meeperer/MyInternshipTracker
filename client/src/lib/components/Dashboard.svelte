@@ -296,7 +296,7 @@
 <div class="dashboard" aria-busy={dashboardBusy || eventsLoading}>
   <header class="dashboard-header animate-rise rise-1">
     <div class="dashboard-header-copy">
-      <h1>Dashboard</h1>
+      <h1 class="sr-only">Dashboard</h1>
       <p>{dashboardMonthLabel}. {$progress.total_hours} of {targetHours} hours logged, {$progress.remaining_hours} remaining.</p>
     </div>
 
@@ -731,7 +731,7 @@
   }
 
   .dashboard-header-copy p {
-    margin-top: 0.28rem;
+    margin: 0;
     font-family: var(--font-ui);
     font-size: 0.92rem;
     color: var(--dark-soft);
@@ -784,14 +784,14 @@
 
   .quote-panel {
     text-align: center;
-    padding-block: 1.05rem;
+    padding-block: 0.7rem;
   }
 
   .quote-shell {
     display: grid;
     justify-items: center;
-    gap: 0.45rem;
-    min-height: 7.25rem;
+    gap: 0.28rem;
+    min-height: 5.35rem;
     align-content: center;
   }
 
@@ -808,7 +808,7 @@
     max-width: 44rem;
     font-family: var(--font-display);
     font-size: clamp(1.25rem, 2vw, 1.7rem);
-    line-height: 1.45;
+    line-height: 1.32;
     color: var(--red);
   }
 
