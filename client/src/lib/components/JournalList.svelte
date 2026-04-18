@@ -78,6 +78,14 @@
     return [hrs, mins, secs].map((n) => String(n).padStart(2, '0')).join(':');
   }
 
+  function formatSummaryPeriodLabel(period) {
+    return period === 'week' ? 'week' : 'month';
+  }
+
+  function prefersReducedMotion() {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
   function getEntryPreview(entry, maxLength = 200) {
     const preview = [
       entry.content_ai_refined,
@@ -185,8 +193,14 @@
   let summaryRequestId = 0;
   let lastFetchedSummaryKey = $state('');
   let lastAutoSummaryKey = $state('');
+  let showSummaryModal = $state(false);
+  let typedSummaryText = $state('');
+  let summaryTypingActive = $state(false);
+  let summaryModalCloseButton = $state(null);
+  let summaryModalPreviousFocus = $state(null);
   let currentPage = $state(1);
   let expandedEntryDate = $state('');
+  let summaryTypingTimer = null;
 
   let weekOptions = $derived.by(() => getWeekOptions($selectedMonth || monthValueFromDate()));
   let filteredEntries = $derived.by(() => {
@@ -329,6 +343,65 @@
     handleGenerateSummary({ silent: true });
   });
 
+  $effect(() => {
+    activeSummaryKey;
+    showSummaryModal = false;
+    typedSummaryText = '';
+    summaryTypingActive = false;
+    if (summaryTypingTimer) {
+      clearInterval(summaryTypingTimer);
+      summaryTypingTimer = null;
+    }
+  });
+
+  $effect(() => {
+    if (!showSummaryModal || !summaryResult?.summary) {
+      typedSummaryText = '';
+      summaryTypingActive = false;
+      if (summaryTypingTimer) {
+        clearInterval(summaryTypingTimer);
+        summaryTypingTimer = null;
+      }
+      return;
+    }
+
+    const fullText = summaryResult.summary;
+
+    if (prefersReducedMotion()) {
+      typedSummaryText = fullText;
+      summaryTypingActive = false;
+      return;
+    }
+
+    typedSummaryText = '';
+    summaryTypingActive = true;
+    let index = 0;
+    const step = Math.max(2, Math.ceil(fullText.length / 110));
+
+    summaryTypingTimer = setInterval(() => {
+      index = Math.min(fullText.length, index + step);
+      typedSummaryText = fullText.slice(0, index);
+
+      if (index >= fullText.length) {
+        summaryTypingActive = false;
+        clearInterval(summaryTypingTimer);
+        summaryTypingTimer = null;
+      }
+    }, 22);
+
+    return () => {
+      if (summaryTypingTimer) {
+        clearInterval(summaryTypingTimer);
+        summaryTypingTimer = null;
+      }
+    };
+  });
+
+  $effect(() => {
+    if (!showSummaryModal || !summaryModalCloseButton) return;
+    queueMicrotask(() => summaryModalCloseButton?.focus());
+  });
+
   function openNewEntryForToday() {
     const today = todayString();
     selectedMonth.setFromDate(today);
@@ -407,6 +480,36 @@
       }
     } finally {
       summaryLoading = false;
+    }
+  }
+
+  function openSummaryModal() {
+    if (!summaryResult?.summary) return;
+    summaryModalPreviousFocus = typeof document !== 'undefined' ? document.activeElement : null;
+    typedSummaryText = prefersReducedMotion() ? summaryResult.summary : '';
+    summaryTypingActive = !prefersReducedMotion();
+    showSummaryModal = true;
+  }
+
+  function closeSummaryModal() {
+    showSummaryModal = false;
+    typedSummaryText = '';
+    summaryTypingActive = false;
+    if (summaryModalPreviousFocus && typeof summaryModalPreviousFocus.focus === 'function') {
+      summaryModalPreviousFocus.focus();
+    }
+  }
+
+  function handleSummaryOverlayClick(event) {
+    if (event.target === event.currentTarget) {
+      closeSummaryModal();
+    }
+  }
+
+  function handleSummaryOverlayKeydown(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSummaryModal();
     }
   }
 
@@ -582,13 +685,23 @@
               {summaryResult.persisted === false ? 'Live only' : 'Saved'}
             </span>
           </div>
-          <p>{summaryResult.summary}</p>
+          <p class="summary-ready-copy">
+            Your {formatSummaryPeriodLabel(summaryResult.period)} summary is ready. Open it when you want the full readout.
+          </p>
+          <button
+            type="button"
+            class="btn btn-sm btn-primary summary-open-button"
+            onclick={openSummaryModal}
+            aria-haspopup="dialog"
+          >
+            See summarized {formatSummaryPeriodLabel(summaryResult.period)}
+          </button>
           <p class="summary-footnote">
             Updated {new Date(summaryResult.updated_at || toDateString(new Date())).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'short',
               day: 'numeric'
-            })} · {summaryResult.entry_count} entr{summaryResult.entry_count === 1 ? 'y' : 'ies'} · {formatHoursValue(summaryResult.total_hours)} hours
+            })} | {summaryResult.entry_count} entr{summaryResult.entry_count === 1 ? 'y' : 'ies'} | {formatHoursValue(summaryResult.total_hours)} hours
           </p>
           {#if summaryResult.persisted === false}
             <p class="summary-warning">
@@ -797,6 +910,66 @@
     </div>
   </section>
 </div>
+
+{#if showSummaryModal && summaryResult}
+  <div
+    class="modal-overlay summary-modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="summary-modal-title"
+    aria-describedby="summary-modal-copy"
+    tabindex="-1"
+    onclick={handleSummaryOverlayClick}
+    onkeydown={handleSummaryOverlayKeydown}
+  >
+    <div class="modal-content summary-modal">
+      <div class="summary-modal-header">
+        <div>
+          <span class="summary-modal-kicker">{summaryResult.label}</span>
+          <h3 id="summary-modal-title">Summarized {formatSummaryPeriodLabel(summaryResult.period)}</h3>
+        </div>
+        <button
+          type="button"
+          class="close-btn summary-modal-close"
+          bind:this={summaryModalCloseButton}
+          onclick={closeSummaryModal}
+          aria-label="Close summarized entry modal"
+        >
+          &times;
+        </button>
+      </div>
+
+      <div class="summary-modal-meta">
+        <span>{summaryResult.entry_count} entr{summaryResult.entry_count === 1 ? 'y' : 'ies'}</span>
+        <span>{formatHoursValue(summaryResult.total_hours)} hours</span>
+        <span>{summaryResult.persisted === false ? 'Live only' : 'Saved'}</span>
+      </div>
+
+      <div class="summary-modal-body">
+        <p
+          id="summary-modal-copy"
+          class:typing={summaryTypingActive}
+          class="summary-modal-copy"
+        >
+          {summaryTypingActive ? typedSummaryText : typedSummaryText || summaryResult.summary}
+        </p>
+      </div>
+
+      <div class="summary-modal-footer">
+        <span class="summary-footnote">
+          Updated {new Date(summaryResult.updated_at || toDateString(new Date())).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          })}
+        </span>
+        <button type="button" class="btn btn-sm" onclick={closeSummaryModal}>
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .journal-view {
@@ -1097,6 +1270,12 @@
     border: 1px solid rgba(190, 53, 25, 0.1);
   }
 
+  .summary-result {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
   .summary-state strong,
   .summary-result-label {
     display: inline-block;
@@ -1116,6 +1295,10 @@
     color: var(--dark);
   }
 
+  .summary-ready-copy {
+    margin: 0;
+  }
+
   .summary-skeleton {
     display: grid;
     gap: 0.55rem;
@@ -1133,6 +1316,10 @@
     gap: 1rem;
     align-items: center;
     margin-bottom: 0.25rem;
+  }
+
+  .summary-open-button {
+    align-self: flex-start;
   }
 
   .summary-save-pill {
@@ -1161,6 +1348,112 @@
   .summary-warning {
     margin-top: 0.65rem;
     color: var(--warning);
+  }
+
+  .summary-modal {
+    max-width: 760px;
+    background: #fffef8;
+  }
+
+  .summary-modal-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .summary-modal-kicker {
+    display: inline-block;
+    font-family: var(--font-ui);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.4rem;
+  }
+
+  .summary-modal-header h3 {
+    margin: 0;
+    font-size: 1.6rem;
+  }
+
+  .summary-modal-close {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: none;
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.08);
+    color: var(--red);
+    font-size: 1.4rem;
+    line-height: 1;
+    transition: background var(--transition-fast), transform var(--transition-fast), color var(--transition-fast);
+  }
+
+  .summary-modal-close:hover {
+    background: rgba(190, 53, 25, 0.14);
+    color: var(--red-hover);
+    transform: translateY(-1px);
+  }
+
+  .summary-modal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 1rem;
+  }
+
+  .summary-modal-meta span {
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    color: var(--dark-soft);
+  }
+
+  .summary-modal-body {
+    margin-top: 1rem;
+    padding: 1.15rem 1.2rem;
+    border-radius: 16px;
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    background: rgba(255, 255, 255, 0.84);
+    min-height: 14rem;
+    max-height: min(60vh, 34rem);
+    overflow: auto;
+  }
+
+  .summary-modal-copy {
+    margin: 0;
+    white-space: pre-wrap;
+    line-height: 1.9;
+    color: var(--dark);
+  }
+
+  .summary-modal-copy.typing::after {
+    content: '|';
+    margin-left: 0.08em;
+    color: var(--red);
+    animation: summaryCursorBlink 0.9s steps(1, end) infinite;
+  }
+
+  .summary-modal-footer {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  @keyframes summaryCursorBlink {
+    0%, 49% {
+      opacity: 1;
+    }
+    50%, 100% {
+      opacity: 0;
+    }
   }
 
   .search-shell {
@@ -1517,6 +1810,18 @@
       grid-template-columns: 1fr;
     }
 
+    .summary-modal-header,
+    .summary-modal-footer {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .summary-open-button,
+    .summary-modal-footer .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
     .journal-hero h2 {
       font-size: 2rem;
     }
@@ -1551,6 +1856,11 @@
     .journal-controls {
       padding-left: 1rem;
       padding-right: 1rem;
+    }
+
+    .summary-modal-body {
+      min-height: 12rem;
+      padding: 1rem;
     }
   }
 </style>
