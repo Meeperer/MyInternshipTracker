@@ -502,8 +502,13 @@
     if (typeof window === 'undefined') return;
 
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
     const host = document.querySelector('main#main-content');
     let frame = 0;
+    let smoothFrame = 0;
+    let smoothCurrent = host?.scrollTop || 0;
+    let smoothTarget = smoothCurrent;
+    let smoothingFromWheel = false;
 
     const updateParallax = () => {
       frame = 0;
@@ -551,9 +556,76 @@
       frame = window.requestAnimationFrame(updateParallax);
     };
 
+    const stopSmoothScroll = () => {
+      if (smoothFrame) {
+        window.cancelAnimationFrame(smoothFrame);
+        smoothFrame = 0;
+      }
+      smoothingFromWheel = false;
+    };
+
+    const syncSmoothStateFromHost = () => {
+      if (!host) return;
+      smoothCurrent = host.scrollTop;
+      smoothTarget = host.scrollTop;
+    };
+
+    const isIgnoredWheelTarget = (target) =>
+      target instanceof Element &&
+      !!target.closest('input, select, textarea, [role="dialog"], dialog, .modal-overlay, .modal-content, .summary-modal-body');
+
+    const animateSmoothScroll = () => {
+      if (!host) {
+        smoothFrame = 0;
+        return;
+      }
+
+      const next = smoothCurrent + ((smoothTarget - smoothCurrent) * 0.14);
+      smoothCurrent = next;
+      host.scrollTop = next;
+      queueUpdate();
+
+      if (Math.abs(smoothTarget - next) <= 0.45) {
+        host.scrollTop = smoothTarget;
+        smoothCurrent = smoothTarget;
+        smoothFrame = 0;
+        smoothingFromWheel = false;
+        return;
+      }
+
+      smoothFrame = window.requestAnimationFrame(animateSmoothScroll);
+    };
+
+    const handleWheel = (event) => {
+      if (!host || motionQuery.matches || coarsePointerQuery.matches) return;
+      if (event.ctrlKey || event.defaultPrevented) return;
+      if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
+      if (isIgnoredWheelTarget(event.target)) return;
+
+      const maxScroll = Math.max(host.scrollHeight - host.clientHeight, 0);
+      if (maxScroll <= 0) return;
+
+      event.preventDefault();
+      smoothingFromWheel = true;
+      smoothTarget = clamp(smoothTarget + (event.deltaY * 0.96), 0, maxScroll);
+
+      if (!smoothFrame) {
+        smoothFrame = window.requestAnimationFrame(animateSmoothScroll);
+      }
+    };
+
+    const handleHostScroll = () => {
+      if (!smoothingFromWheel) {
+        syncSmoothStateFromHost();
+      }
+      queueUpdate();
+    };
+
     scheduleParallaxUpdate = queueUpdate;
+    syncSmoothStateFromHost();
     updateParallax();
-    host?.addEventListener('scroll', queueUpdate, { passive: true });
+    host?.addEventListener('scroll', handleHostScroll, { passive: true });
+    host?.addEventListener('wheel', handleWheel, { passive: false });
     window.addEventListener('resize', queueUpdate, { passive: true });
 
     if (typeof motionQuery.addEventListener === 'function') {
@@ -562,8 +634,16 @@
       motionQuery.addListener(queueUpdate);
     }
 
+    if (typeof coarsePointerQuery.addEventListener === 'function') {
+      coarsePointerQuery.addEventListener('change', stopSmoothScroll);
+    } else {
+      coarsePointerQuery.addListener(stopSmoothScroll);
+    }
+
     return () => {
-      host?.removeEventListener('scroll', queueUpdate);
+      stopSmoothScroll();
+      host?.removeEventListener('scroll', handleHostScroll);
+      host?.removeEventListener('wheel', handleWheel);
       window.removeEventListener('resize', queueUpdate);
       scheduleParallaxUpdate = () => {};
 
@@ -571,6 +651,12 @@
         motionQuery.removeEventListener('change', queueUpdate);
       } else {
         motionQuery.removeListener(queueUpdate);
+      }
+
+      if (typeof coarsePointerQuery.removeEventListener === 'function') {
+        coarsePointerQuery.removeEventListener('change', stopSmoothScroll);
+      } else {
+        coarsePointerQuery.removeListener(stopSmoothScroll);
       }
 
       if (frame) {
