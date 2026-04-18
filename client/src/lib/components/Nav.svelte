@@ -1,7 +1,8 @@
 <script>
   import { auth } from '$stores/auth.js';
+  import { appCommands } from '$stores/appCommands.js';
   import { page } from '$app/stores';
-  import { timezone, timezoneOptions, getTimezoneLabel } from '$stores/timezone.js';
+  import { timezone, timezoneOptions } from '$stores/timezone.js';
 
   function handleLogout() {
     auth.logout();
@@ -46,7 +47,6 @@
   ];
 
   const activePath = $derived($page.url.pathname);
-  const timezoneLabel = $derived(getTimezoneLabel($timezone));
 </script>
 
 <nav class="top-nav animate-rise rise-1">
@@ -81,6 +81,10 @@
   </div>
 
   <div class="nav-right">
+    <button class="command-trigger" type="button" onclick={() => appCommands.openPalette()} aria-label="Open quick command palette">
+      <span>Quick Actions</span>
+      <span class="command-trigger-shortcut">Ctrl/Cmd + K</span>
+    </button>
     <button class="btn btn-sm btn-ghost" onclick={handleLogout}>
       Logout
     </button>
@@ -227,6 +231,37 @@
     justify-content: flex-end;
   }
 
+  .command-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    background: rgba(255, 255, 255, 0.74);
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    color: var(--dark-soft);
+    transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+  }
+
+  .command-trigger:hover {
+    transform: translateY(-1px);
+    border-color: rgba(190, 53, 25, 0.2);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 10px 20px rgba(34, 24, 8, 0.06);
+  }
+
+  .command-trigger-shortcut {
+    padding: 0.25rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.08);
+    color: var(--red);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
   .nav-right .btn {
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
@@ -285,6 +320,9 @@
     .nav-right .btn {
       padding: 0.4rem 0.8rem;
       font-size: 0.8rem;
+    }
+    .command-trigger-shortcut {
+      display: none;
     }
   }
 

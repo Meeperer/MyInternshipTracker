@@ -6,11 +6,38 @@ function createJournalStore() {
   const { subscribe, set, update } = writable({
     entries: [],
     currentEntry: null,
-    loading: false
+    loading: false,
+    summaryLibrary: [],
+    summaryLibraryLoading: false
   });
 
   function syncProgress() {
     progress.fetch().catch(() => {});
+  }
+
+  function upsertSummaryInLibrary(summary, state) {
+    if (!summary?.id) return state;
+
+    const next = [...(state.summaryLibrary || [])];
+    const index = next.findIndex((item) => item.id === summary.id);
+
+    if (index >= 0) {
+      next[index] = { ...next[index], ...summary };
+    } else {
+      next.unshift(summary);
+    }
+
+    next.sort((a, b) => {
+      if (Boolean(a.pinned) !== Boolean(b.pinned)) {
+        return a.pinned ? -1 : 1;
+      }
+
+      const aTime = new Date(a.updated_at || 0).getTime();
+      const bTime = new Date(b.updated_at || 0).getTime();
+      return bTime - aTime;
+    });
+
+    return { ...state, summaryLibrary: next };
   }
 
   return {
@@ -33,11 +60,13 @@ function createJournalStore() {
     },
 
     async summarizePeriod(period, startDate, endDate) {
-      return await api.post('/ai/summary-period', {
+      const result = await api.post('/ai/summary-period', {
         period,
         start_date: startDate,
         end_date: endDate
       });
+      update((state) => upsertSummaryInLibrary(result, state));
+      return result;
     },
 
     async fetchPeriodSummary(period, startDate, endDate) {
@@ -46,7 +75,33 @@ function createJournalStore() {
         start_date: startDate,
         end_date: endDate
       });
-      return await api.get(`/ai/summary-period?${params.toString()}`);
+      const summary = await api.get(`/ai/summary-period?${params.toString()}`);
+      if (summary?.id) {
+        update((state) => upsertSummaryInLibrary(summary, state));
+      }
+      return summary;
+    },
+
+    async fetchSummaryLibrary(limit = 24) {
+      update((state) => ({ ...state, summaryLibraryLoading: true }));
+      try {
+        const summaries = await api.get(`/ai/summary-library?limit=${limit}`);
+        update((state) => ({
+          ...state,
+          summaryLibrary: summaries || [],
+          summaryLibraryLoading: false
+        }));
+        return summaries || [];
+      } catch (error) {
+        update((state) => ({ ...state, summaryLibraryLoading: false }));
+        throw error;
+      }
+    },
+
+    async toggleSummaryPin(summaryId, pinned) {
+      const summary = await api.post(`/ai/summary-library/${summaryId}/pin`, { pinned });
+      update((state) => upsertSummaryInLibrary(summary, state));
+      return summary;
     },
 
     async fetchDate(date) {

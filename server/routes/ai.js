@@ -22,10 +22,17 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_AI_CONTENT = 20_000;
 const VALID_PERIODS = new Set(['week', 'month']);
+const SUMMARY_SELECT =
+  'id, summary, period_type, start_date, end_date, entry_count, summarized_entry_count, total_hours, updated_at, pinned';
 
 function isMissingSummaryTableError(error) {
   const message = error?.message || '';
   return error?.code === '42P01' || message.includes('journal_period_summaries');
+}
+
+function isMissingSummaryPinColumnError(error) {
+  const message = error?.message || '';
+  return error?.code === '42703' && message.includes('pinned');
 }
 
 function validateAIInput(req, res) {
@@ -56,6 +63,23 @@ function hasSummaryContent(entry) {
   ].some((value) => typeof value === 'string' && value.trim().length >= 10);
 }
 
+function mapStoredSummary(data) {
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    summary: data.summary,
+    period: data.period_type,
+    start_date: data.start_date,
+    end_date: data.end_date,
+    entry_count: data.entry_count,
+    summarized_entry_count: data.summarized_entry_count,
+    total_hours: Number(data.total_hours) || 0,
+    updated_at: data.updated_at,
+    pinned: Boolean(data.pinned)
+  };
+}
+
 function validateSummaryInput(req, res) {
   const source = req.method === 'GET' ? req.query : req.body;
   const { period, start_date, end_date } = source;
@@ -79,14 +103,25 @@ function validateSummaryInput(req, res) {
 }
 
 async function fetchStoredSummary(userId, period, startDate, endDate) {
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from('journal_period_summaries')
-    .select('summary, period_type, start_date, end_date, entry_count, summarized_entry_count, total_hours, updated_at')
+    .select(SUMMARY_SELECT)
     .eq('user_id', userId)
     .eq('period_type', period)
     .eq('start_date', startDate)
     .eq('end_date', endDate)
     .maybeSingle();
+
+  if (error && isMissingSummaryPinColumnError(error)) {
+    ({ data, error } = await supabaseAdmin
+      .from('journal_period_summaries')
+      .select('id, summary, period_type, start_date, end_date, entry_count, summarized_entry_count, total_hours, updated_at')
+      .eq('user_id', userId)
+      .eq('period_type', period)
+      .eq('start_date', startDate)
+      .eq('end_date', endDate)
+      .maybeSingle());
+  }
 
   if (error) {
     if (isMissingSummaryTableError(error)) {
@@ -97,16 +132,7 @@ async function fetchStoredSummary(userId, period, startDate, endDate) {
 
   if (!data) return null;
 
-  return {
-    summary: data.summary,
-    period: data.period_type,
-    start_date: data.start_date,
-    end_date: data.end_date,
-    entry_count: data.entry_count,
-    summarized_entry_count: data.summarized_entry_count,
-    total_hours: Number(data.total_hours) || 0,
-    updated_at: data.updated_at
-  };
+  return mapStoredSummary(data);
 }
 
 router.post('/refine', async (req, res) => {
@@ -246,32 +272,125 @@ router.post('/summary-period', async (req, res) => {
       updated_at: new Date().toISOString()
     };
 
+    const upsertPayload = {
+      user_id: req.user.id,
+      period_type: period,
+      start_date,
+      end_date,
+      model: 'llama-3.1-8b-instant',
+      ...payload
+    };
+
     const { error: upsertError } = await supabaseAdmin
       .from('journal_period_summaries')
-      .upsert({
-        user_id: req.user.id,
-        period_type: period,
-        start_date,
-        end_date,
-        model: 'llama-3.1-8b-instant',
-        ...payload
-      }, {
+      .upsert(upsertPayload, {
         onConflict: 'user_id,period_type,start_date,end_date'
       });
 
     const persisted = !upsertError;
     if (upsertError && !isMissingSummaryTableError(upsertError)) throw upsertError;
 
+    const savedSummary = persisted
+      ? await fetchStoredSummary(req.user.id, period, start_date, end_date)
+      : null;
+
+    if (savedSummary) {
+      return res.json({
+        ...savedSummary,
+        persisted: true
+      });
+    }
+
     res.json({
       period,
       start_date,
       end_date,
+      pinned: false,
       persisted,
       ...payload
     });
   } catch (err) {
     console.error('AI period summary error:', err);
     res.status(500).json({ error: 'Period summary generation failed' });
+  }
+});
+
+router.get('/summary-library', async (req, res) => {
+  const limit = Math.max(1, Math.min(Number(req.query.limit) || 24, 60));
+
+  try {
+    let { data, error } = await supabaseAdmin
+      .from('journal_period_summaries')
+      .select(SUMMARY_SELECT)
+      .eq('user_id', req.user.id)
+      .order('pinned', { ascending: false })
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+
+    if (error && isMissingSummaryPinColumnError(error)) {
+      ({ data, error } = await supabaseAdmin
+        .from('journal_period_summaries')
+        .select('id, summary, period_type, start_date, end_date, entry_count, summarized_entry_count, total_hours, updated_at')
+        .eq('user_id', req.user.id)
+        .order('updated_at', { ascending: false })
+        .limit(limit));
+    }
+
+    if (error) {
+      if (isMissingSummaryTableError(error)) {
+        return res.json([]);
+      }
+
+      throw error;
+    }
+
+    res.json((data || []).map(mapStoredSummary));
+  } catch (err) {
+    console.error('Fetch AI summary library error:', err);
+    res.status(500).json({ error: 'Failed to fetch summary library' });
+  }
+});
+
+router.post('/summary-library/:id/pin', async (req, res) => {
+  const { id } = req.params;
+  const { pinned } = req.body;
+
+  if (!UUID_RE.test(id)) {
+    return res.status(400).json({ error: 'Valid summary id is required' });
+  }
+
+  if (typeof pinned !== 'boolean') {
+    return res.status(400).json({ error: 'pinned must be a boolean value' });
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('journal_period_summaries')
+      .update({
+        pinned,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .select(SUMMARY_SELECT)
+      .single();
+
+    if (error) {
+      if (isMissingSummaryPinColumnError(error)) {
+        return res.status(400).json({ error: 'Summary pinning becomes available after the latest database migration is applied.' });
+      }
+
+      if (isMissingSummaryTableError(error)) {
+        return res.status(400).json({ error: 'Summary pinning is unavailable until the latest migration is applied.' });
+      }
+
+      throw error;
+    }
+
+    res.json(mapStoredSummary(data));
+  } catch (err) {
+    console.error('Pin AI summary error:', err);
+    res.status(500).json({ error: 'Failed to update summary pin' });
   }
 });
 

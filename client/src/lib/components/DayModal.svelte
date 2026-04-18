@@ -3,6 +3,12 @@
   import { events } from '$stores/events.js';
   import { toast } from '$stores/toast.js';
   import { formatDateLong } from '$utils/date.js';
+  import {
+    clearOfflineDraft,
+    hasMeaningfulOfflineDraft,
+    loadOfflineDraft,
+    saveOfflineDraft
+  } from '$utils/offlineDrafts.js';
   import EventForm from './EventForm.svelte';
 
   let { date = '', onClose = () => {} } = $props();
@@ -29,6 +35,9 @@
   let previousActiveElement = $state(null);
   let autoSaveStatus = $state('');
   let autoSaveTimer = $state(null);
+  let localDraftTimer = $state(null);
+  let online = $state(typeof navigator === 'undefined' ? true : navigator.onLine);
+  let draftRecovery = $state(null);
 
   const isDirty = $derived(
     (mode === 'edit' && (hours !== initialHoursOnEdit || contentRaw !== initialContentOnEdit)) ||
@@ -36,7 +45,21 @@
   );
 
   $effect(() => {
-    if (mode === 'edit' && isDirty && entry) {
+    if (mode !== 'edit' || !isDirty) {
+      return () => {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      };
+    }
+
+    if (!online) {
+      autoSaveStatus = 'offline-saved';
+      persistLocalDraft(true);
+      return () => {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      };
+    }
+
+    if (entry) {
       if (autoSaveTimer) clearTimeout(autoSaveTimer);
       autoSaveStatus = 'unsaved';
       autoSaveTimer = setTimeout(async () => {
@@ -48,12 +71,15 @@
             content_raw: contentRaw
           });
           entry = result;
+          clearOfflineDraft(date);
+          draftRecovery = null;
           initialHoursOnEdit = hours;
           initialContentOnEdit = contentRaw;
           autoSaveStatus = 'saved';
           setTimeout(() => { if (autoSaveStatus === 'saved') autoSaveStatus = ''; }, 2000);
         } catch {
-          autoSaveStatus = 'error';
+          autoSaveStatus = 'offline-saved';
+          persistLocalDraft(true);
         }
       }, 5000);
     }
@@ -61,10 +87,61 @@
   });
 
   $effect(() => {
+    if (!date || (mode !== 'edit' && mode !== 'log-hours')) {
+      return () => {
+        if (localDraftTimer) clearTimeout(localDraftTimer);
+      };
+    }
+
+    if (localDraftTimer) clearTimeout(localDraftTimer);
+    localDraftTimer = setTimeout(() => {
+      const shouldPersist = hasMeaningfulOfflineDraft({
+        hours,
+        content_raw: contentRaw
+      });
+
+      if (!shouldPersist) {
+        if (!draftRecovery?.unsynced) {
+          clearOfflineDraft(date);
+        }
+        return;
+      }
+
+      saveOfflineDraft(date, {
+        hours,
+        content_raw: contentRaw,
+        mode,
+        unsynced: !online || autoSaveStatus === 'offline-saved'
+      });
+    }, 350);
+
+    return () => {
+      if (localDraftTimer) clearTimeout(localDraftTimer);
+    };
+  });
+
+  $effect(() => {
     if (date) {
       if (typeof document !== 'undefined') previousActiveElement = document.activeElement;
       loadEntry();
     }
+  });
+
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+
+    function syncOnlineStatus() {
+      online = navigator.onLine;
+    }
+
+    syncOnlineStatus();
+    window.addEventListener('online', syncOnlineStatus);
+    window.addEventListener('offline', syncOnlineStatus);
+
+    return () => {
+      window.removeEventListener('online', syncOnlineStatus);
+      window.removeEventListener('offline', syncOnlineStatus);
+    };
   });
 
   $effect(() => {
@@ -166,7 +243,81 @@
     mode = 'view';
     initialHoursOnEdit = '';
     initialContentOnEdit = '';
+    hydrateDraftRecovery();
     loading = false;
+  }
+
+  function persistLocalDraft(unsynced = !online) {
+    if (!date) return null;
+
+    const shouldPersist = hasMeaningfulOfflineDraft({
+      hours,
+      content_raw: contentRaw
+    });
+
+    if (!shouldPersist) {
+      clearOfflineDraft(date);
+      return null;
+    }
+
+    const draft = saveOfflineDraft(date, {
+      hours,
+      content_raw: contentRaw,
+      mode,
+      unsynced
+    });
+
+    draftRecovery = draft;
+    return draft;
+  }
+
+  function hydrateDraftRecovery() {
+    const draft = loadOfflineDraft(date);
+
+    if (!hasMeaningfulOfflineDraft(draft)) {
+      draftRecovery = null;
+      clearOfflineDraft(date);
+      return;
+    }
+
+    const normalizedHours = String(entry?.hours ?? '').trim();
+    const normalizedContent = String(entry?.content_raw ?? '').trim();
+    const draftHours = String(draft?.hours ?? '').trim();
+    const draftContent = String(draft?.content_raw ?? '').trim();
+    const matchesEntry = normalizedHours === draftHours && normalizedContent === draftContent;
+
+    if (matchesEntry && !draft.unsynced) {
+      draftRecovery = null;
+      clearOfflineDraft(date);
+      return;
+    }
+
+    draftRecovery = draft;
+  }
+
+  function restoreOfflineDraft() {
+    if (!draftRecovery) return;
+
+    hours = String(draftRecovery.hours ?? '');
+    contentRaw = draftRecovery.content_raw || '';
+    initialHoursOnEdit = hours;
+    initialContentOnEdit = contentRaw;
+    mode = draftRecovery.mode === 'log-hours' ? 'log-hours' : 'edit';
+    autoSaveStatus = draftRecovery.unsynced ? 'offline-saved' : 'saved';
+    entry = {
+      ...(entry || {}),
+      date,
+      hours: parseFloat(hours) || 0,
+      content_raw: contentRaw,
+      status: entry?.status || 'draft',
+      local_only: draftRecovery.unsynced
+    };
+    toast.success(draftRecovery.unsynced ? 'Offline draft restored' : 'Local draft restored');
+  }
+
+  function dismissOfflineDraft() {
+    clearOfflineDraft(date);
+    draftRecovery = null;
   }
 
   function enterEditMode() {
@@ -202,6 +353,26 @@
 
   async function saveEntry() {
     if (!validateHours(true)) return;
+
+    if (!online) {
+      const draft = persistLocalDraft(true);
+      initialHoursOnEdit = hours;
+      initialContentOnEdit = contentRaw;
+      autoSaveStatus = 'offline-saved';
+      mode = 'view';
+      entry = {
+        ...(entry || {}),
+        date,
+        hours: parseFloat(hours) || 0,
+        content_raw: contentRaw,
+        status: entry?.status || 'draft',
+        local_only: true
+      };
+      draftRecovery = draft;
+      toast.success('Draft saved locally for offline use');
+      return;
+    }
+
     try {
       const result = await journal.save({
         date,
@@ -209,6 +380,8 @@
         content_raw: contentRaw
       });
       entry = result;
+      clearOfflineDraft(date);
+      draftRecovery = null;
       mode = 'view';
       toast.success('Entry saved');
     } catch (err) {
@@ -218,9 +391,30 @@
 
   async function logHoursOnly() {
     if (!validateHours(false)) return;
+
+    if (!online) {
+      const draft = persistLocalDraft(true);
+      initialHoursOnEdit = hours;
+      autoSaveStatus = 'offline-saved';
+      mode = 'view';
+      entry = {
+        ...(entry || {}),
+        date,
+        hours: parseFloat(hours) || 0,
+        content_raw: contentRaw || entry?.content_raw || '',
+        status: entry?.status || 'draft',
+        local_only: true
+      };
+      draftRecovery = draft;
+      toast.success('Hours saved locally for offline use');
+      return;
+    }
+
     try {
       const result = await journal.logHours(date, parseFloat(hours));
       entry = result;
+      clearOfflineDraft(date);
+      draftRecovery = null;
       toast.success('Hours logged');
       mode = 'view';
     } catch (err) {
@@ -238,6 +432,8 @@
     try {
       const result = await journal.finishDay(date);
       entry = result;
+      clearOfflineDraft(date);
+      draftRecovery = null;
       toast.success('Day finished and locked');
     } catch (err) {
       toast.error(err.message);
@@ -293,10 +489,10 @@
 
   let isFinished = $derived(entry?.status === 'finished');
   let statusText = $derived(
-    !entry ? 'Not Started' : entry.status === 'finished' ? 'Finished' : 'In Progress'
+    !entry ? 'Not Started' : entry.local_only ? 'Saved Offline' : entry.status === 'finished' ? 'Finished' : 'In Progress'
   );
   let statusClass = $derived(
-    !entry ? '' : entry.status === 'finished' ? 'badge-finished' : 'badge-draft'
+    !entry ? '' : entry.local_only ? 'badge-offline' : entry.status === 'finished' ? 'badge-finished' : 'badge-draft'
   );
 
   function handleOverlayClick(e) {
@@ -332,12 +528,32 @@
         <h2>{formatDateLong(date)}</h2>
         <div class="header-meta">
           <span class="badge {statusClass}">{statusText}</span>
+          <span class:offline={!online} class="connectivity-chip">
+            {online ? 'Online' : 'Offline mode'}
+          </span>
           {#if entry}
             <span class="hours-badge">{entry.hours} {Number(entry.hours) === 1 ? 'hour' : 'hours'} rendered</span>
           {/if}
         </div>
         <button class="close-btn" onclick={requestClose} aria-label="Close">&times;</button>
       </div>
+
+      {#if draftRecovery}
+        <div class="draft-recovery card" role="status" aria-live="polite">
+          <div class="draft-recovery-copy">
+            <strong>{draftRecovery.unsynced ? 'Offline draft available' : 'Saved local draft available'}</strong>
+            <p>
+              {draftRecovery.unsynced
+                ? 'A local copy of this entry is waiting on this device. Restore it whenever you are ready to keep writing.'
+                : 'A saved local draft exists for this date if you want to bring it back into the editor.'}
+            </p>
+          </div>
+          <div class="draft-recovery-actions">
+            <button class="btn btn-sm btn-primary" onclick={restoreOfflineDraft}>Restore draft</button>
+            <button class="btn btn-sm" onclick={dismissOfflineDraft}>Dismiss</button>
+          </div>
+        </div>
+      {/if}
 
       {#if confirmingUnsaved}
         <div class="confirm-dialog" role="alertdialog" aria-label="Discard changes?">
@@ -447,10 +663,10 @@
 
           {#if !isFinished && entry.content_raw}
             <div class="ai-actions">
-              <button class="btn btn-sm" onclick={refineWithAI} disabled={refining}>
+              <button class="btn btn-sm" onclick={refineWithAI} disabled={refining || entry.local_only}>
                 {refining ? 'Refining...' : 'Refine with AI'}
               </button>
-              <button class="btn btn-sm" onclick={generateARAS} disabled={generatingAras}>
+              <button class="btn btn-sm" onclick={generateARAS} disabled={generatingAras || entry.local_only}>
                 {generatingAras ? 'Generating...' : 'Generate ARAS'}
               </button>
             </div>
@@ -528,10 +744,11 @@
           </div>
           <div class="editor-footer">
             {#if autoSaveStatus}
-              <span class="autosave-status" class:saving={autoSaveStatus === 'saving'} class:saved={autoSaveStatus === 'saved'} class:error={autoSaveStatus === 'error'}>
+              <span class="autosave-status" class:saving={autoSaveStatus === 'saving'} class:saved={autoSaveStatus === 'saved'} class:error={autoSaveStatus === 'error'} class:offline={autoSaveStatus === 'offline-saved'}>
                 {#if autoSaveStatus === 'unsaved'}Unsaved changes
                 {:else if autoSaveStatus === 'saving'}Auto-saving...
                 {:else if autoSaveStatus === 'saved'}Draft saved
+                {:else if autoSaveStatus === 'offline-saved'}Saved offline
                 {:else if autoSaveStatus === 'error'}Save failed
                 {/if}
               </span>
@@ -591,12 +808,74 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
   .hours-badge {
     font-family: var(--font-ui);
     font-size: 0.75rem;
     color: var(--dark-soft);
+  }
+
+  .badge-offline {
+    background: rgba(184, 134, 11, 0.14);
+    color: var(--warning);
+  }
+
+  .connectivity-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(45, 122, 58, 0.12);
+    color: var(--success);
+    font-family: var(--font-ui);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .connectivity-chip.offline {
+    background: rgba(184, 134, 11, 0.14);
+    color: var(--warning);
+  }
+
+  .draft-recovery {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem 1.1rem;
+    background: rgba(255, 251, 239, 0.92);
+    border-color: rgba(184, 134, 11, 0.18);
+    box-shadow: none;
+  }
+
+  .draft-recovery-copy {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .draft-recovery-copy strong {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--red);
+  }
+
+  .draft-recovery-copy p {
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    color: var(--dark-soft);
+    line-height: 1.55;
+  }
+
+  .draft-recovery-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .close-btn {
@@ -851,6 +1130,10 @@
     color: var(--success);
   }
 
+  .autosave-status.offline {
+    color: var(--warning);
+  }
+
   .autosave-status.error {
     color: var(--red);
   }
@@ -906,6 +1189,17 @@
     .aras-block p { font-size: 0.85rem; }
     .editor-actions { flex-wrap: wrap; }
     .editor-actions .btn { flex: 1; min-width: 120px; }
+    .draft-recovery {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .draft-recovery-actions {
+      justify-content: stretch;
+    }
+    .draft-recovery-actions .btn {
+      flex: 1;
+      justify-content: center;
+    }
   }
 
   @media (max-width: 480px) {

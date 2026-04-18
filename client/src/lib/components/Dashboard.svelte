@@ -10,12 +10,17 @@
   import ProgressBar from './ProgressBar.svelte';
 
   let { onNavigateToDate = () => {} } = $props();
+  const HOURS_MILESTONES = [100, 250, 400, 486];
+  const STREAK_MILESTONES = [3, 7, 14];
+  const PROGRESS_RING_RADIUS = 64;
+  const PROGRESS_RING_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RING_RADIUS;
 
   let compilationStatus = $state(null);
   let compiling = $state(false);
   let downloading = $state(false);
   let todayEvents = $state([]);
   let eventsLoading = $state(true);
+  let celebration = $state(null);
 
   const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
@@ -53,6 +58,9 @@
 
   let dashboardMonthLabel = $derived.by(() => formatMonthLabel($selectedMonth || monthValueFromDate()));
   let dashboardBusy = $derived($progress.loading || $journal.loading);
+  let progressRingOffset = $derived.by(() =>
+    PROGRESS_RING_CIRCUMFERENCE - (Math.min($progress.percentage, 100) / 100) * PROGRESS_RING_CIRCUMFERENCE
+  );
 
   let monthStats = $derived.by(() => {
     const entries = $journal.entries || [];
@@ -123,6 +131,42 @@
     return 'Getting started';
   });
 
+  let milestoneCards = $derived.by(() =>
+    HOURS_MILESTONES.map((hours) => ({
+      hours,
+      reached: $progress.total_hours >= hours,
+      remaining: Math.max(0, hours - $progress.total_hours)
+    }))
+  );
+
+  let nextMilestone = $derived.by(() => milestoneCards.find((milestone) => !milestone.reached) || null);
+
+  function getCelebrationStorage() {
+    if (typeof localStorage === 'undefined') return {};
+
+    try {
+      return JSON.parse(localStorage.getItem('progress-celebrations') || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  function markCelebrationSeen(key) {
+    if (typeof localStorage === 'undefined') return;
+    const current = getCelebrationStorage();
+    localStorage.setItem('progress-celebrations', JSON.stringify({
+      ...current,
+      [key]: true
+    }));
+  }
+
+  function closeCelebration() {
+    if (celebration?.key) {
+      markCelebrationSeen(celebration.key);
+    }
+    celebration = null;
+  }
+
   onMount(() => {
     api.get('/compilation/status').then((status) => (compilationStatus = status)).catch(() => {});
     events.fetchDate(todayString())
@@ -130,6 +174,40 @@
       .finally(() => {
         eventsLoading = false;
       });
+  });
+
+  $effect(() => {
+    if ($progress.loading || typeof localStorage === 'undefined' || celebration) return;
+
+    const seen = getCelebrationStorage();
+    const newestHoursMilestone = [...HOURS_MILESTONES]
+      .reverse()
+      .find((hours) => $progress.total_hours >= hours && !seen[`hours-${hours}`]);
+
+    if (newestHoursMilestone) {
+      celebration = {
+        key: `hours-${newestHoursMilestone}`,
+        eyebrow: 'Milestone reached',
+        title: `${newestHoursMilestone} hours unlocked`,
+        message: newestHoursMilestone >= 486
+          ? 'You made it to the full internship target. This is the finish-line moment.'
+          : `Your logged work just crossed ${newestHoursMilestone} hours. The tracker now reads like real momentum, not a rough start.`
+      };
+      return;
+    }
+
+    const newestStreakMilestone = [...STREAK_MILESTONES]
+      .reverse()
+      .find((days) => $progress.current_streak >= days && !seen[`streak-${days}`]);
+
+    if (newestStreakMilestone) {
+      celebration = {
+        key: `streak-${newestStreakMilestone}`,
+        eyebrow: 'Streak celebration',
+        title: `${newestStreakMilestone}-day streak`,
+        message: `You have stayed consistent for ${newestStreakMilestone} days in a row. The steady rhythm is showing up in your progress now.`
+      };
+    }
   });
 
   $effect(() => {
@@ -218,7 +296,60 @@
     <p class="month-sync-label">{dashboardMonthLabel} · {monthStats.count} entr{monthStats.count === 1 ? 'y' : 'ies'} · {monthStats.hours} hours</p>
   </div>
 
-  <div class="stats-grid animate-rise rise-3">
+  <section class="progress-hero animate-rise rise-3">
+    <article class="progress-orbit card">
+      <div class="progress-ring-shell" aria-hidden="true">
+        <svg viewBox="0 0 160 160" class="progress-ring">
+          <circle class="progress-ring-track" cx="80" cy="80" r={PROGRESS_RING_RADIUS}></circle>
+          <circle
+            class="progress-ring-value"
+            cx="80"
+            cy="80"
+            r={PROGRESS_RING_RADIUS}
+            style={`stroke-dasharray: ${PROGRESS_RING_CIRCUMFERENCE}; stroke-dashoffset: ${progressRingOffset};`}
+          ></circle>
+        </svg>
+        <div class="progress-ring-copy">
+          <span class="progress-ring-percent">{$progress.percentage}%</span>
+          <span class="progress-ring-hours">{$progress.total_hours}h logged</span>
+        </div>
+      </div>
+
+      <div class="progress-orbit-copy">
+        <span class="eyebrow-label">Momentum</span>
+        <h3>{greetingLabel}</h3>
+        <p>
+          {#if nextMilestone}
+            {nextMilestone.remaining} hours until the {nextMilestone.hours}-hour marker.
+          {:else}
+            You have cleared every major milestone, including the full requirement.
+          {/if}
+        </p>
+      </div>
+    </article>
+
+    <article class="milestone-shelf card">
+      <div class="milestone-shelf-header">
+        <div>
+          <span class="eyebrow-label">Milestones</span>
+          <h3>Reward the long arc</h3>
+        </div>
+        <span class="streak-pill">{$progress.current_streak}-day streak</span>
+      </div>
+
+      <div class="milestone-shelf-grid">
+        {#each milestoneCards as milestone}
+          <div class:reached={milestone.reached} class="milestone-card">
+            <span class="milestone-card-kicker">{milestone.hours}h</span>
+            <strong>{milestone.reached ? 'Reached' : `${milestone.remaining}h left`}</strong>
+            <p>{milestone.reached ? 'Locked into your progress record.' : 'Still ahead, but close enough to feel tangible.'}</p>
+          </div>
+        {/each}
+      </div>
+    </article>
+  </section>
+
+  <div class="stats-grid animate-rise rise-4">
     {#if dashboardBusy}
       {#each ['Hours Rendered', 'Remaining', 'Days Completed', 'Day Streak'] as label}
         <div class="stat-card stat-card-loading" aria-hidden="true">
@@ -247,7 +378,7 @@
     {/if}
   </div>
 
-  <div class="milestone-badge animate-rise rise-3">
+  <div class="milestone-badge animate-rise rise-4">
     <span class="milestone-label">{greetingLabel}</span>
     <span class="milestone-bar">
       <span class="milestone-fill" style="width: {Math.min($progress.percentage, 100)}%"></span>
@@ -255,7 +386,7 @@
     <span class="milestone-pct">{$progress.percentage}%</span>
   </div>
 
-  <div class="insights-card card animate-rise rise-4">
+  <div class="insights-card card animate-rise rise-5">
     <h3>{dashboardMonthLabel} Snapshot</h3>
     {#if dashboardBusy}
       <div class="insights-grid" aria-hidden="true">
@@ -299,7 +430,7 @@
     {/if}
   </div>
 
-  <div class="progress-section card animate-rise rise-4">
+  <div class="progress-section card animate-rise rise-5">
     <h3>Progress</h3>
     {#if dashboardBusy}
       <div class="progress-skeleton" aria-hidden="true">
@@ -334,7 +465,7 @@
   {/if}
 
   {#if eventsLoading || todayEvents.length > 0}
-    <div class="today-events card animate-rise rise-5">
+    <div class="today-events card animate-rise rise-6">
       <h3>Today's Events</h3>
       {#if eventsLoading}
         <div class="today-events-skeleton" aria-hidden="true">
@@ -367,6 +498,17 @@
       Open Today's Entry
     </button>
   </div>
+
+  {#if celebration}
+    <div class="modal-overlay celebration-overlay" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
+      <div class="modal-content celebration-modal">
+        <span class="eyebrow-label">{celebration.eyebrow}</span>
+        <h2 id="celebration-title">{celebration.title}</h2>
+        <p>{celebration.message}</p>
+        <button class="btn btn-primary" onclick={closeCelebration}>Keep going</button>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -398,6 +540,16 @@
     text-transform: uppercase;
     letter-spacing: 0.15em;
     color: var(--dark-soft);
+  }
+
+  .eyebrow-label {
+    display: inline-flex;
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--red);
   }
 
   .quote-card {
@@ -436,6 +588,167 @@
     flex-direction: column;
     gap: 1rem;
     padding: 1.5rem 1.75rem;
+  }
+
+  .progress-hero {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
+    gap: 1.25rem;
+  }
+
+  .progress-orbit,
+  .milestone-shelf {
+    padding: 1.5rem 1.65rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 251, 244, 0.88));
+  }
+
+  .progress-orbit {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .progress-ring-shell {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    flex-shrink: 0;
+  }
+
+  .progress-ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .progress-ring-track,
+  .progress-ring-value {
+    fill: none;
+    stroke-width: 12;
+  }
+
+  .progress-ring-track {
+    stroke: rgba(212, 212, 200, 0.72);
+  }
+
+  .progress-ring-value {
+    stroke: var(--red);
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s var(--ease-out);
+    filter: drop-shadow(0 6px 14px rgba(190, 53, 25, 0.16));
+  }
+
+  .progress-ring-copy {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    gap: 0.25rem;
+  }
+
+  .progress-ring-percent {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 2.1rem;
+    color: var(--red);
+  }
+
+  .progress-ring-hours {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dark-soft);
+  }
+
+  .progress-orbit-copy {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .progress-orbit-copy h3 {
+    margin: 0;
+    font-size: clamp(1.5rem, 2vw, 2rem);
+  }
+
+  .progress-orbit-copy p {
+    color: var(--dark-soft);
+    line-height: 1.65;
+  }
+
+  .milestone-shelf-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .milestone-shelf-header h3 {
+    margin-top: 0.35rem;
+    font-size: clamp(1.3rem, 1.8vw, 1.55rem);
+  }
+
+  .streak-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.84);
+    border: 1px solid rgba(190, 53, 25, 0.08);
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--red);
+  }
+
+  .milestone-shelf-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .milestone-card {
+    padding: 0.95rem 1rem;
+    border-radius: 18px;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .milestone-card.reached {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 255, 246, 0.9));
+    border-color: rgba(45, 122, 58, 0.18);
+  }
+
+  .milestone-card-kicker {
+    display: inline-flex;
+    margin-bottom: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.08);
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--red);
+  }
+
+  .milestone-card strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--red);
+  }
+
+  .milestone-card p {
+    margin-top: 0.25rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--dark-soft);
+    line-height: 1.5;
   }
 
   .month-sync-copy {
@@ -800,6 +1113,28 @@
     font-size: 1rem;
   }
 
+  .celebration-overlay {
+    z-index: 25;
+  }
+
+  .celebration-modal {
+    max-width: 520px;
+    text-align: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 248, 240, 0.96));
+    border-color: rgba(190, 53, 25, 0.16);
+  }
+
+  .celebration-modal h2 {
+    margin: 0.4rem 0 0.6rem;
+    font-size: clamp(1.8rem, 2.6vw, 2.3rem);
+  }
+
+  .celebration-modal p {
+    margin-bottom: 1rem;
+    color: var(--dark-soft);
+    line-height: 1.65;
+  }
+
   @media (max-width: 992px) {
     .dashboard {
       padding: 2.5rem 2rem 3rem;
@@ -820,6 +1155,11 @@
 
     .quote-card {
       padding: 1.5rem 2rem;
+    }
+
+    .progress-hero,
+    .milestone-shelf-grid {
+      grid-template-columns: 1fr;
     }
   }
 
@@ -859,6 +1199,11 @@
       gap: 0.75rem;
     }
 
+    .progress-orbit {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
     .milestone-label {
       min-width: 90px;
       font-size: 0.72rem;
@@ -879,6 +1224,11 @@
     .insights-grid {
       grid-template-columns: repeat(2, 1fr);
       gap: 1rem;
+    }
+
+    .progress-ring-shell {
+      width: 150px;
+      height: 150px;
     }
 
     .dash-header h1 {

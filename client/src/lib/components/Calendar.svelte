@@ -56,6 +56,7 @@
   let hoverDayEvents = $state([]);
   let hoverJournalStatus = $state('');
   let hoverTimeoutId = $state(null);
+  let activeDate = $state('');
 
   function handleCellMouseEnter(e, cell) {
     if (hoverTimeoutId) {
@@ -107,6 +108,7 @@
   }
 
   function openDate(date) {
+    activeDate = date;
     const monthValue = getMonthValueFromDateString(date);
     if (monthValue !== $selectedMonth) {
       selectedMonth.set(monthValue);
@@ -169,14 +171,16 @@
       hasEntry ? 'has-entry' : '',
       hasContent ? 'has-content' : '',
       checked ? 'checked' : '',
-      hasLoggedHours ? 'has-hours' : ''
+      hasLoggedHours ? 'has-hours' : '',
+      (eventsMap[date] || []).length > 0 ? 'has-events' : '',
+      activeDate === date ? 'selected' : ''
     ].filter(Boolean);
   }
 </script>
 
 <div class="calendar-view-old animate-rise rise-1" aria-busy={calendarBusy}>
-  {#if $progress.total_hours >= ($progress.target_hours ?? 468)}
-    <div class="celebration-banner">468 HOURS REACHED – AMAZING FOCUS</div>
+  {#if $progress.total_hours >= ($progress.target_hours ?? 486)}
+    <div class="celebration-banner">486 HOURS REACHED | AMAZING FOCUS</div>
   {/if}
 
   <div class="calendar-layout">
@@ -212,7 +216,18 @@
               onmouseleave={handleCellMouseLeave}
               aria-label="{cell.date}"
             >
-              {String(cell.day).padStart(2, '0')}
+              <span class="calendar-day-number">{String(cell.day).padStart(2, '0')}</span>
+              <span class="calendar-cell-indicators" aria-hidden="true">
+                {#if entries[cell.date]}
+                  <span class:finished={entries[cell.date]?.status === 'finished'} class="calendar-cell-dot"></span>
+                {/if}
+                {#if (eventsMap[cell.date] || []).length > 0}
+                  <span class="calendar-cell-dot calendar-cell-dot-event"></span>
+                  {#if (eventsMap[cell.date] || []).length > 1}
+                    <span class="calendar-cell-dot calendar-cell-dot-muted"></span>
+                  {/if}
+                {/if}
+              </span>
             </button>
           {/each}
         </div>
@@ -426,21 +441,26 @@
 
   .calendar-date-cell {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
     min-height: 0;
-    background: none;
-    border: none;
+    padding: 0.8rem 0.75rem;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(190, 53, 25, 0.08);
+    border-radius: 18px;
     cursor: pointer;
     font: inherit;
-    padding: 0;
+    text-align: left;
     transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease,
-      transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+      transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.2s ease;
     animation: calendarCellIn 0.35s var(--ease-out) both;
   }
   .calendar-date-cell:hover {
     opacity: 1;
-    transform: scale(1.08);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(34, 24, 8, 0.08);
+    border-color: rgba(190, 53, 25, 0.16);
   }
   .calendar-date-cell.sunday {
     color: var(--dark);
@@ -456,10 +476,10 @@
   }
 
   .calendar-date-cell.has-entry {
-    background: rgba(190, 53, 25, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 243, 0.94));
   }
   .calendar-date-cell.has-content {
-    background: rgba(184, 134, 11, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 250, 238, 0.96));
   }
 
   .calendar-date-cell.today {
@@ -474,18 +494,10 @@
   .calendar-date-cell.checked {
     color: var(--success);
     opacity: 1;
-    background: rgba(45, 122, 58, 0.1);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 255, 246, 0.96));
+    border-color: rgba(45, 122, 58, 0.18);
     text-decoration: none;
   }
-  .calendar-date-cell.checked::before {
-    content: "✓";
-    margin-right: 0.15em;
-    font-size: 0.55em;
-    letter-spacing: 0;
-    color: var(--success);
-    vertical-align: 0.05em;
-  }
-
   .calendar-date-cell.has-hours:not(.checked) {
     text-decoration: underline;
     text-underline-offset: 0.25em;
@@ -495,6 +507,48 @@
   .calendar-date-cell.has-hours.today:not(.checked) {
     text-decoration-thickness: 2px;
     text-decoration-color: var(--red-hover);
+  }
+
+  .calendar-date-cell.selected {
+    border-color: rgba(190, 53, 25, 0.34);
+    box-shadow: 0 18px 30px rgba(190, 53, 25, 0.12);
+    transform: translateY(-2px);
+  }
+
+  .calendar-date-cell.has-events {
+    border-color: rgba(184, 134, 11, 0.14);
+  }
+
+  .calendar-day-number {
+    font-family: var(--font-display);
+    font-size: 1em;
+    line-height: 1;
+  }
+
+  .calendar-cell-indicators {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 0.6rem;
+  }
+
+  .calendar-cell-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.28);
+  }
+
+  .calendar-cell-dot.finished {
+    background: var(--success);
+  }
+
+  .calendar-cell-dot-event {
+    background: var(--warning);
+  }
+
+  .calendar-cell-dot-muted {
+    background: rgba(184, 134, 11, 0.45);
   }
 
   .calendar-dates-skeleton {
@@ -767,9 +821,6 @@
     .calendar-days-row {
       font-size: clamp(0.95rem, 3.2vw, 1.2rem);
       min-height: 2rem;
-    }
-    .calendar-date-cell.checked::before {
-      font-size: 0.55em;
     }
     .calendar-footer {
       gap: 0.35rem;

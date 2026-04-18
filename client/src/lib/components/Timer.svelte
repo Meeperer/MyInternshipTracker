@@ -31,6 +31,7 @@
   }
 
   const displayChars = $derived(($display || '00:00:00').split(''));
+  const presetOptions = [25, 50, 90];
   const progressPct = $derived.by(() => {
     const total = Number($baseDuration) || 1;
     const left = Number($remaining) || 0;
@@ -51,7 +52,26 @@
   }
 </script>
 
-<div class="pomodoro-view-old">
+<div class="pomodoro-view-old animate-rise rise-2">
+  <div class="timer-ribbon">
+    <span class="timer-ribbon-chip">{sessionLabel}</span>
+    <span class="timer-ribbon-chip">{$baseMinutes} minute focus block</span>
+    <span class="timer-ribbon-chip">{Math.max(0, Math.ceil((Number($remaining) || 0) / 60))} minutes left</span>
+  </div>
+
+  <div class="timer-presets" aria-label="Timer presets">
+    {#each presetOptions as preset}
+      <button
+        type="button"
+        class:active={preset === $baseMinutes}
+        class="timer-preset"
+        onclick={() => timer.setDuration(preset)}
+      >
+        {preset} min
+      </button>
+    {/each}
+  </div>
+
   <div class="timer-status animate-rise rise-1">
     <div class="timer-status-copy">
       <span class="timer-status-label">{sessionLabel}</span>
@@ -138,11 +158,58 @@
     min-height: 0;
   }
 
+  .timer-ribbon,
+  .timer-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    justify-content: center;
+  }
+
+  .timer-ribbon {
+    margin-bottom: 0.85rem;
+  }
+
+  .timer-ribbon-chip,
+  .timer-preset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0.55rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    background: rgba(255, 255, 255, 0.78);
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dark-soft);
+  }
+
+  .timer-ribbon-chip {
+    cursor: default;
+  }
+
+  .timer-preset {
+    cursor: pointer;
+    transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .timer-preset:hover,
+  .timer-preset.active {
+    transform: translateY(-1px);
+    border-color: rgba(190, 53, 25, 0.18);
+    background: rgba(190, 53, 25, 0.08);
+    color: var(--red);
+  }
+
   .timer-status {
     width: min(32rem, 100%);
     display: grid;
     gap: 0.65rem;
-    margin-bottom: 1.5rem;
+    margin: 1rem 0 1.5rem;
   }
 
   .timer-status-copy {

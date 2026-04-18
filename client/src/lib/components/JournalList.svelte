@@ -2,6 +2,8 @@
   import { journal } from '$stores/journal.js';
   import { toast } from '$stores/toast.js';
   import { selectedMonth } from '$stores/selectedMonth.js';
+  import { appCommands } from '$stores/appCommands.js';
+  import { buildJournalInsights } from '$utils/journalInsights.js';
   import {
     formatDate,
     getMonthRange,
@@ -82,8 +84,27 @@
     return period === 'week' ? 'week' : 'month';
   }
 
+  function formatSummaryType(period) {
+    return period === 'week' ? 'Weekly summary' : 'Monthly summary';
+  }
+
   function prefersReducedMotion() {
     return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  function getSummaryLabel(summary) {
+    if (!summary) return '';
+    if (summary.label) return summary.label;
+    if (summary.period === 'month') {
+      return formatMonthLabel(summary.start_date.slice(0, 7));
+    }
+    return `Week of ${formatRangeLabel(summary.start_date, summary.end_date)}`;
+  }
+
+  function getSummaryPreview(summaryText, maxLength = 210) {
+    const normalized = String(summaryText || '').trim().replace(/\s+/g, ' ');
+    if (!normalized) return 'No saved summary text yet.';
+    return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3).trimEnd()}...` : normalized;
   }
 
   function getEntryPreview(entry, maxLength = 200) {
@@ -194,6 +215,7 @@
   let lastFetchedSummaryKey = $state('');
   let lastAutoSummaryKey = $state('');
   let showSummaryModal = $state(false);
+  let modalSummary = $state(null);
   let typedSummaryText = $state('');
   let summaryTypingActive = $state(false);
   let summaryModalCloseButton = $state(null);
@@ -201,6 +223,9 @@
   let currentPage = $state(1);
   let expandedEntryDate = $state('');
   let summaryTypingTimer = null;
+  let searchInputEl = $state(null);
+  let summaryLibrarySectionEl = $state(null);
+  let summaryLibraryHydrated = $state(false);
 
   let weekOptions = $derived.by(() => getWeekOptions($selectedMonth || monthValueFromDate()));
   let filteredEntries = $derived.by(() => {
@@ -219,6 +244,7 @@
     return filteredEntries.slice(start, start + PAGE_SIZE);
   });
   let visiblePageNumbers = $derived.by(() => buildPageNumbers(totalPages, currentPage));
+  let journalInsights = $derived.by(() => buildJournalInsights($journal.entries));
 
   let monthHours = $derived.by(() =>
     $journal.entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0)
@@ -259,6 +285,41 @@
   let rangeContentCount = $derived.by(() =>
     rangeEntries.filter((entry) => hasSummaryContent(entry)).length
   );
+
+  $effect(() => {
+    if (summaryLibraryHydrated) return;
+
+    summaryLibraryHydrated = true;
+    journal.fetchSummaryLibrary(36).catch(() => {});
+  });
+
+  $effect(() => {
+    const command = $appCommands.pendingCommand;
+    if (!command) return;
+
+    if (command.type === 'open-journal-date' && command.date) {
+      selectedMonth.setFromDate(command.date);
+      onDateSelect(command.date);
+      appCommands.consume(command.id);
+      return;
+    }
+
+    if (command.type === 'focus-journal-search') {
+      queueMicrotask(() => searchInputEl?.focus());
+      appCommands.consume(command.id);
+      return;
+    }
+
+    if (command.type === 'focus-summary-library') {
+      queueMicrotask(() =>
+        summaryLibrarySectionEl?.scrollIntoView({
+          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+          block: 'start'
+        })
+      );
+      appCommands.consume(command.id);
+    }
+  });
 
   $effect(() => {
     if (!$selectedMonth) {
@@ -346,6 +407,7 @@
   $effect(() => {
     activeSummaryKey;
     showSummaryModal = false;
+    modalSummary = null;
     typedSummaryText = '';
     summaryTypingActive = false;
     if (summaryTypingTimer) {
@@ -355,7 +417,7 @@
   });
 
   $effect(() => {
-    if (!showSummaryModal || !summaryResult?.summary) {
+    if (!showSummaryModal || !modalSummary?.summary) {
       typedSummaryText = '';
       summaryTypingActive = false;
       if (summaryTypingTimer) {
@@ -365,7 +427,7 @@
       return;
     }
 
-    const fullText = summaryResult.summary;
+    const fullText = modalSummary.summary;
 
     if (prefersReducedMotion()) {
       typedSummaryText = fullText;
@@ -483,16 +545,21 @@
     }
   }
 
-  function openSummaryModal() {
-    if (!summaryResult?.summary) return;
+  function openSummaryModal(summary = summaryResult) {
+    if (!summary?.summary) return;
     summaryModalPreviousFocus = typeof document !== 'undefined' ? document.activeElement : null;
-    typedSummaryText = prefersReducedMotion() ? summaryResult.summary : '';
+    modalSummary = {
+      ...summary,
+      label: getSummaryLabel(summary)
+    };
+    typedSummaryText = prefersReducedMotion() ? summary.summary : '';
     summaryTypingActive = !prefersReducedMotion();
     showSummaryModal = true;
   }
 
   function closeSummaryModal() {
     showSummaryModal = false;
+    modalSummary = null;
     typedSummaryText = '';
     summaryTypingActive = false;
     if (summaryModalPreviousFocus && typeof summaryModalPreviousFocus.focus === 'function') {
@@ -520,6 +587,75 @@
   function goToPage(page) {
     currentPage = Math.min(totalPages, Math.max(1, page));
     expandedEntryDate = '';
+  }
+
+  async function toggleSummaryPin(summary) {
+    try {
+      const next = await journal.toggleSummaryPin(summary.id, !summary.pinned);
+      if (modalSummary?.id === next.id) {
+        modalSummary = {
+          ...modalSummary,
+          ...next,
+          label: getSummaryLabel(next)
+        };
+      }
+      if (summaryResult?.id === next.id) {
+        summaryResult = {
+          ...summaryResult,
+          ...next,
+          label: getSummaryLabel(next)
+        };
+      }
+      toast.success(next.pinned ? 'Summary pinned to the library' : 'Summary unpinned');
+    } catch (error) {
+      toast.error(error.message || 'Failed to update summary pin');
+    }
+  }
+
+  function exportSummary(summary, format = 'markdown') {
+    const label = getSummaryLabel(summary);
+    const periodLabel = formatSummaryType(summary.period);
+    const safeLabel = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    let blob;
+    let filename;
+
+    if (format === 'json') {
+      blob = new Blob([JSON.stringify({
+        id: summary.id,
+        period: summary.period,
+        label,
+        start_date: summary.start_date,
+        end_date: summary.end_date,
+        entry_count: summary.entry_count,
+        summarized_entry_count: summary.summarized_entry_count,
+        total_hours: summary.total_hours,
+        updated_at: summary.updated_at,
+        pinned: summary.pinned,
+        summary: summary.summary
+      }, null, 2)], { type: 'application/json' });
+      filename = `${safeLabel || 'journal-summary'}.json`;
+    } else {
+      const markdown = [
+        `# ${periodLabel}`,
+        '',
+        `**Label:** ${label}`,
+        `**Date range:** ${summary.start_date} to ${summary.end_date}`,
+        `**Entries:** ${summary.entry_count}`,
+        `**Hours:** ${formatHoursValue(summary.total_hours)}`,
+        `**Saved:** ${summary.pinned ? 'Pinned' : 'Standard'}`,
+        '',
+        summary.summary
+      ].join('\n');
+      blob = new Blob([markdown], { type: 'text/markdown' });
+      filename = `${safeLabel || 'journal-summary'}.md`;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 </script>
 
@@ -571,7 +707,113 @@
     </article>
   </section>
 
-  <section class="workspace-grid animate-rise rise-3">
+  <section class="insights-grid animate-rise rise-3">
+    <article class="insights-panel card glass-card">
+      <div class="panel-header">
+        <div>
+          <span class="panel-kicker">Recurring themes</span>
+          <h3>What keeps showing up</h3>
+        </div>
+      </div>
+
+      {#if journalInsights.recurringThemes.length > 0}
+        <div class="theme-chip-list">
+          {#each journalInsights.recurringThemes as theme}
+            <span class="theme-chip">
+              <strong>{theme.label}</strong>
+              <span>{theme.count}x</span>
+            </span>
+          {/each}
+        </div>
+      {:else}
+        <div class="insights-empty">
+          <strong>Themes appear once your entries have more detail.</strong>
+          <p>Add a few fuller notes and the journal will start surfacing repeated work patterns here.</p>
+        </div>
+      {/if}
+    </article>
+
+    <article class="insights-panel card glass-card">
+      <div class="panel-header">
+        <div>
+          <span class="panel-kicker">Mood + workload</span>
+          <h3>How the month feels</h3>
+        </div>
+      </div>
+
+      {#if journalInsights.workloadTrend.length > 0}
+        <div class="trend-list">
+          {#each journalInsights.workloadTrend as week}
+            <div class="trend-row">
+              <div class="trend-copy">
+                <strong>{week.label}</strong>
+                <span>{week.entries} entr{week.entries === 1 ? 'y' : 'ies'} | {week.tone}</span>
+              </div>
+              <div class="trend-bar-shell" aria-hidden="true">
+                <span class="trend-bar-fill" style={`width: ${Math.min(100, Math.max(14, week.hours * 10))}%`}></span>
+              </div>
+              <span class="trend-hours">{formatHoursValue(week.hours)}h</span>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="insights-empty">
+          <strong>No trend line yet.</strong>
+          <p>Once you log a few entries, this section will show how busy each week looked and how the writing tone shifted.</p>
+        </div>
+      {/if}
+    </article>
+
+    <article class="insights-panel card glass-card">
+      <div class="panel-header">
+        <div>
+          <span class="panel-kicker">Top wins</span>
+          <h3>Work worth keeping</h3>
+        </div>
+      </div>
+
+      {#if journalInsights.topWins.length > 0}
+        <div class="insight-note-list">
+          {#each journalInsights.topWins as win}
+            <div class="insight-note insight-note-win">
+              <p>{win}</p>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="insights-empty">
+          <strong>No wins captured yet.</strong>
+          <p>Use a sentence or two when you finish something meaningful so the month can surface it back to you.</p>
+        </div>
+      {/if}
+    </article>
+
+    <article class="insights-panel card glass-card">
+      <div class="panel-header">
+        <div>
+          <span class="panel-kicker">Blockers</span>
+          <h3>What slowed you down</h3>
+        </div>
+      </div>
+
+      {#if journalInsights.blockers.length > 0}
+        <div class="insight-note-list">
+          {#each journalInsights.blockers as blocker}
+            <div class="insight-note insight-note-blocker">
+              <p>{blocker}</p>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="insights-empty">
+          <strong>No clear blockers spotted.</strong>
+          <p>Your recent notes read as steady progress, without repeated friction surfacing in the writing.</p>
+        </div>
+      {/if}
+    </article>
+  </section>
+
+  <section class="workspace-grid animate-rise rise-4">
     <div class="journal-controls card glass-card">
       <div class="panel-header">
         <div>
@@ -722,8 +964,71 @@
     </div>
   </section>
 
-  <div class="search-shell animate-rise rise-4">
+  <section class="summary-library-shell card glass-card animate-rise rise-5" bind:this={summaryLibrarySectionEl}>
+    <div class="summary-library-header">
+      <div>
+        <span class="panel-kicker">Summary library</span>
+        <h3>Saved weekly + monthly reads</h3>
+        <p class="summary-caption">Reopen, pin, and export your saved summaries without regenerating them.</p>
+      </div>
+      <span class="summary-library-count">{$journal.summaryLibrary.length} saved</span>
+    </div>
+
+    {#if $journal.summaryLibraryLoading}
+      <div class="summary-library-list">
+        {#each Array.from({ length: 3 }) as _, index}
+          <div class="summary-library-item summary-library-skeleton" style={`animation-delay: ${index * 40}ms;`}>
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        {/each}
+      </div>
+    {:else if $journal.summaryLibrary.length > 0}
+      <div class="summary-library-list">
+        {#each $journal.summaryLibrary as item}
+          <article class:pinned={item.pinned} class="summary-library-item">
+            <div class="summary-library-copy">
+              <div class="summary-library-meta">
+                <span class="summary-library-type">{formatSummaryType(item.period)}</span>
+                {#if item.pinned}
+                  <span class="summary-library-pin">Pinned</span>
+                {/if}
+              </div>
+              <h4>{getSummaryLabel(item)}</h4>
+              <p>{getSummaryPreview(item.summary)}</p>
+              <span class="summary-library-footnote">
+                {item.start_date} to {item.end_date} | {item.entry_count} entr{item.entry_count === 1 ? 'y' : 'ies'} | {formatHoursValue(item.total_hours)}h
+              </span>
+            </div>
+            <div class="summary-library-actions">
+              <button type="button" class="btn btn-sm btn-primary" onclick={() => openSummaryModal(item)}>
+                Open
+              </button>
+              <button type="button" class="btn btn-sm" onclick={() => exportSummary(item, 'markdown')}>
+                Markdown
+              </button>
+              <button type="button" class="btn btn-sm" onclick={() => exportSummary(item, 'json')}>
+                JSON
+              </button>
+              <button type="button" class="btn btn-sm" onclick={() => toggleSummaryPin(item)}>
+                {item.pinned ? 'Unpin' : 'Pin'}
+              </button>
+            </div>
+          </article>
+        {/each}
+      </div>
+    {:else}
+      <div class="insights-empty summary-library-empty">
+        <strong>Your library starts filling as soon as a week or month gets summarized.</strong>
+        <p>Saved summaries stay here so you can reopen them later, pin the best ones, and export them cleanly.</p>
+      </div>
+    {/if}
+  </section>
+
+  <div class="search-shell animate-rise rise-6">
     <input
+      bind:this={searchInputEl}
       class="input search-input"
       type="text"
       placeholder="Search entries by content or date..."
@@ -732,7 +1037,7 @@
     />
   </div>
 
-  <section class="entries-shell card glass-card animate-rise rise-5" aria-live="polite">
+  <section class="entries-shell card glass-card animate-rise rise-6" aria-live="polite">
     <div class="entries-toolbar">
       <div>
         <h3>Entries</h3>
@@ -911,7 +1216,7 @@
   </section>
 </div>
 
-{#if showSummaryModal && summaryResult}
+{#if showSummaryModal && modalSummary}
   <div
     class="modal-overlay summary-modal-overlay"
     role="dialog"
@@ -925,8 +1230,8 @@
     <div class="modal-content summary-modal">
       <div class="summary-modal-header">
         <div>
-          <span class="summary-modal-kicker">{summaryResult.label}</span>
-          <h3 id="summary-modal-title">Summarized {formatSummaryPeriodLabel(summaryResult.period)}</h3>
+          <span class="summary-modal-kicker">{modalSummary.label}</span>
+          <h3 id="summary-modal-title">Summarized {formatSummaryPeriodLabel(modalSummary.period)}</h3>
         </div>
         <button
           type="button"
@@ -940,9 +1245,9 @@
       </div>
 
       <div class="summary-modal-meta">
-        <span>{summaryResult.entry_count} entr{summaryResult.entry_count === 1 ? 'y' : 'ies'}</span>
-        <span>{formatHoursValue(summaryResult.total_hours)} hours</span>
-        <span>{summaryResult.persisted === false ? 'Live only' : 'Saved'}</span>
+        <span>{modalSummary.entry_count} entr{modalSummary.entry_count === 1 ? 'y' : 'ies'}</span>
+        <span>{formatHoursValue(modalSummary.total_hours)} hours</span>
+        <span>{modalSummary.persisted === false ? 'Live only' : modalSummary.pinned ? 'Pinned' : 'Saved'}</span>
       </div>
 
       <div class="summary-modal-body">
@@ -951,21 +1256,31 @@
           class:typing={summaryTypingActive}
           class="summary-modal-copy"
         >
-          {summaryTypingActive ? typedSummaryText : typedSummaryText || summaryResult.summary}
+          {summaryTypingActive ? typedSummaryText : typedSummaryText || modalSummary.summary}
         </p>
       </div>
 
       <div class="summary-modal-footer">
         <span class="summary-footnote">
-          Updated {new Date(summaryResult.updated_at || toDateString(new Date())).toLocaleDateString('en-US', {
+          Updated {new Date(modalSummary.updated_at || toDateString(new Date())).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
           })}
         </span>
-        <button type="button" class="btn btn-sm" onclick={closeSummaryModal}>
-          Close
-        </button>
+        <div class="summary-modal-footer-actions">
+          {#if modalSummary.id}
+            <button type="button" class="btn btn-sm" onclick={() => toggleSummaryPin(modalSummary)}>
+              {modalSummary.pinned ? 'Unpin' : 'Pin'}
+            </button>
+          {/if}
+          <button type="button" class="btn btn-sm" onclick={() => exportSummary(modalSummary, 'markdown')}>
+            Export
+          </button>
+          <button type="button" class="btn btn-sm" onclick={closeSummaryModal}>
+            Close
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1083,6 +1398,129 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem;
+  }
+
+  .insights-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .insights-panel {
+    padding: 1.25rem 1.35rem;
+  }
+
+  .theme-chip-list,
+  .insight-note-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .theme-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    color: var(--dark-soft);
+  }
+
+  .theme-chip strong {
+    color: var(--red);
+    font-size: 0.9rem;
+  }
+
+  .trend-list {
+    display: grid;
+    gap: 0.85rem;
+    margin-top: 1rem;
+  }
+
+  .trend-row {
+    display: grid;
+    grid-template-columns: minmax(0, 160px) minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .trend-copy {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .trend-copy strong {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--red);
+  }
+
+  .trend-copy span,
+  .trend-hours {
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    color: var(--dark-soft);
+  }
+
+  .trend-bar-shell {
+    position: relative;
+    min-height: 12px;
+    border-radius: 999px;
+    background: rgba(212, 212, 200, 0.52);
+    overflow: hidden;
+  }
+
+  .trend-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, rgba(190, 53, 25, 0.72), rgba(190, 53, 25, 0.98));
+  }
+
+  .insight-note {
+    flex: 1 1 240px;
+    padding: 0.95rem 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .insight-note p {
+    margin: 0;
+    line-height: 1.65;
+    color: var(--dark);
+  }
+
+  .insight-note-win {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 255, 245, 0.92));
+    border-color: rgba(45, 122, 58, 0.16);
+  }
+
+  .insight-note-blocker {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 240, 0.94));
+    border-color: rgba(190, 53, 25, 0.14);
+  }
+
+  .insights-empty {
+    margin-top: 1rem;
+    padding: 1rem 1.05rem;
+    border-radius: 18px;
+    border: 1px dashed rgba(190, 53, 25, 0.16);
+    background: rgba(255, 255, 255, 0.78);
+    color: var(--dark-soft);
+  }
+
+  .insights-empty strong {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--red);
   }
 
   .overview-card {
@@ -1447,6 +1885,13 @@
     align-items: center;
   }
 
+  .summary-modal-footer-actions {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
   @keyframes summaryCursorBlink {
     0%, 49% {
       opacity: 1;
@@ -1467,6 +1912,124 @@
 
   .entries-shell {
     padding: 1.35rem 1.4rem;
+  }
+
+  .summary-library-shell {
+    padding: 1.35rem 1.4rem;
+  }
+
+  .summary-library-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .summary-library-count {
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.84);
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    color: var(--dark-soft);
+  }
+
+  .summary-library-list {
+    display: grid;
+    gap: 0.85rem;
+    margin-top: 1rem;
+  }
+
+  .summary-library-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    padding: 1rem 1.05rem;
+    border-radius: 20px;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    background: rgba(255, 255, 255, 0.88);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .summary-library-item:hover {
+    transform: translateY(-1px);
+    border-color: rgba(190, 53, 25, 0.18);
+    box-shadow: 0 14px 28px rgba(34, 24, 8, 0.06);
+  }
+
+  .summary-library-item.pinned {
+    border-color: rgba(184, 134, 11, 0.22);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 251, 236, 0.94));
+  }
+
+  .summary-library-copy {
+    min-width: 0;
+  }
+
+  .summary-library-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .summary-library-type,
+  .summary-library-pin {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .summary-library-type {
+    background: rgba(190, 53, 25, 0.08);
+    color: var(--red);
+  }
+
+  .summary-library-pin {
+    background: rgba(184, 134, 11, 0.14);
+    color: var(--warning);
+  }
+
+  .summary-library-item h4 {
+    margin: 0;
+    font-size: 1.18rem;
+  }
+
+  .summary-library-item p {
+    margin: 0.35rem 0 0.55rem;
+    color: var(--dark-soft);
+    line-height: 1.65;
+  }
+
+  .summary-library-footnote {
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    color: var(--dark-soft);
+  }
+
+  .summary-library-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-content: flex-start;
+    justify-content: flex-end;
+    min-width: 208px;
+  }
+
+  .summary-library-skeleton {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .summary-library-empty {
+    margin-top: 1rem;
   }
 
   .entries-toolbar {
@@ -1762,6 +2325,7 @@
     }
 
     .journal-hero,
+    .insights-grid,
     .workspace-grid,
     .overview-strip {
       grid-template-columns: 1fr;
@@ -1788,6 +2352,7 @@
     }
 
     .entries-toolbar,
+    .summary-library-header,
     .pagination {
       flex-direction: column;
       align-items: stretch;
@@ -1817,9 +2382,20 @@
     }
 
     .summary-open-button,
-    .summary-modal-footer .btn {
+    .summary-modal-footer .btn,
+    .summary-library-actions .btn {
       width: 100%;
       justify-content: center;
+    }
+
+    .summary-library-item,
+    .trend-row {
+      grid-template-columns: 1fr;
+    }
+
+    .summary-library-actions {
+      min-width: 0;
+      justify-content: stretch;
     }
 
     .journal-hero h2 {
@@ -1852,6 +2428,7 @@
     }
 
     .entries-shell,
+    .summary-library-shell,
     .summary-panel,
     .journal-controls {
       padding-left: 1rem;
