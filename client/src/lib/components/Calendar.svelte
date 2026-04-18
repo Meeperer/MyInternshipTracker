@@ -8,16 +8,48 @@
 
   let { onDateSelect = () => {}, onQuickAction = () => {} } = $props();
 
-  const MONTH_NAMES_SHORT = ['', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-  const DAY_HEADERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const MONTH_NAMES = [
+    '',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+  ];
+
+  const DAY_HEADERS = [
+    { long: 'Sunday', short: 'Sun' },
+    { long: 'Monday', short: 'Mon' },
+    { long: 'Tuesday', short: 'Tue' },
+    { long: 'Wednesday', short: 'Wed' },
+    { long: 'Thursday', short: 'Thu' },
+    { long: 'Friday', short: 'Fri' },
+    { long: 'Saturday', short: 'Sat' }
+  ];
+
+  const ROWS = 6;
+  const TOTAL_CELLS = ROWS * 7;
+
   let currentYear = $derived.by(() => Number(($selectedMonth || '').slice(0, 4)));
   let currentMonth = $derived.by(() => Number(($selectedMonth || '').slice(5, 7)));
   let calendarBusy = $derived($journal.loading || $events.loading);
+  let monthHeading = $derived.by(() => MONTH_NAMES[currentMonth] || '');
+  let yearParts = $derived.by(() => {
+    const year = String(currentYear || '').padStart(4, '0');
+    return [year.slice(0, 2), year.slice(2)];
+  });
 
   let entries = $derived.by(() => {
     const map = {};
-    for (const e of $journal.entries) {
-      map[e.date] = e;
+    for (const entry of $journal.entries) {
+      map[entry.date] = entry;
     }
     return map;
   });
@@ -26,16 +58,22 @@
 
   let monthStats = $derived.by(() => {
     const all = Object.values(entries);
-    const currentMonthEntries = all.filter(e => {
-      const d = e.date;
-      const y = parseInt(d.slice(0, 4));
-      const m = parseInt(d.slice(5, 7));
-      return y === currentYear && m === currentMonth;
+    const currentMonthEntries = all.filter((entry) => {
+      const date = entry.date;
+      const year = parseInt(date.slice(0, 4), 10);
+      const month = parseInt(date.slice(5, 7), 10);
+      return year === currentYear && month === currentMonth;
     });
+
     const count = currentMonthEntries.length;
-    const finished = currentMonthEntries.filter(e => e.status === 'finished').length;
-    const hours = currentMonthEntries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
-    return { count, finished, hours: Math.round(hours * 10) / 10 };
+    const finished = currentMonthEntries.filter((entry) => entry.status === 'finished').length;
+    const hours = currentMonthEntries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
+
+    return {
+      count,
+      finished,
+      hours: Math.round(hours * 10) / 10
+    };
   });
 
   $effect(() => {
@@ -43,6 +81,7 @@
       selectedMonth.init();
       return;
     }
+
     journal.fetchMonth(currentYear, currentMonth);
     events.fetchMonth(currentYear, currentMonth);
   });
@@ -58,20 +97,86 @@
   let hoverTimeoutId = $state(null);
   let activeDate = $state('');
 
-  function handleCellMouseEnter(e, cell) {
+  function parseDate(date) {
+    const [year, month, day] = date.split('-').map(Number);
+    return { year, month, day };
+  }
+
+  function formatHours(value) {
+    if (!value) return '0h';
+    return Number.isInteger(value) ? `${value}h` : `${value.toFixed(1)}h`;
+  }
+
+  function formatDateLabel(date) {
+    const { year, month, day } = parseDate(date);
+    return `${MONTH_NAMES[month]} ${day}, ${year}`;
+  }
+
+  function getCellMeta(date) {
+    const entry = entries[date];
+    const dayEvents = eventsMap[date] || [];
+    const hours = Number(entry?.hours) || 0;
+
+    if (hours > 0) return `${formatHours(hours)} logged`;
+    if (dayEvents.length > 0) return dayEvents.length === 1 ? '1 event' : `${dayEvents.length} events`;
+    if (entry?.status === 'finished') return 'finished';
+    if ((entry?.content_raw || '').trim()) return 'journal note';
+    return '';
+  }
+
+  // Keep each date button self-describing for screen readers without relying on color alone.
+  function getCellAriaLabel(cell) {
+    const entry = entries[cell.date];
+    const dayEvents = eventsMap[cell.date] || [];
+    const labelParts = [formatDateLabel(cell.date)];
+
+    if (!cell.isCurrentMonth) {
+      labelParts.push('outside the selected month');
+    }
+
+    if (isToday(cell.date)) {
+      labelParts.push('today');
+    }
+
+    if (activeDate === cell.date) {
+      labelParts.push('selected');
+    }
+
+    if (entry?.status === 'finished') {
+      labelParts.push('journal finished');
+    } else if (entry?.status === 'draft') {
+      labelParts.push('journal draft');
+    }
+
+    if ((Number(entry?.hours) || 0) > 0) {
+      labelParts.push(`${formatHours(Number(entry.hours))} logged`);
+    }
+
+    if (dayEvents.length > 0) {
+      labelParts.push(dayEvents.length === 1 ? '1 event' : `${dayEvents.length} events`);
+    }
+
+    return labelParts.join(', ');
+  }
+
+  function handleCellMouseEnter(event, cell) {
     if (hoverTimeoutId) {
       clearTimeout(hoverTimeoutId);
       hoverTimeoutId = null;
     }
-    const rect = e.currentTarget.getBoundingClientRect();
+
+    const rect = event.currentTarget.getBoundingClientRect();
     let x = rect.right + 8;
     let y = rect.top;
+
     if (x + 220 > window.innerWidth) x = rect.left - 228;
     if (y + 200 > window.innerHeight) y = window.innerHeight - 210;
     if (y < 8) y = 8;
+
     hoverX = x;
     hoverY = y;
     hoverDate = cell.date;
+
     const entry = entries[cell.date];
     hoverHours = entry ? Number(entry.hours) || 0 : 0;
     hoverDayEvents = eventsMap[cell.date] || [];
@@ -84,7 +189,7 @@
     hoverTimeoutId = setTimeout(() => {
       hoverVisible = false;
       hoverTimeoutId = null;
-    }, 150);
+    }, 140);
   }
 
   function handlePreviewEnter() {
@@ -110,15 +215,13 @@
   function openDate(date) {
     activeDate = date;
     const monthValue = getMonthValueFromDateString(date);
+
     if (monthValue !== $selectedMonth) {
       selectedMonth.set(monthValue);
     }
+
     onDateSelect(date);
   }
-
-  const ROWS = 6;
-  const COLS = 7;
-  const TOTAL_CELLS = ROWS * COLS;
 
   let calendarDays = $derived.by(() => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
@@ -133,145 +236,158 @@
 
     const cells = [];
 
-    for (let i = 0; i < firstDay; i++) {
-      const d = prevMonthDays - firstDay + 1 + i;
-      const dateStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      cells.push({ day: d, date: dateStr, isCurrentMonth: false });
+    for (let i = 0; i < firstDay; i += 1) {
+      const day = prevMonthDays - firstDay + 1 + i;
+      const date = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      cells.push({ day, date, isCurrentMonth: false });
     }
 
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      cells.push({ day: d, date: dateStr, isCurrentMonth: true });
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      cells.push({ day, date, isCurrentMonth: true });
     }
 
     const remaining = TOTAL_CELLS - cells.length;
-    for (let i = 0; i < remaining; i++) {
-      const d = i + 1;
-      const dateStr = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      cells.push({ day: d, date: dateStr, isCurrentMonth: false });
+    for (let i = 0; i < remaining; i += 1) {
+      const day = i + 1;
+      const date = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      cells.push({ day, date, isCurrentMonth: false });
     }
 
     return cells;
   });
 
   function cellClasses(cell) {
-    const { date, isCurrentMonth } = cell;
-    const entry = entries[date];
+    const entry = entries[cell.date];
     const hasEntry = !!entry;
-    const hasContent = entry && (Number(entry.hours) > 0 || (entry.content_raw && entry.content_raw.trim().length > 0));
+    const hasContent = hasEntry && ((Number(entry.hours) > 0) || (entry.content_raw && entry.content_raw.trim().length > 0));
     const checked = entry?.status === 'finished';
-    const hasLoggedHours = entry && Number(entry.hours) > 0;
-    const dayOfWeek = new Date(date + 'T00:00:00').getDay();
+    const hasLoggedHours = hasEntry && Number(entry.hours) > 0;
+
     return [
       'calendar-date-cell',
-      dayOfWeek === 0 ? 'sunday' : '',
-      !isCurrentMonth ? 'other-month' : '',
-      isToday(date) ? 'today' : '',
-      isPast(date) ? 'past' : '',
+      !cell.isCurrentMonth ? 'other-month' : '',
+      isToday(cell.date) ? 'today' : '',
+      isPast(cell.date) ? 'past' : '',
       hasEntry ? 'has-entry' : '',
       hasContent ? 'has-content' : '',
       checked ? 'checked' : '',
       hasLoggedHours ? 'has-hours' : '',
-      (eventsMap[date] || []).length > 0 ? 'has-events' : '',
-      activeDate === date ? 'selected' : ''
+      (eventsMap[cell.date] || []).length > 0 ? 'has-events' : '',
+      activeDate === cell.date ? 'selected' : ''
     ].filter(Boolean);
   }
 </script>
 
 <div class="calendar-view-old animate-rise rise-1" aria-busy={calendarBusy}>
-  {#if $progress.total_hours >= ($progress.target_hours ?? 486)}
-    <div class="celebration-banner">486 HOURS REACHED | AMAZING FOCUS</div>
-  {/if}
+  <section class="calendar-layout" aria-label={`Calendar for ${monthHeading} ${currentYear}`}>
+    <header class="calendar-month-display">
+      <div class="calendar-title-wrap">
+        <h1 class="calendar-month-name">{monthHeading}</h1>
+        {#if $progress.total_hours >= ($progress.target_hours ?? 486)}
+          <p class="celebration-banner">486 hours reached</p>
+        {/if}
+      </div>
 
-  <div class="calendar-layout">
-    <div class="calendar-month-display">
-      <span class="calendar-month-name">{MONTH_NAMES_SHORT[currentMonth]}</span>
-      <span class="calendar-year">({currentYear})</span>
-    </div>
+      <div class="calendar-header-tools">
+        <div class="calendar-year" aria-label={`Year ${currentYear}`}>
+          <span>{yearParts[0]}</span>
+          <span>{yearParts[1]}</span>
+        </div>
 
-    <div class="calendar-layout-divider" aria-hidden="true"></div>
+        <div class="calendar-nav" aria-label="Month navigation">
+          <button type="button" class="calendar-nav-btn" onclick={() => shiftMonth(-1)} aria-label="Previous month">
+            Prev
+          </button>
+          <button type="button" class="calendar-nav-btn" onclick={() => shiftMonth(1)} aria-label="Next month">
+            Next
+          </button>
+        </div>
+      </div>
+    </header>
 
     <div class="calendar-grid-wrap">
-      <div class="calendar-days-row">
-        {#each DAY_HEADERS as h}
-          <span class="calendar-day-head">{h}</span>
+      <div class="calendar-days-row" aria-hidden="true">
+        {#each DAY_HEADERS as day}
+          <span class="calendar-day-head">
+            <span class="day-head-full">{day.long}</span>
+            <span class="day-head-short">{day.short}</span>
+          </span>
         {/each}
       </div>
 
       {#if calendarBusy}
         <div class="calendar-dates calendar-dates-skeleton" aria-hidden="true">
           {#each Array.from({ length: TOTAL_CELLS }) as _, index}
-            <div class="calendar-skeleton-cell skeleton-block" style={`animation-delay: ${index * 12}ms;`}></div>
+            <div class="calendar-skeleton-cell" style={`animation-delay: ${index * 18}ms;`}></div>
           {/each}
         </div>
       {:else}
-        <div class="calendar-dates" role="grid" aria-label="Calendar">
+        <div class="calendar-dates" aria-label={`Calendar for ${monthHeading} ${currentYear}`}>
           {#each calendarDays as cell, index}
             <button
               type="button"
               class={cellClasses(cell).join(' ')}
-              style={`animation-delay: ${index * 12}ms;`}
+              style={`animation-delay: ${index * 18}ms;`}
               onclick={() => openDate(cell.date)}
-              onmouseenter={(e) => handleCellMouseEnter(e, cell)}
+              onmouseenter={(event) => handleCellMouseEnter(event, cell)}
               onmouseleave={handleCellMouseLeave}
-              aria-label={cell.date}
+              aria-current={isToday(cell.date) ? 'date' : undefined}
+              aria-label={getCellAriaLabel(cell)}
             >
               <span class="calendar-day-number">{String(cell.day).padStart(2, '0')}</span>
+
+              {#if getCellMeta(cell.date)}
+                <span class="calendar-cell-meta">{getCellMeta(cell.date)}</span>
+              {/if}
+
               <span class="calendar-cell-indicators" aria-hidden="true">
                 {#if entries[cell.date]}
                   <span class:finished={entries[cell.date]?.status === 'finished'} class="calendar-cell-dot"></span>
                 {/if}
                 {#if (eventsMap[cell.date] || []).length > 0}
                   <span class="calendar-cell-dot calendar-cell-dot-event"></span>
-                  {#if (eventsMap[cell.date] || []).length > 1}
-                    <span class="calendar-cell-dot calendar-cell-dot-muted"></span>
-                  {/if}
+                {/if}
+                {#if (eventsMap[cell.date] || []).length > 1}
+                  <span class="calendar-cell-dot calendar-cell-dot-muted"></span>
                 {/if}
               </span>
             </button>
           {/each}
         </div>
       {/if}
-
-      <div class="calendar-footer">
-        <div class="calendar-month-stats">
-          <span class="month-stat">{monthStats.count} {monthStats.count === 1 ? 'entry' : 'entries'}</span>
-          <span class="month-stat-sep" aria-hidden="true">·</span>
-          <span class="month-stat">{monthStats.hours}h logged</span>
-          <span class="month-stat-sep" aria-hidden="true">·</span>
-          <span class="month-stat">{monthStats.finished} finished</span>
-        </div>
-        {#if $progress.current_streak > 0}
-          <div class="streak-badge" title="Current streak: {$progress.current_streak} days">
-            <span class="streak-flame" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path
-                  d="M8 1.5C8.8 3 9.2 4.1 9.2 5.1c0 .7-.2 1.2-.5 1.6.3-.1.6-.2.9-.2 1.5 0 2.7 1.2 2.7 2.8 0 2.1-1.7 3.7-4.3 3.7S3.7 11.4 3.7 9.3c0-1.9 1.2-3.2 2.4-4.4.5-.5.9-1 1.1-1.7.1-.4.2-.9.2-1.7Z"
-                  fill="currentColor"
-                  fill-rule="evenodd"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </span>
-            <span class="streak-count">{$progress.current_streak}</span>
-            <span class="streak-text">day streak</span>
-            {#if $progress.current_streak >= $progress.longest_streak && $progress.current_streak > 1}
-              <span class="streak-best">Best!</span>
-            {/if}
-          </div>
-        {/if}
-      </div>
-
-      <div class="calendar-nav" aria-label="Month navigation">
-        <button type="button" class="calendar-nav-btn" onclick={() => shiftMonth(-1)} aria-label="Previous month">
-          &#x2190;
-        </button>
-        <button type="button" class="calendar-nav-btn" onclick={() => shiftMonth(1)} aria-label="Next month">
-          &#x2192;
-        </button>
-      </div>
     </div>
-  </div>
+
+    <footer class="calendar-footer">
+      <div class="calendar-month-stats">
+        <span class="month-stat">{monthStats.count} {monthStats.count === 1 ? 'entry' : 'entries'}</span>
+        <span class="month-stat-sep" aria-hidden="true">·</span>
+        <span class="month-stat">{formatHours(monthStats.hours)} logged</span>
+        <span class="month-stat-sep" aria-hidden="true">·</span>
+        <span class="month-stat">{monthStats.finished} finished</span>
+      </div>
+
+      {#if $progress.current_streak > 0}
+        <div class="streak-badge" title={`Current streak: ${$progress.current_streak} days`}>
+          <span class="streak-flame" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M8 1.5C8.8 3 9.2 4.1 9.2 5.1c0 .7-.2 1.2-.5 1.6.3-.1.6-.2.9-.2 1.5 0 2.7 1.2 2.7 2.8 0 2.1-1.7 3.7-4.3 3.7S3.7 11.4 3.7 9.3c0-1.9 1.2-3.2 2.4-4.4.5-.5.9-1 1.1-1.7.1-.4.2-.9.2-1.7Z"
+                fill="currentColor"
+                fill-rule="evenodd"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </span>
+          <span class="streak-count">{$progress.current_streak}</span>
+          <span class="streak-text">day streak</span>
+          {#if $progress.current_streak >= $progress.longest_streak && $progress.current_streak > 1}
+            <span class="streak-best">Best</span>
+          {/if}
+        </div>
+      {/if}
+    </footer>
+  </section>
 </div>
 
 <HoverPreview
@@ -283,9 +399,9 @@
   eventCount={hoverEventCount}
   dayEvents={hoverDayEvents}
   journalStatus={hoverJournalStatus}
-    onLogHours={handleQuickActionClick}
-    onAddEvent={handleQuickActionClick}
-    onJournalEntry={handleQuickActionClick}
+  onLogHours={handleQuickActionClick}
+  onAddEvent={handleQuickActionClick}
+  onJournalEntry={handleQuickActionClick}
   onMouseEnter={handlePreviewEnter}
   onMouseLeave={handlePreviewLeave}
 />
@@ -294,277 +410,330 @@
   .calendar-view-old {
     width: 100%;
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    text-align: left;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    padding: clamp(0.9rem, 1.7vw, 1.5rem);
   }
 
   .calendar-layout {
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    justify-content: center;
-    gap: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: clamp(0.6rem, 1.1vw, 1rem);
     width: 100%;
-    max-width: 90rem;
-    margin: 0 auto;
-    padding: 2rem 4rem 4rem;
-    flex: 1;
+    height: 100%;
+    min-height: 0;
   }
 
   .calendar-month-display {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    flex: 0 0 32rem;
-    width: 32rem;
-    min-width: 32rem;
-    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: end;
   }
 
-  .calendar-layout-divider {
-    flex: 0 0 1px;
-    width: 1px;
-    min-height: 12rem;
-    align-self: center;
-    background: var(--border);
-    margin: 0 3rem;
-    opacity: 0;
+  .calendar-title-wrap {
+    min-width: 0;
+    animation: calendarTitleIn 0.45s var(--ease-out) both;
   }
 
   .calendar-month-name {
+    margin: 0;
     font-family: var(--font-display);
-    font-weight: 900;
+    font-size: clamp(3.8rem, 8.4vw, 6.4rem);
+    line-height: 0.88;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
     color: var(--red);
-    font-size: 14rem;
-    line-height: 0.92;
-    letter-spacing: -0.02em;
-    white-space: nowrap;
+  }
+
+  .celebration-banner {
+    margin-top: 0.35rem;
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--red-hover);
+  }
+
+  .calendar-header-tools {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.7rem;
+    animation: calendarTitleIn 0.45s 0.06s var(--ease-out) both;
   }
 
   .calendar-year {
-    font-family: var(--font-display);
-    font-weight: 900;
-    color: var(--red);
-    font-size: 5rem;
-    margin-top: -0.1em;
-    letter-spacing: -0.02em;
-  }
-
-  .calendar-grid-wrap {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-    align-items: stretch;
-    flex: 0 0 42rem;
-    width: 42rem;
-    min-width: 42rem;
+    align-items: flex-end;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4.5vw, 3.25rem);
+    font-weight: 700;
+    line-height: 0.82;
+    letter-spacing: -0.05em;
+    color: var(--red);
   }
 
   .calendar-nav {
-    position: fixed;
-    left: 50%;
-    bottom: 1.75rem;
-    transform: translateX(-50%);
     display: flex;
-    justify-content: center;
     align-items: center;
-    gap: 2.5rem;
-    font-family: var(--font-body);
-    font-size: 3rem;
-    z-index: 10;
+    gap: 0.45rem;
   }
 
   .calendar-nav-btn {
-    background: none;
-    border: none;
-    padding: 0.75rem;
+    min-width: 4.15rem;
+    min-height: 2.4rem;
+    padding: 0 0.85rem;
+    border: 1px solid rgba(190, 53, 25, 0.22);
+    background: rgba(255, 254, 248, 0.9);
     color: var(--red);
-    cursor: pointer;
-    line-height: 1;
-    font-size: 3rem;
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
     font-weight: 700;
-    transition: color 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
   }
+
   .calendar-nav-btn:hover {
-    color: var(--red-hover);
-    transform: scale(1.15);
-    outline: none;
+    background: rgba(190, 53, 25, 0.08);
+    border-color: rgba(190, 53, 25, 0.38);
   }
-  .calendar-nav-btn:active {
-    transform: scale(1.05);
+
+  .calendar-grid-wrap {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    animation: calendarGridIn 0.55s 0.1s var(--ease-out) both;
   }
 
   .calendar-days-row {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 0;
-    font-family: var(--font-ui);
-    font-size: 2.25rem;
-    font-weight: 900;
-    text-align: center;
-    letter-spacing: 0.06em;
-    min-height: 3.5rem;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    border-top: 1px solid rgba(190, 53, 25, 0.48);
+    border-left: 1px solid rgba(190, 53, 25, 0.48);
+    border-right: 1px solid rgba(190, 53, 25, 0.48);
+    overflow: hidden;
   }
 
   .calendar-day-head {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .calendar-day-head:nth-child(1) {
-    color: var(--dark);
-  }
-  .calendar-day-head:nth-child(n+2) {
-    color: var(--red);
-  }
-  .calendar-day-head:nth-child(7) {
-    color: var(--dark);
-  }
-
-  .calendar-dates {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    grid-template-rows: repeat(6, 1fr);
-    width: 100%;
-    height: min(32rem, calc(100vh - 14rem));
-    min-height: 24rem;
-    gap: 0.5rem;
-    font-family: var(--font-display);
-    font-size: 2.25rem;
+    place-items: center;
+    min-height: 2rem;
+    padding: 0.25rem 0.35rem;
+    border-right: 1px solid rgba(190, 53, 25, 0.48);
+    font-family: var(--font-ui);
+    font-size: clamp(0.58rem, 0.95vw, 0.82rem);
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--red);
     text-align: center;
   }
 
-  .calendar-date-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: space-between;
-    min-height: 0;
-    padding: 0.8rem 0.75rem;
-    background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(190, 53, 25, 0.08);
-    border-radius: 18px;
-    cursor: pointer;
-    font: inherit;
-    text-align: left;
-    transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease,
-      transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.2s ease;
-    animation: calendarCellIn 0.35s var(--ease-out) both;
-  }
-  .calendar-date-cell:hover {
-    opacity: 1;
-    transform: translateY(-2px);
-    box-shadow: 0 14px 28px rgba(34, 24, 8, 0.08);
-    border-color: rgba(190, 53, 25, 0.16);
-  }
-  .calendar-date-cell.sunday {
-    color: var(--dark);
-  }
-  .calendar-date-cell:not(.sunday):not(.other-month) {
-    color: var(--red);
-  }
-  .calendar-date-cell.other-month {
-    color: rgba(190, 53, 25, 0.4);
-  }
-  .calendar-date-cell.other-month.sunday {
-    color: rgba(30, 30, 30, 0.4);
+  .calendar-day-head:last-child {
+    border-right: none;
   }
 
-  .calendar-date-cell.has-entry {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 243, 0.94));
+  .day-head-short {
+    display: none;
   }
-  .calendar-date-cell.has-content {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 250, 238, 0.96));
+
+  .calendar-dates {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    border-left: 1px solid rgba(190, 53, 25, 0.48);
+    border-right: 1px solid rgba(190, 53, 25, 0.48);
+    border-bottom: 1px solid rgba(190, 53, 25, 0.48);
+    background: rgba(255, 252, 246, 0.54);
+  }
+
+  .calendar-date-cell,
+  .calendar-skeleton-cell {
+    min-height: 0;
+    border: none;
+    border-top: 1px solid rgba(190, 53, 25, 0.38);
+    border-right: 1px solid rgba(190, 53, 25, 0.38);
+  }
+
+  .calendar-date-cell:nth-child(7n),
+  .calendar-skeleton-cell:nth-child(7n) {
+    border-right: none;
+  }
+
+  .calendar-date-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.25rem;
+    padding: 0.36rem 0.45rem 0.4rem;
+    background: transparent;
+    color: var(--red);
+    text-align: left;
+    transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+    animation: calendarCellIn 0.35s var(--ease-out) both;
+  }
+
+  .calendar-date-cell:hover {
+    background: rgba(190, 53, 25, 0.05);
+  }
+
+  .calendar-date-cell.other-month {
+    color: rgba(190, 53, 25, 0.28);
+  }
+
+  .calendar-date-cell.past:not(.today):not(.selected) {
+    color: rgba(190, 53, 25, 0.68);
   }
 
   .calendar-date-cell.today {
-    text-decoration: underline;
-    text-underline-offset: 0.25em;
-    text-decoration-thickness: 2px;
-    text-decoration-color: var(--red-hover);
-  }
-  .calendar-date-cell.past {
-    opacity: 0.7;
-  }
-  .calendar-date-cell.checked {
-    color: var(--success);
-    opacity: 1;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 255, 246, 0.96));
-    border-color: rgba(45, 122, 58, 0.18);
-    text-decoration: none;
-  }
-  .calendar-date-cell.has-hours:not(.checked) {
-    text-decoration: underline;
-    text-underline-offset: 0.25em;
-    text-decoration-thickness: 1px;
-    text-decoration-color: var(--red);
-  }
-  .calendar-date-cell.has-hours.today:not(.checked) {
-    text-decoration-thickness: 2px;
-    text-decoration-color: var(--red-hover);
+    background: rgba(190, 53, 25, 0.07);
+    box-shadow: inset 0 0 0 1px rgba(190, 53, 25, 0.24);
   }
 
   .calendar-date-cell.selected {
-    border-color: rgba(190, 53, 25, 0.34);
-    box-shadow: 0 18px 30px rgba(190, 53, 25, 0.12);
-    transform: translateY(-2px);
+    background: rgba(190, 53, 25, 0.12);
+    box-shadow: inset 0 0 0 2px rgba(190, 53, 25, 0.56);
   }
 
-  .calendar-date-cell.has-events {
-    border-color: rgba(184, 134, 11, 0.14);
+  .calendar-date-cell.checked {
+    background: rgba(184, 134, 11, 0.1);
+    color: #7a5c1e;
+  }
+
+  .calendar-date-cell.has-events:not(.selected):not(.today) {
+    background: rgba(190, 53, 25, 0.03);
   }
 
   .calendar-day-number {
-    font-family: var(--font-display);
-    font-size: 1em;
+    align-self: flex-end;
+    font-family: var(--font-ui);
+    font-size: clamp(0.76rem, 1vw, 1rem);
+    font-weight: 600;
     line-height: 1;
+    letter-spacing: 0.02em;
+  }
+
+  .calendar-cell-meta {
+    max-width: 11ch;
+    font-family: var(--font-body);
+    font-size: clamp(0.62rem, 0.9vw, 0.78rem);
+    line-height: 1.35;
+    color: rgba(120, 54, 34, 0.9);
+    overflow: hidden;
+    text-wrap: balance;
+  }
+
+  .calendar-date-cell.checked .calendar-cell-meta {
+    color: #7a5c1e;
   }
 
   .calendar-cell-indicators {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    min-height: 0.6rem;
+    gap: 0.2rem;
+    min-height: 0.35rem;
   }
 
   .calendar-cell-dot {
-    width: 0.4rem;
-    height: 0.4rem;
+    width: 0.28rem;
+    height: 0.28rem;
     border-radius: 999px;
-    background: rgba(190, 53, 25, 0.28);
+    background: rgba(190, 53, 25, 0.56);
   }
 
   .calendar-cell-dot.finished {
-    background: var(--success);
+    background: #7a5c1e;
   }
 
   .calendar-cell-dot-event {
-    background: var(--warning);
+    background: #9f5e23;
   }
 
   .calendar-cell-dot-muted {
-    background: rgba(184, 134, 11, 0.45);
+    background: rgba(159, 94, 35, 0.42);
   }
 
   .calendar-dates-skeleton {
-    align-items: stretch;
+    background: rgba(255, 252, 246, 0.54);
   }
 
   .calendar-skeleton-cell {
-    min-height: 0;
-    opacity: 0.9;
-    animation: calendarCellIn 0.35s var(--ease-out) both;
+    background: rgba(190, 53, 25, 0.03);
+    animation: calendarPulse 1.1s ease-in-out infinite alternate;
   }
 
-  @keyframes calendarCellIn {
+  .calendar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 2rem;
+    animation: calendarGridIn 0.55s 0.16s var(--ease-out) both;
+  }
+
+  .calendar-month-stats {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dark-soft);
+  }
+
+  .month-stat-sep {
+    color: rgba(190, 53, 25, 0.3);
+  }
+
+  .streak-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32rem;
+    color: var(--red);
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    letter-spacing: 0.04em;
+  }
+
+  .streak-flame,
+  .streak-count {
+    color: var(--red);
+  }
+
+  .streak-count {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .streak-text {
+    text-transform: uppercase;
+    color: var(--dark-soft);
+  }
+
+  .streak-best {
+    margin-left: 0.2rem;
+    padding: 0.08rem 0.32rem;
+    border: 1px solid rgba(190, 53, 25, 0.18);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+
+  @keyframes calendarTitleIn {
     from {
       opacity: 0;
-      transform: translateY(8px);
+      transform: translateY(10px);
     }
     to {
       opacity: 1;
@@ -572,501 +741,152 @@
     }
   }
 
-  .calendar-footer {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-top: 1rem;
-    gap: 1.5rem;
-  }
-
-  .calendar-month-stats {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    font-family: var(--font-ui);
-    font-size: 0.8rem;
-    color: var(--dark-soft);
-    letter-spacing: 0.04em;
-  }
-
-  .month-stat-sep {
-    color: var(--border);
-    user-select: none;
-  }
-
-  .streak-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-family: var(--font-ui);
-    font-size: 0.8rem;
-    color: var(--red);
-    animation: streakPulse 2s ease-in-out infinite;
-  }
-
-  .streak-flame {
-    font-size: 1rem;
-    line-height: 1;
-  }
-
-  .streak-count {
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--red);
-  }
-
-  .streak-text {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--dark-soft);
-  }
-
-  .streak-best {
-    font-size: 0.6rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    background: var(--red);
-    color: var(--bg);
-    padding: 0.1rem 0.35rem;
-    border-radius: 999px;
-    font-weight: 700;
-  }
-
-  @keyframes streakPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.85; }
-  }
-
-  .celebration-banner {
-    position: fixed;
-    left: 50%;
-    top: 1.25rem;
-    transform: translateX(-50%);
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    color: var(--red);
-    z-index: 20;
-  }
-
-  @media (max-width: 1200px) {
-    .calendar-layout {
-      padding: 2rem 2.5rem 3.5rem;
-      max-width: 100%;
+  @keyframes calendarGridIn {
+    from {
+      opacity: 0;
     }
-    .calendar-layout-divider {
-      margin: 0 2.5rem;
+    to {
+      opacity: 1;
     }
-    .calendar-month-display {
-      flex: 0 0 26rem;
-      width: 26rem;
-      min-width: 26rem;
+  }
+
+  @keyframes calendarCellIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
     }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes calendarPulse {
+    from {
+      opacity: 0.62;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 920px) {
+    .calendar-view-old {
+      padding: 0.8rem;
+    }
+
     .calendar-month-name {
-      font-size: 11rem;
+      font-size: clamp(3rem, 10vw, 4.6rem);
     }
-    .calendar-year {
-      font-size: 4rem;
-    }
-    .calendar-grid-wrap {
-      width: min(38rem, 100%);
-      min-width: 0;
-    }
-    .calendar-dates {
-      height: min(28rem, calc(100vh - 16rem));
-      min-height: 22rem;
-      font-size: 2rem;
-    }
-    .calendar-days-row {
-      font-size: 2rem;
-      min-height: 3rem;
-    }
-  }
 
-  @media (max-width: 1100px) {
-    .calendar-layout {
-      padding: 2rem 2rem 3rem;
-    }
-    .calendar-layout-divider {
-      margin: 0 2rem;
-    }
-    .calendar-month-display {
-      flex: 0 0 22rem;
-      width: 22rem;
-      min-width: 22rem;
-    }
-    .calendar-month-name {
-      font-size: 9rem;
-    }
     .calendar-year {
-      font-size: 3.25rem;
+      font-size: clamp(1.5rem, 5vw, 2.3rem);
     }
-    .calendar-grid-wrap {
-      width: min(34rem, 100%);
-    }
-    .calendar-dates {
-      height: min(24rem, calc(100vh - 15rem));
-      min-height: 20rem;
-      font-size: 1.75rem;
-    }
-    .calendar-days-row {
-      font-size: 1.75rem;
-      min-height: 2.75rem;
-    }
-  }
 
-  @media (max-width: 900px) {
-    .calendar-layout {
-      flex-direction: column;
-      gap: 0;
-      padding: 1.5rem 1.5rem 3rem;
-    }
-    .calendar-layout-divider {
-      width: 100%;
-      min-width: 0;
-      min-height: 0;
-      height: 1px;
-      margin: 1rem 0;
-    }
-    .calendar-month-display {
-      align-items: center;
-      flex: 0 0 auto;
-      width: auto;
-      min-width: 0;
-    }
-    .calendar-month-name {
-      font-size: clamp(5rem, 20vw, 9rem);
-    }
-    .calendar-year {
-      font-size: clamp(2.5rem, 10vw, 3.5rem);
-      margin-top: 0;
-    }
-    .calendar-grid-wrap {
-      max-width: 100%;
-      min-width: 0;
-      width: 100%;
-    }
-    .calendar-dates {
-      height: min(20rem, calc(100vh - 18rem));
-      min-height: 16rem;
-      font-size: clamp(1.2rem, 4vw, 1.65rem);
-    }
-    .calendar-days-row {
-      font-size: clamp(1.2rem, 4vw, 1.65rem);
-      min-height: 2.5rem;
-    }
     .calendar-footer {
       flex-direction: column;
-      align-items: center;
+      align-items: flex-start;
+      gap: 0.45rem;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .calendar-layout {
       gap: 0.5rem;
     }
-  }
-
-  @media (max-width: 768px) {
-    .calendar-layout {
-      padding: 1.25rem 1.25rem 2.5rem;
-      gap: 1.75rem;
-    }
-    .calendar-month-name {
-      font-size: clamp(4.5rem, 18vw, 7rem);
-    }
-    .calendar-year {
-      font-size: clamp(2rem, 9vw, 3rem);
-    }
-    .calendar-dates {
-      height: min(18rem, calc(100vh - 16rem));
-      min-height: 14rem;
-      font-size: clamp(1.1rem, 3.8vw, 1.4rem);
-      gap: 0.35rem;
-    }
-    .calendar-days-row {
-      font-size: clamp(1.1rem, 3.8vw, 1.4rem);
-      min-height: 2.25rem;
-    }
-    .calendar-nav {
-      bottom: 1.25rem;
-      gap: 2rem;
-      font-size: 2.5rem;
-    }
-    .calendar-nav-btn {
-      font-size: 2.5rem;
-    }
-    .celebration-banner {
-      font-size: 0.8rem;
-      top: 1rem;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .calendar-layout {
-      padding: 1rem 1rem 2rem;
-      gap: 1.25rem;
-    }
-    .calendar-month-name {
-      font-size: clamp(3.5rem, 16vw, 5.5rem);
-    }
-    .calendar-year {
-      font-size: clamp(1.5rem, 7vw, 2.5rem);
-    }
-    .calendar-dates {
-      font-size: clamp(0.95rem, 3.2vw, 1.2rem);
-      height: min(14rem, calc(100vh - 14rem));
-      min-height: 12rem;
-      gap: 0.25rem;
-    }
-    .calendar-days-row {
-      font-size: clamp(0.95rem, 3.2vw, 1.2rem);
-      min-height: 2rem;
-    }
-    .calendar-footer {
-      gap: 0.35rem;
-    }
-    .calendar-month-stats {
-      font-size: 0.7rem;
-      gap: 0.35rem;
-    }
-    .calendar-nav {
-      bottom: 1rem;
-      gap: 1.75rem;
-      font-size: 2.25rem;
-    }
-    .calendar-nav-btn {
-      font-size: 2.25rem;
-    }
-  }
-
-  /* Simpler calendar pass */
-  .calendar-layout {
-    align-items: center;
-    gap: 1.5rem;
-    max-width: 76rem;
-    padding: 1.25rem 2rem 2rem;
-  }
-
-  .calendar-month-display {
-    flex: 0 0 18rem;
-    width: 18rem;
-    min-width: 18rem;
-    justify-content: flex-start;
-  }
-
-  .calendar-layout-divider {
-    display: none;
-  }
-
-  .calendar-month-name {
-    font-size: clamp(6rem, 12vw, 9rem);
-    line-height: 0.9;
-  }
-
-  .calendar-year {
-    font-size: clamp(2.4rem, 5vw, 3.6rem);
-    margin-top: 0.1rem;
-  }
-
-  .calendar-grid-wrap {
-    flex: 1 1 auto;
-    width: min(34rem, 100%);
-    min-width: 0;
-    gap: 0.85rem;
-  }
-
-  .calendar-nav {
-    position: static;
-    transform: none;
-    gap: 0.65rem;
-    justify-content: flex-end;
-    margin-top: 0.15rem;
-    font-size: 1rem;
-  }
-
-  .calendar-nav-btn {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-    border: 1px solid rgba(190, 53, 25, 0.14);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.9);
-    font-size: 1.25rem;
-  }
-
-  .calendar-nav-btn:hover {
-    transform: none;
-    background: rgba(190, 53, 25, 0.06);
-  }
-
-  .calendar-days-row {
-    min-height: 2.3rem;
-    font-size: 1.35rem;
-    letter-spacing: 0.08em;
-  }
-
-  .calendar-dates {
-    height: auto;
-    min-height: 0;
-    gap: 0.25rem;
-    font-size: 1.65rem;
-    letter-spacing: 0;
-  }
-
-  .calendar-date-cell {
-    aspect-ratio: 1 / 0.88;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 0.22rem;
-    padding: 0.35rem 0.4rem;
-    background: transparent;
-    border: none;
-    border-radius: 12px;
-    box-shadow: none;
-    transition: background var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
-  }
-
-  .calendar-date-cell:hover {
-    transform: none;
-    box-shadow: none;
-    border-color: transparent;
-    background: rgba(190, 53, 25, 0.05);
-  }
-
-  .calendar-date-cell.has-entry,
-  .calendar-date-cell.has-content,
-  .calendar-date-cell.has-events {
-    background: transparent;
-    border-color: transparent;
-  }
-
-  .calendar-date-cell.today {
-    background: rgba(190, 53, 25, 0.08);
-    text-decoration: none;
-  }
-
-  .calendar-date-cell.checked {
-    background: rgba(45, 122, 58, 0.08);
-    border-color: transparent;
-  }
-
-  .calendar-date-cell.selected {
-    background: rgba(190, 53, 25, 0.12);
-    box-shadow: none;
-    transform: none;
-  }
-
-  .calendar-date-cell.other-month {
-    opacity: 0.48;
-  }
-
-  .calendar-date-cell.past:not(.selected):not(.today) {
-    opacity: 0.72;
-  }
-
-  .calendar-day-number {
-    font-size: 1em;
-  }
-
-  .calendar-cell-indicators {
-    gap: 0.2rem;
-    min-height: 0.45rem;
-  }
-
-  .calendar-cell-dot {
-    width: 0.28rem;
-    height: 0.28rem;
-    background: rgba(190, 53, 25, 0.44);
-  }
-
-  .calendar-cell-dot-event {
-    background: rgba(184, 134, 11, 0.75);
-  }
-
-  .calendar-footer {
-    margin-top: 0.25rem;
-    align-items: center;
-  }
-
-  .calendar-month-stats {
-    font-size: 0.78rem;
-  }
-
-  .streak-badge {
-    animation: none;
-  }
-
-  @media (max-width: 1100px) {
-    .calendar-layout {
-      padding: 1.15rem 1.5rem 1.75rem;
-    }
 
     .calendar-month-display {
-      flex-basis: 15rem;
-      width: 15rem;
-      min-width: 15rem;
-    }
-  }
-
-  @media (max-width: 900px) {
-    .calendar-layout {
-      gap: 1rem;
-      padding: 1rem 1.25rem 1.5rem;
+      align-items: start;
     }
 
-    .calendar-month-display {
-      align-items: flex-start;
-      width: 100%;
-      min-width: 0;
-      flex: 0 0 auto;
-    }
-
-    .calendar-grid-wrap {
-      width: 100%;
-    }
-
-    .calendar-dates {
-      font-size: clamp(1.1rem, 3vw, 1.45rem);
-    }
-
-    .calendar-footer {
-      flex-direction: row;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 0.65rem;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .calendar-layout {
-      padding: 0.9rem 0.9rem 1.25rem;
-    }
-
-    .calendar-month-name {
-      font-size: clamp(4.4rem, 17vw, 6rem);
-    }
-
-    .calendar-year {
-      font-size: clamp(1.6rem, 7vw, 2.2rem);
-    }
-
-    .calendar-days-row {
+    .calendar-day-head {
       min-height: 1.8rem;
-      font-size: 0.95rem;
+      font-size: 0.56rem;
     }
 
-    .calendar-dates {
-      gap: 0.18rem;
-      font-size: clamp(0.92rem, 3.6vw, 1.12rem);
+    .day-head-full {
+      display: none;
+    }
+
+    .day-head-short {
+      display: inline;
     }
 
     .calendar-date-cell {
-      padding: 0.2rem 0.25rem;
-      border-radius: 8px;
+      padding: 0.28rem 0.3rem 0.32rem;
     }
 
-    .calendar-footer {
-      flex-direction: column;
-      align-items: flex-start;
+    .calendar-day-number {
+      font-size: 0.72rem;
+    }
+
+    .calendar-cell-meta {
+      display: none;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .calendar-view-old {
+      padding: 0.65rem;
+    }
+
+    .calendar-month-display {
+      grid-template-columns: 1fr;
+      gap: 0.45rem;
+    }
+
+    .calendar-header-tools {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: end;
+    }
+
+    .calendar-month-name {
+      font-size: clamp(2.2rem, 12vw, 3.2rem);
+    }
+
+    .calendar-year {
+      font-size: 1.35rem;
+      line-height: 0.9;
+    }
+
+    .calendar-nav-btn {
+      min-width: 3.35rem;
+      min-height: 2.05rem;
+      font-size: 0.68rem;
+    }
+
+    .calendar-day-head {
+      min-height: 1.55rem;
+      padding: 0.18rem;
+    }
+
+    .calendar-date-cell {
+      gap: 0.18rem;
+    }
+
+    .calendar-cell-indicators {
+      gap: 0.16rem;
+    }
+
+    .calendar-month-stats {
+      font-size: 0.68rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .calendar-title-wrap,
+    .calendar-header-tools,
+    .calendar-grid-wrap,
+    .calendar-footer,
+    .calendar-date-cell,
+    .calendar-skeleton-cell {
+      animation: none !important;
+    }
+
+    .calendar-date-cell,
+    .calendar-nav-btn {
+      transition: none;
     }
   }
 </style>
