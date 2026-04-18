@@ -19,9 +19,20 @@
 </script>
 
 <AuthShell>
-  <Calendar onDateSelect={handleDateSelect} onQuickAction={handleQuickAction} />
+  <div class="calendar-page-shell">
+    <Calendar onDateSelect={handleDateSelect} onQuickAction={handleQuickAction} />
+  </div>
 </AuthShell>
 
 {#if selectedDate}
   <DayModal date={selectedDate} onClose={closeModal} />
 {/if}
+
+<style>
+  .calendar-page-shell {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+  }
+</style>

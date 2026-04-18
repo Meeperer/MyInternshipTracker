@@ -413,8 +413,7 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    height: calc(100dvh - 8.6rem);
-    min-height: calc(100dvh - 8.6rem);
+    height: 100%;
     overflow: hidden;
     padding: clamp(0.65rem, 1.2vw, 1rem);
   }
@@ -778,8 +777,6 @@
 
   @media (max-width: 920px) {
     .calendar-view-old {
-      height: calc(100dvh - 9.4rem);
-      min-height: calc(100dvh - 9.4rem);
       padding: 0.7rem;
     }
 
@@ -799,11 +796,6 @@
   }
 
   @media (max-width: 720px) {
-    .calendar-view-old {
-      height: calc(100dvh - 10rem);
-      min-height: calc(100dvh - 10rem);
-    }
-
     .calendar-layout {
       gap: 0.5rem;
     }
@@ -840,8 +832,6 @@
 
   @media (max-width: 560px) {
     .calendar-view-old {
-      height: calc(100dvh - 10.6rem);
-      min-height: calc(100dvh - 10.6rem);
       padding: 0.55rem;
     }
 
