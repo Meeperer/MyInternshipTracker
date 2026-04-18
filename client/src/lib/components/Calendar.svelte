@@ -2,16 +2,16 @@
   import { journal } from '$stores/journal.js';
   import { progress } from '$stores/progress.js';
   import { events } from '$stores/events.js';
-  import { getDaysInMonth, getFirstDayOfMonth, isToday, isPast, todayString } from '$utils/date.js';
+  import { selectedMonth } from '$stores/selectedMonth.js';
+  import { getDaysInMonth, getFirstDayOfMonth, getMonthValueFromDateString, isToday, isPast } from '$utils/date.js';
   import HoverPreview from './HoverPreview.svelte';
 
   let { onDateSelect = () => {}, onQuickAction = () => {} } = $props();
 
-  let currentYear = $state(new Date().getFullYear());
-  let currentMonth = $state(new Date().getMonth() + 1);
-
   const MONTH_NAMES_SHORT = ['', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   const DAY_HEADERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  let currentYear = $derived.by(() => Number(($selectedMonth || '').slice(0, 4)));
+  let currentMonth = $derived.by(() => Number(($selectedMonth || '').slice(5, 7)));
 
   let entries = $derived.by(() => {
     const map = {};
@@ -38,6 +38,10 @@
   });
 
   $effect(() => {
+    if (!$selectedMonth) {
+      selectedMonth.init();
+      return;
+    }
     journal.fetchMonth(currentYear, currentMonth);
     events.fetchMonth(currentYear, currentMonth);
   });
@@ -98,12 +102,15 @@
   }
 
   function shiftMonth(delta) {
-    let m = currentMonth + delta;
-    let y = currentYear;
-    if (m < 1) { m = 12; y--; }
-    if (m > 12) { m = 1; y++; }
-    currentMonth = m;
-    currentYear = y;
+    selectedMonth.shift(delta);
+  }
+
+  function openDate(date) {
+    const monthValue = getMonthValueFromDateString(date);
+    if (monthValue !== $selectedMonth) {
+      selectedMonth.set(monthValue);
+    }
+    onDateSelect(date);
   }
 
   const ROWS = 6;
@@ -191,7 +198,7 @@
           <button
             type="button"
             class={cellClasses(cell).join(' ')}
-            onclick={() => onDateSelect(cell.date)}
+            onclick={() => openDate(cell.date)}
             onmouseenter={(e) => handleCellMouseEnter(e, cell)}
             onmouseleave={handleCellMouseLeave}
             aria-label="{cell.date}"

@@ -32,6 +32,23 @@ function createJournalStore() {
       return entries;
     },
 
+    async summarizePeriod(period, startDate, endDate) {
+      return await api.post('/ai/summary-period', {
+        period,
+        start_date: startDate,
+        end_date: endDate
+      });
+    },
+
+    async fetchPeriodSummary(period, startDate, endDate) {
+      const params = new URLSearchParams({
+        period,
+        start_date: startDate,
+        end_date: endDate
+      });
+      return await api.get(`/ai/summary-period?${params.toString()}`);
+    },
+
     async fetchDate(date) {
       try {
         const entry = await api.get(`/journals/${date}`);

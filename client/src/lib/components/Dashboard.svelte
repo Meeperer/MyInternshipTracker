@@ -1,12 +1,13 @@
 <script>
+  import { onMount } from 'svelte';
   import { progress } from '$stores/progress.js';
   import { journal } from '$stores/journal.js';
   import { events } from '$stores/events.js';
+  import { selectedMonth } from '$stores/selectedMonth.js';
   import { toast } from '$stores/toast.js';
-  import { todayString } from '$utils/date.js';
-  import ProgressBar from './ProgressBar.svelte';
-  import { onMount } from 'svelte';
+  import { monthValueFromDate, parseMonthValue, todayString } from '$utils/date.js';
   import { api } from '$utils/api.js';
+  import ProgressBar from './ProgressBar.svelte';
 
   let { onNavigateToDate = () => {} } = $props();
 
@@ -15,74 +16,80 @@
   let downloading = $state(false);
   let todayEvents = $state([]);
 
-  const CURRENT_MONTH = new Date().getMonth() + 1;
-  const CURRENT_YEAR = new Date().getFullYear();
-  const NOW = new Date();
+  const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'long'
+  });
+
+  function formatMonthLabel(monthValue) {
+    const { year, month } = parseMonthValue(monthValue);
+    return MONTH_LABEL_FORMATTER.format(new Date(year, (month || 1) - 1, 1));
+  }
+
+  function formatTimeRange(ev) {
+    const start = ev.start_time?.slice(0, 5);
+    const end = ev.end_time?.slice(0, 5);
+    if (start && end) return `${start} - ${end}`;
+    if (start) return start;
+    if (end) return `until ${end}`;
+    return '';
+  }
+
+  const QUOTES = [
+    { text: 'The secret of getting ahead is getting started.', author: 'Mark Twain' },
+    { text: "It always seems impossible until it's done.", author: 'Nelson Mandela' },
+    { text: 'Small daily improvements are the key to staggering long-term results.', author: 'Robin Sharma' },
+    { text: 'Success is the sum of small efforts repeated day in and day out.', author: 'Robert Collier' },
+    { text: 'Discipline is the bridge between goals and accomplishment.', author: 'Jim Rohn' },
+    { text: 'The only way to do great work is to love what you do.', author: 'Steve Jobs' },
+    { text: "Don't watch the clock; do what it does. Keep going.", author: 'Sam Levenson' },
+    { text: 'Consistency is the hallmark of the unimaginative.', author: 'Oscar Wilde' },
+    { text: 'You are never too old to set another goal or to dream a new dream.', author: 'C.S. Lewis' },
+    { text: 'Energy and persistence conquer all things.', author: 'Benjamin Franklin' },
+    { text: 'What you do today can improve all your tomorrows.', author: 'Ralph Marston' },
+    { text: 'Start where you are. Use what you have. Do what you can.', author: 'Arthur Ashe' }
+  ];
+
+  let dashboardMonthLabel = $derived.by(() => formatMonthLabel($selectedMonth || monthValueFromDate()));
 
   let monthStats = $derived.by(() => {
     const entries = $journal.entries || [];
-    const relevant = entries.filter(e => {
-      const y = parseInt(e.date.slice(0, 4));
-      const m = parseInt(e.date.slice(5, 7));
-      return y === CURRENT_YEAR && m === CURRENT_MONTH;
-    });
-    const count = relevant.length;
-    const finished = relevant.filter(e => e.status === 'finished').length;
-    const hours = relevant.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+    const count = entries.length;
+    const finished = entries.filter((entry) => entry.status === 'finished').length;
+    const hours = entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
     return { count, finished, hours: Math.round(hours * 10) / 10 };
   });
 
-  let weeklyInsights = $derived.by(() => {
+  let monthInsights = $derived.by(() => {
     const entries = $journal.entries || [];
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - dayOfWeek);
-    weekStart.setHours(0, 0, 0, 0);
-
-    const prevWeekStart = new Date(weekStart);
-    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
-
-    let thisWeekHours = 0;
-    let thisWeekDays = 0;
-    let prevWeekHours = 0;
-
-    for (const e of entries) {
-      const d = new Date(e.date + 'T00:00:00');
-      const h = Number(e.hours) || 0;
-      if (d >= weekStart) {
-        thisWeekHours += h;
-        if (h > 0) thisWeekDays++;
-      } else if (d >= prevWeekStart && d < weekStart) {
-        prevWeekHours += h;
-      }
-    }
-
-    const trend = prevWeekHours > 0
-      ? Math.round(((thisWeekHours - prevWeekHours) / prevWeekHours) * 100)
-      : thisWeekHours > 0 ? 100 : 0;
+    const activeEntries = entries.filter((entry) =>
+      (Number(entry.hours) || 0) > 0 || (entry.content_raw || '').trim().length > 0
+    );
+    const totalHours = entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
+    const activeDays = activeEntries.length;
+    const finishedDays = entries.filter((entry) => entry.status === 'finished').length;
+    const averagePerActiveDay = activeDays > 0 ? totalHours / activeDays : 0;
 
     const remaining = $progress.remaining_hours;
     const avgDaily = $progress.days_completed > 0
       ? $progress.total_hours / $progress.days_completed
       : 8;
 
-    // Compute how many working days (Mon–Fri) you still need,
-    // then convert that to a calendar date by skipping weekends.
     const workingDaysNeeded = avgDaily > 0 ? Math.ceil(remaining / avgDaily) : 0;
     let projectedDate = 'Complete!';
 
     if (workingDaysNeeded > 0) {
       let date = new Date();
       let remainingWorkDays = workingDaysNeeded;
-      // Walk forward counting only Mon–Fri as working days
+
       while (remainingWorkDays > 0) {
         date.setDate(date.getDate() + 1);
-        const dow = date.getDay(); // 0 = Sun, 6 = Sat
-        if (dow !== 0 && dow !== 6) {
-          remainingWorkDays--;
+        const day = date.getDay();
+        if (day !== 0 && day !== 6) {
+          remainingWorkDays -= 1;
         }
       }
+
       projectedDate = date.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -91,49 +98,47 @@
     }
 
     return {
-      thisWeekHours: Math.round(thisWeekHours * 10) / 10,
-      thisWeekDays,
-      trend,
-      avgDaily: Math.round(avgDaily * 10) / 10,
+      totalHours: Math.round(totalHours * 10) / 10,
+      activeDays,
+      finishedDays,
+      averagePerActiveDay: Math.round(averagePerActiveDay * 10) / 10,
       projectedCompletion: projectedDate,
       daysNeeded: workingDaysNeeded
     };
   });
-
-  function formatTimeRange(ev) {
-    const s = ev.start_time?.slice(0, 5);
-    const e = ev.end_time?.slice(0, 5);
-    if (s && e) return `${s} – ${e}`;
-    if (s) return s;
-    if (e) return `until ${e}`;
-    return '';
-  }
-
-  const QUOTES = [
-    { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
-    { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
-    { text: "Small daily improvements are the key to staggering long-term results.", author: "Robin Sharma" },
-    { text: "Success is the sum of small efforts repeated day in and day out.", author: "Robert Collier" },
-    { text: "Discipline is the bridge between goals and accomplishment.", author: "Jim Rohn" },
-    { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
-    { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
-    { text: "Consistency is the hallmark of the unimaginative.", author: "Oscar Wilde" },
-    { text: "You are never too old to set another goal or to dream a new dream.", author: "C.S. Lewis" },
-    { text: "Energy and persistence conquer all things.", author: "Benjamin Franklin" },
-    { text: "What you do today can improve all your tomorrows.", author: "Ralph Marston" },
-    { text: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" }
-  ];
 
   let todayQuote = $derived.by(() => {
     const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
     return QUOTES[dayOfYear % QUOTES.length];
   });
 
-  onMount(() => {
-    api.get('/compilation/status').then(s => compilationStatus = s).catch(() => {});
-    journal.fetchMonth(CURRENT_YEAR, CURRENT_MONTH);
-    events.fetchDate(todayString()).then(list => (todayEvents = list || []));
+  let greetingLabel = $derived.by(() => {
+    const pct = $progress.percentage;
+    if (pct >= 100) return 'Complete!';
+    if (pct >= 75) return 'Almost there';
+    if (pct >= 50) return 'Halfway mark';
+    if (pct >= 25) return 'Great progress';
+    return 'Getting started';
   });
+
+  onMount(() => {
+    api.get('/compilation/status').then((status) => (compilationStatus = status)).catch(() => {});
+    events.fetchDate(todayString()).then((list) => (todayEvents = list || []));
+  });
+
+  $effect(() => {
+    if (!$selectedMonth) {
+      selectedMonth.init();
+      return;
+    }
+
+    const { year, month } = parseMonthValue($selectedMonth);
+    journal.fetchMonth(year, month);
+  });
+
+  function shiftSelectedMonth(delta) {
+    selectedMonth.shift(delta);
+  }
 
   async function handleCompile() {
     compiling = true;
@@ -153,10 +158,10 @@
     try {
       const blob = await api.getBlob('/compilation/download');
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'Internship_Journal_Report.pdf';
-      a.click();
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Internship_Journal_Report.pdf';
+      link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
       toast.error(err.message);
@@ -164,15 +169,6 @@
       downloading = false;
     }
   }
-
-  let greetingLabel = $derived.by(() => {
-    const pct = $progress.percentage;
-    if (pct >= 100) return 'Complete!';
-    if (pct >= 75) return 'Almost there';
-    if (pct >= 50) return 'Halfway mark';
-    if (pct >= 25) return 'Great progress';
-    return 'Getting started';
-  });
 </script>
 
 <div class="dashboard">
@@ -183,7 +179,29 @@
 
   <div class="quote-card card">
     <blockquote class="quote-text">"{todayQuote.text}"</blockquote>
-    <cite class="quote-author">— {todayQuote.author}</cite>
+    <cite class="quote-author">- {todayQuote.author}</cite>
+  </div>
+
+  <div class="month-sync card">
+    <div class="month-sync-copy">
+      <h3>Selected Month</h3>
+      <p class="month-sync-hint">Calendar, dashboard, and journal now follow the same month selection.</p>
+    </div>
+    <div class="month-sync-controls">
+      <button type="button" class="btn btn-sm" onclick={() => shiftSelectedMonth(-1)}>
+        Previous
+      </button>
+      <input
+        class="month-input"
+        type="month"
+        bind:value={$selectedMonth}
+        aria-label="Select dashboard month"
+      />
+      <button type="button" class="btn btn-sm" onclick={() => shiftSelectedMonth(1)}>
+        Next
+      </button>
+    </div>
+    <p class="month-sync-label">{dashboardMonthLabel} · {monthStats.count} entr{monthStats.count === 1 ? 'y' : 'ies'} · {monthStats.hours} hours</p>
   </div>
 
   <div class="stats-grid">
@@ -214,32 +232,30 @@
   </div>
 
   <div class="insights-card card">
-    <h3>Weekly Insights</h3>
+    <h3>{dashboardMonthLabel} Snapshot</h3>
     <div class="insights-grid">
       <div class="insight">
-        <span class="insight-value">{weeklyInsights.thisWeekHours}h</span>
-        <span class="insight-label">This Week</span>
+        <span class="insight-value">{monthInsights.totalHours}h</span>
+        <span class="insight-label">Hours Logged</span>
       </div>
       <div class="insight">
-        <span class="insight-value">{weeklyInsights.thisWeekDays}</span>
+        <span class="insight-value">{monthInsights.activeDays}</span>
         <span class="insight-label">Days Active</span>
       </div>
       <div class="insight">
-        <span class="insight-value" class:trend-up={weeklyInsights.trend > 0} class:trend-down={weeklyInsights.trend < 0}>
-          {weeklyInsights.trend > 0 ? '+' : ''}{weeklyInsights.trend}%
-        </span>
-        <span class="insight-label">vs Last Week</span>
+        <span class="insight-value">{monthInsights.finishedDays}</span>
+        <span class="insight-label">Finished Days</span>
       </div>
       <div class="insight">
-        <span class="insight-value">{weeklyInsights.avgDaily}h</span>
-        <span class="insight-label">Avg / Day</span>
+        <span class="insight-value">{monthInsights.averagePerActiveDay}h</span>
+        <span class="insight-label">Avg / Active Day</span>
       </div>
     </div>
     {#if !$progress.is_completed}
       <div class="projection">
         <span class="projection-label">Projected completion</span>
-        <span class="projection-value">{weeklyInsights.projectedCompletion}</span>
-        <span class="projection-detail">({weeklyInsights.daysNeeded} working days remaining)</span>
+        <span class="projection-value">{monthInsights.projectedCompletion}</span>
+        <span class="projection-detail">({monthInsights.daysNeeded} working days remaining)</span>
       </div>
     {/if}
   </div>
@@ -251,7 +267,7 @@
       total={$progress.total_hours}
       target={$progress.target_hours}
     />
-    <p class="progress-hint">Log hours from the Journal — open a date and use "Log Hours" or "Edit Entry".</p>
+    <p class="progress-hint">Log hours from the Journal - open a date and use "Log Hours" or "Edit Entry".</p>
   </div>
 
   {#if $progress.is_completed}
@@ -354,6 +370,64 @@
     letter-spacing: 0.1em;
   }
 
+  .month-sync {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem 1.75rem;
+  }
+
+  .month-sync-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .month-sync-copy h3 {
+    font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+  }
+
+  .month-sync-hint,
+  .month-sync-label {
+    font-family: var(--font-ui);
+    color: var(--dark-soft);
+    line-height: 1.5;
+  }
+
+  .month-sync-hint {
+    font-size: 0.85rem;
+  }
+
+  .month-sync-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .month-sync-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .month-input {
+    min-height: 42px;
+    padding: 0.65rem 0.85rem;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-ui);
+    font-size: 0.88rem;
+    background: white;
+    color: var(--dark);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .month-input:focus {
+    outline: none;
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(190, 53, 25, 0.12);
+  }
+
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -371,6 +445,7 @@
     transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out),
       border-color 0.2s ease;
   }
+
   .stat-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
@@ -570,14 +645,6 @@
     font-weight: 700;
   }
 
-  .insight-value.trend-up {
-    color: var(--success);
-  }
-
-  .insight-value.trend-down {
-    color: var(--warning);
-  }
-
   .insight-label {
     display: block;
     font-family: var(--font-ui);
@@ -639,10 +706,22 @@
       padding: 2.5rem 2rem 3rem;
       gap: 1.75rem;
     }
-    .dash-header h1 { font-size: 2.75rem; }
-    .stat-value { font-size: 2.5rem; }
-    .stat-card { padding: 1.5rem; }
-    .quote-card { padding: 1.5rem 2rem; }
+
+    .dash-header h1 {
+      font-size: 2.75rem;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+    }
+
+    .stat-card {
+      padding: 1.5rem;
+    }
+
+    .quote-card {
+      padding: 1.5rem 2rem;
+    }
   }
 
   @media (max-width: 768px) {
@@ -650,15 +729,45 @@
       padding: 2rem 1.5rem 2.5rem;
       gap: 1.5rem;
     }
-    .dash-header h1 { font-size: 2.35rem; }
-    .dash-subtitle { font-size: 0.9rem; }
-    .stats-grid { gap: 1.25rem; }
-    .stat-value { font-size: 2.25rem; }
-    .stat-label { font-size: 0.75rem; }
+
+    .dash-header h1 {
+      font-size: 2.35rem;
+    }
+
+    .dash-subtitle {
+      font-size: 0.9rem;
+    }
+
+    .stats-grid {
+      gap: 1.25rem;
+    }
+
+    .stat-value {
+      font-size: 2.25rem;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+    }
+
     .progress-section h3,
-    .quick-access h3 { font-size: 1.2rem; }
-    .milestone-badge { padding: 0.65rem 1rem; gap: 0.75rem; }
-    .milestone-label { min-width: 90px; font-size: 0.72rem; }
+    .quick-access h3 {
+      font-size: 1.2rem;
+    }
+
+    .milestone-badge {
+      padding: 0.65rem 1rem;
+      gap: 0.75rem;
+    }
+
+    .milestone-label {
+      min-width: 90px;
+      font-size: 0.72rem;
+    }
+
+    .month-sync-controls {
+      flex-wrap: wrap;
+    }
   }
 
   @media (max-width: 600px) {
@@ -666,35 +775,78 @@
       padding: 1.75rem 1.25rem 2rem;
       gap: 1.25rem;
     }
+
     .stats-grid,
     .insights-grid {
       grid-template-columns: repeat(2, 1fr);
       gap: 1rem;
     }
-    .dash-header h1 { font-size: 2rem; }
-    .stat-value { font-size: 2rem; }
-    .stat-card { padding: 1.25rem; }
+
+    .dash-header h1 {
+      font-size: 2rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+    }
+
+    .stat-card {
+      padding: 1.25rem;
+    }
+
+    .month-sync-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .month-sync-controls .btn,
+    .month-input {
+      width: 100%;
+    }
   }
 
   @media (max-width: 480px) {
     .dashboard {
       padding: 1.5rem 1rem 1.75rem;
     }
-    .dash-header h1 { font-size: 1.75rem; }
-    .stat-value { font-size: 1.85rem; }
-    .stat-card { padding: 1rem; }
-    .completion-banner h2 { font-size: 1.5rem; }
+
+    .dash-header h1 {
+      font-size: 1.75rem;
+    }
+
+    .stat-value {
+      font-size: 1.85rem;
+    }
+
+    .stat-card {
+      padding: 1rem;
+    }
+
+    .completion-banner h2 {
+      font-size: 1.5rem;
+    }
+
     .quick-access {
       flex-direction: column;
       align-items: stretch;
       gap: 0.75rem;
     }
+
     .quick-access .btn {
       width: 100%;
       justify-content: center;
     }
-    .quote-card { padding: 1.25rem 1rem; }
-    .quote-text { font-size: 0.95rem; }
-    .milestone-badge { flex-wrap: wrap; }
+
+    .quote-card {
+      padding: 1.25rem 1rem;
+    }
+
+    .quote-text {
+      font-size: 0.95rem;
+    }
+
+    .milestone-badge {
+      flex-wrap: wrap;
+    }
   }
 </style>

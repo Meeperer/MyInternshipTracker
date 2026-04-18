@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { supabaseAdmin } from '../services/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
 import { generateCompiledPDF } from '../services/pdf.js';
@@ -13,7 +13,7 @@ const compileLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip),
   message: { error: 'Too many compilation requests. Please wait before trying again.' }
 });
 

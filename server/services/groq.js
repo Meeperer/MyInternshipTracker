@@ -85,3 +85,116 @@ Each value should be a string paragraph. No markdown formatting in values.`
     tokens: completion.usage?.total_tokens || 0
   };
 }
+
+function clipText(value, maxLength = 1800) {
+  const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  return normalized.length <= maxLength
+    ? normalized
+    : `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
+function getEntrySummaryText(entry) {
+  const arasParts = [
+    entry.aras_action && `Action: ${entry.aras_action}`,
+    entry.aras_reflection && `Reflection: ${entry.aras_reflection}`,
+    entry.aras_analysis && `Analysis: ${entry.aras_analysis}`,
+    entry.aras_summary && `Summary: ${entry.aras_summary}`
+  ].filter(Boolean);
+
+  if (arasParts.length > 0) {
+    return clipText(arasParts.join('\n'));
+  }
+
+  if (entry.content_ai_refined?.trim()) {
+    return clipText(entry.content_ai_refined);
+  }
+
+  return clipText(entry.content_raw);
+}
+
+function buildPeriodSummarySource(entries, maxChars = 16000) {
+  const blocks = [];
+  let remaining = maxChars;
+  let usedEntryCount = 0;
+
+  for (const entry of entries) {
+    const content = getEntrySummaryText(entry);
+    if (!content) continue;
+
+    const block = [
+      `Date: ${entry.date}`,
+      `Hours: ${entry.hours ?? 0}`,
+      `Status: ${entry.status || 'draft'}`,
+      content
+    ].join('\n');
+
+    if (block.length > remaining) {
+      const clipped = clipText(block, Math.max(remaining - 1, 0));
+      if (clipped) {
+        blocks.push(clipped);
+        usedEntryCount += 1;
+      }
+      break;
+    }
+
+    blocks.push(block);
+    remaining -= block.length + 2;
+    usedEntryCount += 1;
+  }
+
+  return {
+    source: blocks.join('\n\n'),
+    usedEntryCount
+  };
+}
+
+export async function summarizeJournalPeriod(entries, { period, startDate, endDate }) {
+  const { source, usedEntryCount } = buildPeriodSummarySource(entries);
+
+  if (!source) {
+    return {
+      summary: '',
+      tokens: 0,
+      usedEntryCount: 0
+    };
+  }
+
+  const completion = await withTimeout(groq.chat.completions.create({
+    model: MODEL,
+    messages: [
+      {
+        role: 'system',
+        content: `You are an internship journal summarization assistant.
+Summarize a user's journal entries for a week or month.
+
+STRICT RULES:
+- Use ONLY the provided journal content.
+- Do NOT invent events, accomplishments, blockers, or plans.
+- Keep the writing professional, concise, and grounded in the source material.
+- If some information is sparse, say less rather than guessing.
+- Return exactly three short paragraphs:
+  1. Main work completed and overall progress
+  2. Key learnings, themes, or patterns
+  3. Challenges, follow-up work, or priorities implied by the entries
+- Return ONLY plain text, with no headings or bullet points.`
+      },
+      {
+        role: 'user',
+        content: `Period type: ${period}
+Date range: ${startDate} to ${endDate}
+
+Journal entries:
+${source}`
+      }
+    ],
+    temperature: 0.3,
+    max_tokens: 900
+  }));
+
+  return {
+    summary: completion.choices[0].message.content?.trim() || '',
+    tokens: completion.usage?.total_tokens || 0,
+    usedEntryCount
+  };
+}

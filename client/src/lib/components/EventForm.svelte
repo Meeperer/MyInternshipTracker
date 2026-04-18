@@ -10,23 +10,32 @@
     onDelete = () => {}
   } = $props();
 
-  let title = $state(event?.title || '');
-  let description = $state(event?.description || '');
-  let startTime = $state(event?.start_time?.slice(0, 5) || '');
-  let endTime = $state(event?.end_time?.slice(0, 5) || '');
-  let type = $state(event?.type || 'personal');
-  let reminderEnabled = $state(event?.reminder_enabled || false);
+  let title = $state('');
+  let description = $state('');
+  let startTime = $state('');
+  let endTime = $state('');
+  let type = $state('personal');
+  let reminderEnabled = $state(false);
   let saving = $state(false);
   let deleting = $state(false);
   let confirmingDelete = $state(false);
 
-  const isEditing = !!event;
+  let isEditing = $derived(!!event);
   const EVENT_TYPES = [
     { value: 'meeting', label: 'Meeting' },
     { value: 'deadline', label: 'Deadline' },
     { value: 'reminder', label: 'Reminder' },
     { value: 'personal', label: 'Personal' }
   ];
+
+  $effect(() => {
+    title = event?.title || '';
+    description = event?.description || '';
+    startTime = event?.start_time?.slice(0, 5) || '';
+    endTime = event?.end_time?.slice(0, 5) || '';
+    type = event?.type || 'personal';
+    reminderEnabled = event?.reminder_enabled || false;
+  });
 
   async function handleSubmit() {
     if (!title.trim()) {
@@ -92,7 +101,7 @@
         <button class="btn btn-danger" onclick={confirmDeleteEvent} disabled={deleting}>
           {deleting ? 'Deleting...' : 'Delete'}
         </button>
-        <button class="btn" onclick={() => (confirmingDelete = false)}>Cancel</button>
+        <button type="button" class="btn" onclick={() => (confirmingDelete = false)}>Cancel</button>
       </div>
     </div>
   {:else}
@@ -104,8 +113,10 @@
   </div>
 
   <div class="field">
-    <label class="label">Type</label>
-    <div class="type-selector">
+    <!-- Use a fieldset/legend so screen readers announce the type buttons as one related choice group. -->
+    <fieldset class="type-fieldset">
+      <legend class="label">Type</legend>
+      <div class="type-selector" role="group" aria-label="Event type">
       {#each EVENT_TYPES as t}
         <button
           type="button"
@@ -116,7 +127,8 @@
           {t.label}
         </button>
       {/each}
-    </div>
+      </div>
+    </fieldset>
   </div>
 
   <div class="field-row">
@@ -141,13 +153,13 @@
   </label>
 
   <div class="form-actions">
-    <button class="btn btn-primary" onclick={handleSubmit} disabled={saving}>
+    <button type="button" class="btn btn-primary" onclick={handleSubmit} disabled={saving}>
       {saving ? 'Saving...' : isEditing ? 'Update' : 'Create'}
     </button>
     {#if isEditing}
-      <button class="btn btn-danger" onclick={handleDelete} disabled={deleting}>Delete</button>
+      <button type="button" class="btn btn-danger" onclick={handleDelete} disabled={deleting}>Delete</button>
     {/if}
-    <button class="btn" onclick={onCancel}>Cancel</button>
+    <button type="button" class="btn" onclick={onCancel}>Cancel</button>
   </div>
   {/if}
 </div>
@@ -164,6 +176,12 @@
   }
   .field {
     margin-bottom: 0.75rem;
+  }
+  .type-fieldset {
+    margin: 0;
+    padding: 0;
+    border: none;
+    min-width: 0;
   }
   .field-row {
     display: flex;
