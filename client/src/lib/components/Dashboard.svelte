@@ -7,39 +7,26 @@
   import { toast } from '$stores/toast.js';
   import { monthValueFromDate, parseMonthValue, todayString } from '$utils/date.js';
   import { api } from '$utils/api.js';
-  import ProgressBar from './ProgressBar.svelte';
 
   let { onNavigateToDate = () => {} } = $props();
+
   const HOURS_MILESTONES = [100, 250, 400, 486];
   const STREAK_MILESTONES = [3, 7, 14];
-  const PROGRESS_RING_RADIUS = 64;
-  const PROGRESS_RING_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RING_RADIUS;
 
+  let dashboardNode;
   let compilationStatus = $state(null);
   let compiling = $state(false);
   let downloading = $state(false);
   let todayEvents = $state([]);
   let eventsLoading = $state(true);
   let celebration = $state(null);
+  let parallaxShift = $state(0);
+  let parallaxProgress = $state(0);
 
   const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'long'
   });
-
-  function formatMonthLabel(monthValue) {
-    const { year, month } = parseMonthValue(monthValue);
-    return MONTH_LABEL_FORMATTER.format(new Date(year, (month || 1) - 1, 1));
-  }
-
-  function formatTimeRange(ev) {
-    const start = ev.start_time?.slice(0, 5);
-    const end = ev.end_time?.slice(0, 5);
-    if (start && end) return `${start} - ${end}`;
-    if (start) return start;
-    if (end) return `until ${end}`;
-    return '';
-  }
 
   const QUOTES = [
     { text: 'The secret of getting ahead is getting started.', author: 'Mark Twain' },
@@ -56,90 +43,36 @@
     { text: 'Start where you are. Use what you have. Do what you can.', author: 'Arthur Ashe' }
   ];
 
-  let dashboardMonthLabel = $derived.by(() => formatMonthLabel($selectedMonth || monthValueFromDate()));
-  let dashboardBusy = $derived($progress.loading || $journal.loading);
-  let progressRingOffset = $derived.by(() =>
-    PROGRESS_RING_CIRCUMFERENCE - (Math.min($progress.percentage, 100) / 100) * PROGRESS_RING_CIRCUMFERENCE
-  );
+  function formatMonthLabel(monthValue) {
+    const { year, month } = parseMonthValue(monthValue);
+    return MONTH_LABEL_FORMATTER.format(new Date(year, (month || 1) - 1, 1));
+  }
 
-  let monthStats = $derived.by(() => {
-    const entries = $journal.entries || [];
-    const count = entries.length;
-    const finished = entries.filter((entry) => entry.status === 'finished').length;
-    const hours = entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
-    return { count, finished, hours: Math.round(hours * 10) / 10 };
-  });
+  function formatTimeRange(ev) {
+    const start = ev.start_time?.slice(0, 5);
+    const end = ev.end_time?.slice(0, 5);
+    if (start && end) return `${start} - ${end}`;
+    if (start) return start;
+    if (end) return `until ${end}`;
+    return '';
+  }
 
-  let monthInsights = $derived.by(() => {
-    const entries = $journal.entries || [];
-    const activeEntries = entries.filter((entry) =>
-      (Number(entry.hours) || 0) > 0 || (entry.content_raw || '').trim().length > 0
-    );
-    const totalHours = entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
-    const activeDays = activeEntries.length;
-    const finishedDays = entries.filter((entry) => entry.status === 'finished').length;
-    const averagePerActiveDay = activeDays > 0 ? totalHours / activeDays : 0;
+  function formatHours(value) {
+    if (!value) return '0h';
+    return Number.isInteger(value) ? `${value}h` : `${value.toFixed(1)}h`;
+  }
 
-    const remaining = $progress.remaining_hours;
-    const avgDaily = $progress.days_completed > 0
-      ? $progress.total_hours / $progress.days_completed
-      : 8;
-
-    const workingDaysNeeded = avgDaily > 0 ? Math.ceil(remaining / avgDaily) : 0;
-    let projectedDate = 'Complete!';
-
-    if (workingDaysNeeded > 0) {
-      let date = new Date();
-      let remainingWorkDays = workingDaysNeeded;
-
-      while (remainingWorkDays > 0) {
-        date.setDate(date.getDate() + 1);
-        const day = date.getDay();
-        if (day !== 0 && day !== 6) {
-          remainingWorkDays -= 1;
-        }
-      }
-
-      projectedDate = date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
+  function formatMilestoneCopy(milestone) {
+    if (milestone.reached) {
+      return milestone.hours >= 486
+        ? 'Target cleared. The dashboard can turn toward reporting and review.'
+        : 'This marker is already part of the record now.';
     }
 
-    return {
-      totalHours: Math.round(totalHours * 10) / 10,
-      activeDays,
-      finishedDays,
-      averagePerActiveDay: Math.round(averagePerActiveDay * 10) / 10,
-      projectedCompletion: projectedDate,
-      daysNeeded: workingDaysNeeded
-    };
-  });
-
-  let todayQuote = $derived.by(() => {
-    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
-    return QUOTES[dayOfYear % QUOTES.length];
-  });
-
-  let greetingLabel = $derived.by(() => {
-    const pct = $progress.percentage;
-    if (pct >= 100) return 'Complete!';
-    if (pct >= 75) return 'Almost there';
-    if (pct >= 50) return 'Halfway mark';
-    if (pct >= 25) return 'Great progress';
-    return 'Getting started';
-  });
-
-  let milestoneCards = $derived.by(() =>
-    HOURS_MILESTONES.map((hours) => ({
-      hours,
-      reached: $progress.total_hours >= hours,
-      remaining: Math.max(0, hours - $progress.total_hours)
-    }))
-  );
-
-  let nextMilestone = $derived.by(() => milestoneCards.find((milestone) => !milestone.reached) || null);
+    if (milestone.remaining <= 16) return 'Very close now. One more solid push will move it.';
+    if (milestone.remaining <= 48) return 'Within reach. The progress line already leans toward it.';
+    return 'Still ahead, but now visible enough to plan around.';
+  }
 
   function getCelebrationStorage() {
     if (typeof localStorage === 'undefined') return {};
@@ -166,59 +99,6 @@
     }
     celebration = null;
   }
-
-  onMount(() => {
-    api.get('/compilation/status').then((status) => (compilationStatus = status)).catch(() => {});
-    events.fetchDate(todayString())
-      .then((list) => (todayEvents = list || []))
-      .finally(() => {
-        eventsLoading = false;
-      });
-  });
-
-  $effect(() => {
-    if ($progress.loading || typeof localStorage === 'undefined' || celebration) return;
-
-    const seen = getCelebrationStorage();
-    const newestHoursMilestone = [...HOURS_MILESTONES]
-      .reverse()
-      .find((hours) => $progress.total_hours >= hours && !seen[`hours-${hours}`]);
-
-    if (newestHoursMilestone) {
-      celebration = {
-        key: `hours-${newestHoursMilestone}`,
-        eyebrow: 'Milestone reached',
-        title: `${newestHoursMilestone} hours unlocked`,
-        message: newestHoursMilestone >= 486
-          ? 'You made it to the full internship target. This is the finish-line moment.'
-          : `Your logged work just crossed ${newestHoursMilestone} hours. The tracker now reads like real momentum, not a rough start.`
-      };
-      return;
-    }
-
-    const newestStreakMilestone = [...STREAK_MILESTONES]
-      .reverse()
-      .find((days) => $progress.current_streak >= days && !seen[`streak-${days}`]);
-
-    if (newestStreakMilestone) {
-      celebration = {
-        key: `streak-${newestStreakMilestone}`,
-        eyebrow: 'Streak celebration',
-        title: `${newestStreakMilestone}-day streak`,
-        message: `You have stayed consistent for ${newestStreakMilestone} days in a row. The steady rhythm is showing up in your progress now.`
-      };
-    }
-  });
-
-  $effect(() => {
-    if (!$selectedMonth) {
-      selectedMonth.init();
-      return;
-    }
-
-    const { year, month } = parseMonthValue($selectedMonth);
-    journal.fetchMonth(year, month);
-  });
 
   function shiftSelectedMonth(delta) {
     selectedMonth.shift(delta);
@@ -253,256 +133,572 @@
       downloading = false;
     }
   }
+
+  // Respect reduced-motion users by disabling the scroll-linked dashboard layers entirely.
+  function initParallax() {
+    if (typeof window === 'undefined' || !dashboardNode) return () => {};
+
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const scrollHost = dashboardNode.closest('main#main-content');
+    if (!scrollHost) return () => {};
+
+    let frame = 0;
+
+    const updateParallax = () => {
+      frame = 0;
+
+      if (motionQuery.matches) {
+        parallaxShift = 0;
+        parallaxProgress = 0;
+        return;
+      }
+
+      const scrollTop = scrollHost.scrollTop;
+      const maxScroll = Math.max(scrollHost.scrollHeight - scrollHost.clientHeight, 1);
+
+      parallaxShift = Math.min(scrollTop, 560);
+      parallaxProgress = Math.min(scrollTop / maxScroll, 1);
+    };
+
+    const queueUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateParallax);
+    };
+
+    const handleMotionChange = () => updateParallax();
+
+    updateParallax();
+    scrollHost.addEventListener('scroll', queueUpdate, { passive: true });
+
+    if (typeof motionQuery.addEventListener === 'function') {
+      motionQuery.addEventListener('change', handleMotionChange);
+    } else {
+      motionQuery.addListener(handleMotionChange);
+    }
+
+    return () => {
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+      scrollHost.removeEventListener('scroll', queueUpdate);
+      if (typeof motionQuery.removeEventListener === 'function') {
+        motionQuery.removeEventListener('change', handleMotionChange);
+      } else {
+        motionQuery.removeListener(handleMotionChange);
+      }
+    };
+  }
+
+  let targetHours = $derived($progress.target_hours || 486);
+  let dashboardMonthLabel = $derived.by(() => formatMonthLabel($selectedMonth || monthValueFromDate()));
+  let dashboardMonthWord = $derived.by(() => dashboardMonthLabel.split(' ')[0].toUpperCase());
+  let dashboardYearWord = $derived.by(() => dashboardMonthLabel.split(' ')[1] || '');
+  let dashboardBusy = $derived($progress.loading || $journal.loading);
+  let todayQuote = $derived.by(() => {
+    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+    return QUOTES[dayOfYear % QUOTES.length];
+  });
+
+  let monthStats = $derived.by(() => {
+    const entries = $journal.entries || [];
+    const count = entries.length;
+    const finished = entries.filter((entry) => entry.status === 'finished').length;
+    const hours = entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
+    return { count, finished, hours: Math.round(hours * 10) / 10 };
+  });
+
+  let monthInsights = $derived.by(() => {
+    const entries = $journal.entries || [];
+    const activeEntries = entries.filter((entry) =>
+      (Number(entry.hours) || 0) > 0 || (entry.content_raw || '').trim().length > 0
+    );
+    const totalHours = entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
+    const activeDays = activeEntries.length;
+    const finishedDays = entries.filter((entry) => entry.status === 'finished').length;
+    const averagePerActiveDay = activeDays > 0 ? totalHours / activeDays : 0;
+    const remaining = $progress.remaining_hours;
+    const avgDaily = $progress.days_completed > 0 ? $progress.total_hours / $progress.days_completed : 8;
+
+    const workingDaysNeeded = avgDaily > 0 ? Math.ceil(remaining / avgDaily) : 0;
+    let projectedDate = 'Complete';
+
+    if (workingDaysNeeded > 0) {
+      const date = new Date();
+      let remainingWorkDays = workingDaysNeeded;
+
+      while (remainingWorkDays > 0) {
+        date.setDate(date.getDate() + 1);
+        const day = date.getDay();
+        if (day !== 0 && day !== 6) {
+          remainingWorkDays -= 1;
+        }
+      }
+
+      projectedDate = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+
+    return {
+      totalHours: Math.round(totalHours * 10) / 10,
+      activeDays,
+      finishedDays,
+      averagePerActiveDay: Math.round(averagePerActiveDay * 10) / 10,
+      projectedCompletion: projectedDate,
+      daysNeeded: workingDaysNeeded
+    };
+  });
+
+  let monthContribution = $derived.by(() =>
+    targetHours > 0 ? Math.min(100, Math.round((monthInsights.totalHours / targetHours) * 100)) : 0
+  );
+
+  let completionRate = $derived.by(() =>
+    monthStats.count > 0 ? Math.round((monthStats.finished / monthStats.count) * 100) : 0
+  );
+
+  let cadenceLabel = $derived.by(() => {
+    const avg = monthInsights.averagePerActiveDay;
+    if (avg >= 8) return 'Full-day pace';
+    if (avg >= 5) return 'Steady pace';
+    if (avg >= 2.5) return 'Building pace';
+    if (avg > 0) return 'Light pace';
+    return 'No pace yet';
+  });
+
+  let greetingLabel = $derived.by(() => {
+    const pct = $progress.percentage;
+    if (pct >= 100) return 'Requirement complete';
+    if (pct >= 75) return 'Closing stretch';
+    if (pct >= 50) return 'Halfway through';
+    if (pct >= 25) return 'Solid start';
+    return 'Early run';
+  });
+
+  let milestoneCards = $derived.by(() =>
+    HOURS_MILESTONES.map((hours) => ({
+      hours,
+      reached: $progress.total_hours >= hours,
+      remaining: Math.max(0, hours - $progress.total_hours)
+    }))
+  );
+
+  let nextMilestone = $derived.by(() => milestoneCards.find((milestone) => !milestone.reached) || null);
+
+  let progressMarkers = $derived.by(() =>
+    HOURS_MILESTONES.map((hours) => ({
+      hours,
+      reached: $progress.total_hours >= hours,
+      left: Math.min((hours / targetHours) * 100, 100)
+    }))
+  );
+
+  let todaySummary = $derived.by(() => {
+    if (eventsLoading) return 'Loading today';
+    if (todayEvents.length === 0) return 'No events scheduled today';
+    return `${todayEvents.length} event${todayEvents.length === 1 ? '' : 's'} scheduled today`;
+  });
+
+  $effect(() => {
+    if (!$selectedMonth) {
+      selectedMonth.init();
+      return;
+    }
+
+    const { year, month } = parseMonthValue($selectedMonth);
+    journal.fetchMonth(year, month);
+  });
+
+  $effect(() => {
+    if ($progress.loading || typeof localStorage === 'undefined' || celebration) return;
+
+    const seen = getCelebrationStorage();
+    const newestHoursMilestone = [...HOURS_MILESTONES]
+      .reverse()
+      .find((hours) => $progress.total_hours >= hours && !seen[`hours-${hours}`]);
+
+    if (newestHoursMilestone) {
+      celebration = {
+        key: `hours-${newestHoursMilestone}`,
+        title: newestHoursMilestone >= 486 ? '486 hours complete' : `${newestHoursMilestone} hours reached`,
+        message: newestHoursMilestone >= 486
+          ? 'You hit the full internship target. This is the handoff point from accumulation to finishing work.'
+          : `Your log just crossed ${newestHoursMilestone} hours. The tracker reads like real momentum now.`
+      };
+      return;
+    }
+
+    const newestStreakMilestone = [...STREAK_MILESTONES]
+      .reverse()
+      .find((days) => $progress.current_streak >= days && !seen[`streak-${days}`]);
+
+    if (newestStreakMilestone) {
+      celebration = {
+        key: `streak-${newestStreakMilestone}`,
+        title: `${newestStreakMilestone}-day streak`,
+        message: `You have stayed consistent for ${newestStreakMilestone} days in a row. That rhythm is now visible in the overall record.`
+      };
+    }
+  });
+
+  onMount(() => {
+    api.get('/compilation/status').then((status) => (compilationStatus = status)).catch(() => {});
+    events.fetchDate(todayString())
+      .then((list) => (todayEvents = list || []))
+      .finally(() => {
+        eventsLoading = false;
+      });
+
+    const cleanupParallax = initParallax();
+    return () => cleanupParallax();
+  });
 </script>
 
-<div class="dashboard" aria-busy={dashboardBusy || eventsLoading}>
-  <header class="dash-header animate-rise rise-1">
-    <h1>Internship Tracker</h1>
-    <p class="dash-subtitle">{$progress.target_hours}-Hour Compliance System</p>
-  </header>
-
-  <div class="quote-card card animate-rise rise-2">
-    {#if dashboardBusy}
-      <div class="quote-skeleton" aria-hidden="true">
-        <div class="skeleton-line long"></div>
-        <div class="skeleton-line medium"></div>
-        <div class="skeleton-line short"></div>
-      </div>
-    {:else}
-      <blockquote class="quote-text">"{todayQuote.text}"</blockquote>
-      <cite class="quote-author">- {todayQuote.author}</cite>
-    {/if}
+<div
+  class="dashboard"
+  bind:this={dashboardNode}
+  style={`--parallax-shift: ${parallaxShift}px; --parallax-progress: ${parallaxProgress};`}
+  aria-busy={dashboardBusy || eventsLoading}
+>
+  <!-- Decorative parallax layers stay hidden from assistive tech so the reading order remains clean. -->
+  <div class="dashboard-parallax" aria-hidden="true">
+    <span class="parallax-month-word">{dashboardMonthWord}</span>
+    <span class="parallax-year-word">{dashboardYearWord}</span>
+    <span class="parallax-target-word">{targetHours}</span>
+    <span class="parallax-rule parallax-rule-a"></span>
+    <span class="parallax-rule parallax-rule-b"></span>
+    <span class="parallax-rule parallax-rule-c"></span>
   </div>
 
-  <div class="month-sync card animate-rise rise-2">
-    <div class="month-sync-copy">
-      <h3>Selected Month</h3>
-      <p class="month-sync-hint">Calendar, dashboard, and journal now follow the same month selection.</p>
+  <header class="dashboard-bar animate-rise rise-1">
+    <div class="dashboard-bar-copy">
+      <h1>Dashboard</h1>
+      <p>{dashboardMonthLabel}. {$progress.total_hours} of {targetHours} hours logged, {$progress.remaining_hours} remaining.</p>
     </div>
-    <div class="month-sync-controls">
+
+    <div class="dashboard-bar-controls" role="group" aria-label="Selected month controls">
       <button type="button" class="btn btn-sm" onclick={() => shiftSelectedMonth(-1)}>
-        Previous
+        Prev
       </button>
-      <input
-        class="month-input"
-        type="month"
-        bind:value={$selectedMonth}
-        aria-label="Select dashboard month"
-      />
+
+      <label class="month-picker">
+        <span class="month-picker-label">Month</span>
+        <input
+          class="month-input"
+          type="month"
+          bind:value={$selectedMonth}
+          aria-label="Select dashboard month"
+        />
+      </label>
+
       <button type="button" class="btn btn-sm" onclick={() => shiftSelectedMonth(1)}>
         Next
       </button>
     </div>
-    <p class="month-sync-label">{dashboardMonthLabel} · {monthStats.count} entr{monthStats.count === 1 ? 'y' : 'ies'} · {monthStats.hours} hours</p>
-  </div>
+  </header>
 
-  <section class="progress-hero animate-rise rise-3">
-    <article class="progress-orbit card">
-      <div class="progress-ring-shell" aria-hidden="true">
-        <svg viewBox="0 0 160 160" class="progress-ring">
-          <circle class="progress-ring-track" cx="80" cy="80" r={PROGRESS_RING_RADIUS}></circle>
-          <circle
-            class="progress-ring-value"
-            cx="80"
-            cy="80"
-            r={PROGRESS_RING_RADIUS}
-            style={`stroke-dasharray: ${PROGRESS_RING_CIRCUMFERENCE}; stroke-dashoffset: ${progressRingOffset};`}
-          ></circle>
-        </svg>
-        <div class="progress-ring-copy">
-          <span class="progress-ring-percent">{$progress.percentage}%</span>
-          <span class="progress-ring-hours">{$progress.total_hours}h logged</span>
-        </div>
-      </div>
+  <section class="dashboard-main-grid animate-rise rise-2" aria-label="Progress overview">
+    <div class="parallax-plane depth-1">
+      <article class="trajectory-panel card">
+        <header class="panel-head">
+          <div>
+            <h2>Trajectory</h2>
+            <p>
+              {#if nextMilestone}
+                {nextMilestone.remaining} hours until the {nextMilestone.hours}-hour mark.
+              {:else}
+                Every major milestone is already cleared.
+              {/if}
+            </p>
+          </div>
 
-      <div class="progress-orbit-copy">
-        <span class="eyebrow-label">Momentum</span>
-        <h3>{greetingLabel}</h3>
-        <p>
-          {#if nextMilestone}
-            {nextMilestone.remaining} hours until the {nextMilestone.hours}-hour marker.
+          {#if dashboardBusy}
+            <div class="trajectory-total-skeleton" aria-hidden="true">
+              <span class="skeleton-line short"></span>
+              <span class="skeleton-line medium"></span>
+            </div>
           {:else}
-            You have cleared every major milestone, including the full requirement.
+            <div class="trajectory-total">
+              <span class="trajectory-total-value">{$progress.total_hours}</span>
+              <span class="trajectory-total-unit">hours logged</span>
+            </div>
+          {/if}
+        </header>
+
+        {#if dashboardBusy}
+          <div class="trajectory-skeleton" aria-hidden="true">
+            <div class="skeleton-block trajectory-skeleton-rail"></div>
+            <div class="trajectory-ledger trajectory-ledger-loading">
+              {#each Array.from({ length: 4 }) as _}
+                <div>
+                  <span class="skeleton-line short"></span>
+                  <span class="skeleton-line medium"></span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <div class="trajectory-rail" aria-label={`Progress toward ${targetHours} internship hours`}>
+            <div class="trajectory-rail-track">
+              <span class="trajectory-rail-fill" style={`width: ${Math.min($progress.percentage, 100)}%`}></span>
+
+              {#each progressMarkers as marker}
+                <span
+                  class:reached={marker.reached}
+                  class="trajectory-marker"
+                  style={`left: ${marker.left}%`}
+                  aria-hidden="true"
+                >
+                  <span class="trajectory-marker-line"></span>
+                  <span class="trajectory-marker-label">{marker.hours}</span>
+                </span>
+              {/each}
+            </div>
+          </div>
+
+          <dl class="trajectory-ledger">
+            <div>
+              <dt>Current status</dt>
+              <dd>{greetingLabel}</dd>
+            </div>
+            <div>
+              <dt>Projected finish</dt>
+              <dd>{monthInsights.projectedCompletion}</dd>
+            </div>
+            <div>
+              <dt>Average active day</dt>
+              <dd>{formatHours(monthInsights.averagePerActiveDay)}</dd>
+            </div>
+            <div>
+              <dt>Current streak</dt>
+              <dd>{$progress.current_streak} days</dd>
+            </div>
+          </dl>
+        {/if}
+      </article>
+    </div>
+
+    <div class="parallax-plane depth-2">
+      <aside class="month-panel card" aria-labelledby="month-panel-title">
+        <header class="panel-head panel-head-compact">
+          <div>
+            <h2 id="month-panel-title">{dashboardMonthLabel}</h2>
+            <p>{monthStats.count} entries currently in view.</p>
+          </div>
+        </header>
+
+        {#if dashboardBusy}
+          <div class="month-panel-grid month-panel-grid-loading" aria-hidden="true">
+            {#each Array.from({ length: 4 }) as _}
+              <div class="month-panel-tile month-panel-tile-loading">
+                <span class="skeleton-line medium"></span>
+                <span class="skeleton-line short"></span>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <dl class="month-panel-grid">
+            <div class="month-panel-tile">
+              <dt>Hours this month</dt>
+              <dd>{formatHours(monthStats.hours)}</dd>
+            </div>
+            <div class="month-panel-tile">
+              <dt>Finished days</dt>
+              <dd>{monthStats.finished}</dd>
+            </div>
+            <div class="month-panel-tile">
+              <dt>Active days</dt>
+              <dd>{monthInsights.activeDays}</dd>
+            </div>
+            <div class="month-panel-tile">
+              <dt>Month share of goal</dt>
+              <dd>{monthContribution}%</dd>
+            </div>
+          </dl>
+        {/if}
+
+        <p class="month-panel-note">
+          {#if monthStats.finished > 0}
+            {completionRate}% of this month&apos;s entries are already finished and counting toward the target.
+          {:else}
+            Finish entries in this month to move the total forward.
           {/if}
         </p>
-      </div>
-    </article>
-
-    <article class="milestone-shelf card">
-      <div class="milestone-shelf-header">
-        <div>
-          <span class="eyebrow-label">Milestones</span>
-          <h3>Reward the long arc</h3>
-        </div>
-        <span class="streak-pill">{$progress.current_streak}-day streak</span>
-      </div>
-
-      <div class="milestone-shelf-grid">
-        {#each milestoneCards as milestone}
-          <div class:reached={milestone.reached} class="milestone-card">
-            <span class="milestone-card-kicker">{milestone.hours}h</span>
-            <strong>{milestone.reached ? 'Reached' : `${milestone.remaining}h left`}</strong>
-            <p>{milestone.reached ? 'Locked into your progress record.' : 'Still ahead, but close enough to feel tangible.'}</p>
-          </div>
-        {/each}
-      </div>
-    </article>
+      </aside>
+    </div>
   </section>
 
-  <div class="stats-grid animate-rise rise-4">
-    {#if dashboardBusy}
-      {#each ['Hours Rendered', 'Remaining', 'Days Completed', 'Day Streak'] as label}
-        <div class="stat-card stat-card-loading" aria-hidden="true">
-          <div class="skeleton-line medium stat-skeleton-value"></div>
-          <div class="skeleton-line short"></div>
-          <span class="sr-only">{label}</span>
-        </div>
+  <section class="milestones-panel card animate-rise rise-3" aria-labelledby="dashboard-milestones-title">
+    <header class="section-head">
+      <div>
+        <h2 id="dashboard-milestones-title">Milestones</h2>
+        <p>Hours markers and streak progress in one line of sight.</p>
+      </div>
+      <p class="section-meta">{$progress.current_streak}-day streak. {$progress.longest_streak}-day best.</p>
+    </header>
+
+    <div class="milestones-grid">
+      {#each milestoneCards as milestone}
+        <article class:reached={milestone.reached} class="milestone-card">
+          <h3>{milestone.hours} hours</h3>
+          <p class="milestone-status">
+            {milestone.reached ? 'Reached' : `${milestone.remaining} hours left`}
+          </p>
+          <p class="milestone-note">{formatMilestoneCopy(milestone)}</p>
+        </article>
       {/each}
-    {:else}
-      <div class="stat-card">
-        <span class="stat-value">{$progress.total_hours}</span>
-        <span class="stat-label">Hours Rendered</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">{$progress.remaining_hours}</span>
-        <span class="stat-label">Remaining</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">{$progress.days_completed}</span>
-        <span class="stat-label">Days Completed</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">{$progress.current_streak}</span>
-        <span class="stat-label">Day Streak</span>
-      </div>
-    {/if}
-  </div>
+    </div>
+  </section>
 
-  <div class="milestone-badge animate-rise rise-4">
-    <span class="milestone-label">{greetingLabel}</span>
-    <span class="milestone-bar">
-      <span class="milestone-fill" style="width: {Math.min($progress.percentage, 100)}%"></span>
-    </span>
-    <span class="milestone-pct">{$progress.percentage}%</span>
-  </div>
-
-  <div class="insights-card card animate-rise rise-5">
-    <h3>{dashboardMonthLabel} Snapshot</h3>
-    {#if dashboardBusy}
-      <div class="insights-grid" aria-hidden="true">
-        {#each Array.from({ length: 4 }) as _}
-          <div class="insight insight-loading">
-            <div class="skeleton-line medium"></div>
-            <div class="skeleton-line short"></div>
+  <section class="dashboard-lower-grid animate-rise rise-4">
+    <div class="parallax-plane depth-1">
+      <article class="snapshot-panel card" aria-labelledby="dashboard-snapshot-title">
+        <header class="section-head">
+          <div>
+            <h2 id="dashboard-snapshot-title">Month snapshot</h2>
+            <p>Selected month contribution, cadence, and completion forecast.</p>
           </div>
-        {/each}
-      </div>
-      <div class="projection projection-loading" aria-hidden="true">
-        <div class="skeleton-line short"></div>
-        <div class="skeleton-line medium"></div>
-      </div>
-    {:else}
-      <div class="insights-grid">
-        <div class="insight">
-          <span class="insight-value">{monthInsights.totalHours}h</span>
-          <span class="insight-label">Hours Logged</span>
-        </div>
-        <div class="insight">
-          <span class="insight-value">{monthInsights.activeDays}</span>
-          <span class="insight-label">Days Active</span>
-        </div>
-        <div class="insight">
-          <span class="insight-value">{monthInsights.finishedDays}</span>
-          <span class="insight-label">Finished Days</span>
-        </div>
-        <div class="insight">
-          <span class="insight-value">{monthInsights.averagePerActiveDay}h</span>
-          <span class="insight-label">Avg / Active Day</span>
-        </div>
-      </div>
-      {#if !$progress.is_completed}
-        <div class="projection">
-          <span class="projection-label">Projected completion</span>
-          <span class="projection-value">{monthInsights.projectedCompletion}</span>
-          <span class="projection-detail">({monthInsights.daysNeeded} working days remaining)</span>
-        </div>
-      {/if}
-    {/if}
-  </div>
+        </header>
 
-  <div class="progress-section card animate-rise rise-5">
-    <h3>Progress</h3>
-    {#if dashboardBusy}
-      <div class="progress-skeleton" aria-hidden="true">
-        <div class="skeleton-line medium"></div>
-        <div class="skeleton-block" style="height: 0.85rem;"></div>
-        <div class="skeleton-line long"></div>
-      </div>
-    {:else}
-      <ProgressBar
-        percentage={$progress.percentage}
-        total={$progress.total_hours}
-        target={$progress.target_hours}
-      />
-      <p class="progress-hint">Log hours from the Journal - open a date and use "Log Hours" or "Edit Entry".</p>
-    {/if}
-  </div>
+        {#if dashboardBusy}
+          <div class="snapshot-grid snapshot-grid-loading" aria-hidden="true">
+            {#each Array.from({ length: 4 }) as _}
+              <div class="snapshot-item">
+                <span class="skeleton-line medium"></span>
+                <span class="skeleton-line short"></span>
+              </div>
+            {/each}
+          </div>
+          <div class="snapshot-progress snapshot-progress-loading" aria-hidden="true">
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-block snapshot-loading-track"></div>
+            <div class="skeleton-line long"></div>
+          </div>
+        {:else}
+          <div class="snapshot-grid">
+            <div class="snapshot-item">
+              <span class="snapshot-value">{formatHours(monthInsights.totalHours)}</span>
+              <span class="snapshot-label">Hours logged</span>
+            </div>
+            <div class="snapshot-item">
+              <span class="snapshot-value">{monthInsights.activeDays}</span>
+              <span class="snapshot-label">Days active</span>
+            </div>
+            <div class="snapshot-item">
+              <span class="snapshot-value">{monthInsights.finishedDays}</span>
+              <span class="snapshot-label">Days finished</span>
+            </div>
+            <div class="snapshot-item">
+              <span class="snapshot-value">{cadenceLabel}</span>
+              <span class="snapshot-label">Current cadence</span>
+            </div>
+          </div>
+
+          <div class="snapshot-progress">
+            <div class="snapshot-progress-head">
+              <span>This month contributes {monthContribution}% of the internship goal.</span>
+              <span>{formatHours(monthInsights.totalHours)}</span>
+            </div>
+            <div class="snapshot-progress-track" aria-hidden="true">
+              <span class="snapshot-progress-fill" style={`width: ${monthContribution}%`}></span>
+            </div>
+            <p class="snapshot-footnote">
+              {#if !$progress.is_completed}
+                At your current pace, the projected finish lands around {monthInsights.projectedCompletion}.
+              {:else}
+                The target is complete, so this month now reads as part of the final record.
+              {/if}
+            </p>
+          </div>
+        {/if}
+      </article>
+    </div>
+
+    <div class="parallax-plane depth-2">
+      <article class="today-panel card" aria-labelledby="dashboard-today-title">
+        <header class="section-head">
+          <div>
+            <h2 id="dashboard-today-title">Today</h2>
+            <p>{todaySummary}</p>
+          </div>
+        </header>
+
+        <div class="today-quote">
+          <blockquote>{todayQuote.text}</blockquote>
+          <cite>{todayQuote.author}</cite>
+        </div>
+
+        {#if eventsLoading}
+          <div class="today-events-skeleton" aria-hidden="true">
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line long"></div>
+          </div>
+        {:else if todayEvents.length > 0}
+          <ul class="today-events-list">
+            {#each todayEvents as ev}
+              <li class="today-event-item">
+                <div>
+                  <span class="today-event-title">{ev.title}</span>
+                  {#if ev.description}
+                    <span class="today-event-description">{ev.description}</span>
+                  {/if}
+                </div>
+                {#if formatTimeRange(ev)}
+                  <span class="today-event-time">{formatTimeRange(ev)}</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="today-empty">No scheduled events today. Use the calendar or journal entry to anchor the day.</p>
+        {/if}
+
+        <div class="today-actions">
+          <button class="btn btn-primary" onclick={() => onNavigateToDate(todayString())}>
+            Open today in calendar
+          </button>
+        </div>
+      </article>
+    </div>
+  </section>
 
   {#if $progress.is_completed}
-    <div class="completion-banner card">
-      <h2>{$progress.target_hours} Hours Complete!</h2>
-      <p>Your internship hours requirement has been fulfilled.</p>
-      {#if compilationStatus?.has_report}
-        <button class="btn btn-primary" onclick={handleDownload} disabled={downloading}>
-          {downloading ? 'Downloading...' : 'Download Report (PDF)'}
-        </button>
-      {:else}
-        <button class="btn btn-primary" onclick={handleCompile} disabled={compiling}>
-          {compiling ? 'Compiling...' : 'Compile Final Report'}
-        </button>
-      {/if}
-    </div>
-  {/if}
-
-  {#if eventsLoading || todayEvents.length > 0}
-    <div class="today-events card animate-rise rise-6">
-      <h3>Today's Events</h3>
-      {#if eventsLoading}
-        <div class="today-events-skeleton" aria-hidden="true">
-          <div class="skeleton-line long"></div>
-          <div class="skeleton-line medium"></div>
-          <div class="skeleton-line long"></div>
+    <section class="report-panel card animate-rise rise-5" aria-labelledby="dashboard-report-title">
+      <header class="section-head">
+        <div>
+          <h2 id="dashboard-report-title">Final report</h2>
+          <p>The internship requirement is complete. Compile or download the PDF report from here.</p>
         </div>
-      {:else}
-        <ul class="today-events-list">
-          {#each todayEvents as ev}
-            <li class="today-event-item">
-              <span class="today-event-title">{ev.title}</span>
-              {#if formatTimeRange(ev)}
-                <span class="today-event-time">{formatTimeRange(ev)}</span>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-        <button class="btn btn-sm" onclick={() => onNavigateToDate(todayString())}>
-          Open today in Calendar
-        </button>
-      {/if}
-    </div>
-  {/if}
+      </header>
 
-  <div class="quick-access card animate-rise rise-6">
-    <h3>Quick Access</h3>
-    <p class="quick-access-hint">Add or edit today's journal and log rendered hours.</p>
-    <button class="btn" onclick={() => onNavigateToDate(todayString())}>
-      Open Today's Entry
-    </button>
-  </div>
+      <div class="report-panel-body">
+        <p class="report-status">
+          {#if compilationStatus?.has_report}
+            A compiled report is ready to download.
+          {:else}
+            The report has not been compiled yet.
+          {/if}
+        </p>
+
+        {#if compilationStatus?.has_report}
+          <button class="btn btn-primary" onclick={handleDownload} disabled={downloading}>
+            {downloading ? 'Downloading...' : 'Download report'}
+          </button>
+        {:else}
+          <button class="btn btn-primary" onclick={handleCompile} disabled={compiling}>
+            {compiling ? 'Compiling...' : 'Compile final report'}
+          </button>
+        {/if}
+      </div>
+    </section>
+  {/if}
 
   {#if celebration}
     <div class="modal-overlay celebration-overlay" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
       <div class="modal-content celebration-modal">
-        <span class="eyebrow-label">{celebration.eyebrow}</span>
         <h2 id="celebration-title">{celebration.title}</h2>
         <p>{celebration.message}</p>
         <button class="btn btn-primary" onclick={closeCelebration}>Keep going</button>
@@ -513,287 +709,153 @@
 
 <style>
   .dashboard {
-    flex: 1;
-    min-height: 0;
-    width: 100%;
-    max-width: min(1400px, 92vw);
-    margin: 0 auto;
-    padding: clamp(2rem, 4vw, 4rem) clamp(2rem, 5vw, 5rem) clamp(3rem, 6vw, 6rem);
-    display: flex;
-    flex-direction: column;
-    gap: clamp(1.75rem, 3vw, 2.75rem);
-  }
-
-  .dash-header {
-    text-align: center;
-    margin-bottom: 0.25rem;
-  }
-
-  .dash-header h1 {
-    font-size: clamp(2.5rem, 5vw, 4.25rem);
-    margin-bottom: 0.35rem;
-  }
-
-  .dash-subtitle {
-    font-family: var(--font-ui);
-    font-size: clamp(0.85rem, 1.2vw, 1.1rem);
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--dark-soft);
-  }
-
-  .eyebrow-label {
-    display: inline-flex;
-    font-family: var(--font-ui);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--red);
-  }
-
-  .quote-card {
-    text-align: center;
-    padding: 1.75rem 2.5rem;
-    background: rgba(190, 53, 25, 0.03);
-    border: 1px solid rgba(190, 53, 25, 0.1);
-  }
-
-  .quote-skeleton {
-    display: grid;
-    gap: 0.65rem;
-    justify-items: center;
-  }
-
-  .quote-text {
-    font-family: var(--font-display);
-    font-size: clamp(1rem, 1.5vw, 1.25rem);
-    color: var(--dark);
-    line-height: 1.6;
-    font-style: italic;
-    margin-bottom: 0.5rem;
-  }
-
-  .quote-author {
-    font-family: var(--font-ui);
-    font-size: 0.8rem;
-    color: var(--red);
-    font-style: normal;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .month-sync {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1.5rem 1.75rem;
-  }
-
-  .progress-hero {
-    display: grid;
-    grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
-    gap: 1.25rem;
-  }
-
-  .progress-orbit,
-  .milestone-shelf {
-    padding: 1.5rem 1.65rem;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 251, 244, 0.88));
-  }
-
-  .progress-orbit {
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-  }
-
-  .progress-ring-shell {
     position: relative;
-    width: 180px;
-    height: 180px;
-    flex-shrink: 0;
+    width: min(1480px, calc(100vw - 2rem));
+    margin: 0 auto;
+    padding: clamp(1.35rem, 2vw, 2rem) clamp(1rem, 1.8vw, 1.65rem) clamp(3rem, 5vw, 4rem);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1rem, 1.7vw, 1.4rem);
+    overflow: hidden;
   }
 
-  .progress-ring {
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-  }
-
-  .progress-ring-track,
-  .progress-ring-value {
-    fill: none;
-    stroke-width: 12;
-  }
-
-  .progress-ring-track {
-    stroke: rgba(212, 212, 200, 0.72);
-  }
-
-  .progress-ring-value {
-    stroke: var(--red);
-    stroke-linecap: round;
-    transition: stroke-dashoffset 0.8s var(--ease-out);
-    filter: drop-shadow(0 6px 14px rgba(190, 53, 25, 0.16));
-  }
-
-  .progress-ring-copy {
+  .dashboard-parallax {
     position: absolute;
     inset: 0;
-    display: grid;
-    place-items: center;
-    text-align: center;
-    gap: 0.25rem;
+    pointer-events: none;
+    overflow: hidden;
   }
 
-  .progress-ring-percent {
-    display: block;
+  .parallax-month-word,
+  .parallax-year-word,
+  .parallax-target-word {
+    position: absolute;
     font-family: var(--font-display);
-    font-size: 2.1rem;
-    color: var(--red);
-  }
-
-  .progress-ring-hours {
-    display: block;
-    font-family: var(--font-ui);
-    font-size: 0.78rem;
-    letter-spacing: 0.08em;
+    color: rgba(190, 53, 25, 0.06);
+    line-height: 0.82;
+    letter-spacing: -0.05em;
     text-transform: uppercase;
-    color: var(--dark-soft);
+    user-select: none;
   }
 
-  .progress-orbit-copy {
+  .parallax-month-word {
+    top: -0.25rem;
+    left: clamp(0.3rem, 1vw, 0.8rem);
+    font-size: clamp(4rem, 12vw, 8rem);
+    transform: translate3d(0, calc(var(--parallax-shift) * 0.08), 0);
+  }
+
+  .parallax-year-word {
+    top: 4.7rem;
+    left: clamp(0.4rem, 1.2vw, 1rem);
+    font-size: clamp(2.1rem, 5vw, 3.6rem);
+    transform: translate3d(0, calc(var(--parallax-shift) * 0.12), 0);
+  }
+
+  .parallax-target-word {
+    top: 1rem;
+    right: clamp(0.3rem, 1.2vw, 0.8rem);
+    font-size: clamp(4.25rem, 10vw, 7rem);
+    transform: translate3d(0, calc(var(--parallax-shift) * -0.12), 0);
+  }
+
+  .parallax-rule {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(190, 53, 25, 0.12);
+    transform-origin: center;
+  }
+
+  .parallax-rule-a {
+    top: 7.8rem;
+    transform: translate3d(0, calc(var(--parallax-shift) * 0.04), 0);
+  }
+
+  .parallax-rule-b {
+    top: 29rem;
+    left: 18%;
+    right: 3%;
+    transform: translate3d(0, calc(var(--parallax-shift) * -0.03), 0);
+  }
+
+  .parallax-rule-c {
+    top: 47rem;
+    left: 8%;
+    right: 20%;
+    transform: translate3d(0, calc(var(--parallax-shift) * 0.05), 0);
+  }
+
+  .dashboard-bar,
+  .trajectory-panel,
+  .month-panel,
+  .milestones-panel,
+  .snapshot-panel,
+  .today-panel,
+  .report-panel {
+    position: relative;
+    z-index: 1;
+  }
+
+  .dashboard :global(.card) {
+    border-radius: 12px;
+    background: rgba(255, 252, 246, 0.96);
+    border-color: rgba(190, 53, 25, 0.1);
+    box-shadow: 0 8px 24px rgba(34, 24, 8, 0.05);
+  }
+
+  .dashboard-bar {
     display: grid;
-    gap: 0.45rem;
-  }
-
-  .progress-orbit-copy h3 {
-    margin: 0;
-    font-size: clamp(1.5rem, 2vw, 2rem);
-  }
-
-  .progress-orbit-copy p {
-    color: var(--dark-soft);
-    line-height: 1.65;
-  }
-
-  .milestone-shelf-header {
-    display: flex;
-    justify-content: space-between;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 1rem;
-    align-items: flex-start;
-    margin-bottom: 1rem;
+    align-items: end;
+    padding: 0.75rem 0 0.15rem;
+    border-bottom: 1px solid rgba(190, 53, 25, 0.16);
   }
 
-  .milestone-shelf-header h3 {
+  .dashboard-bar-copy h1 {
+    margin: 0;
+    font-size: clamp(1.8rem, 3vw, 2.7rem);
+    line-height: 1;
+  }
+
+  .dashboard-bar-copy p {
     margin-top: 0.35rem;
-    font-size: clamp(1.3rem, 1.8vw, 1.55rem);
-  }
-
-  .streak-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.45rem 0.8rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.84);
-    border: 1px solid rgba(190, 53, 25, 0.08);
+    max-width: 38rem;
     font-family: var(--font-ui);
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--red);
+    font-size: 0.95rem;
+    color: var(--dark-soft);
   }
 
-  .milestone-shelf-grid {
+  .dashboard-bar-controls {
+    display: inline-flex;
+    align-items: end;
+    gap: 0.55rem;
+  }
+
+  .month-picker {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 0.32rem;
   }
 
-  .milestone-card {
-    padding: 0.95rem 1rem;
-    border-radius: 18px;
-    border: 1px solid rgba(190, 53, 25, 0.1);
-    background: rgba(255, 255, 255, 0.82);
-  }
-
-  .milestone-card.reached {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 255, 246, 0.9));
-    border-color: rgba(45, 122, 58, 0.18);
-  }
-
-  .milestone-card-kicker {
-    display: inline-flex;
-    margin-bottom: 0.4rem;
-    padding: 0.25rem 0.55rem;
-    border-radius: 999px;
-    background: rgba(190, 53, 25, 0.08);
+  .month-picker-label {
     font-family: var(--font-ui);
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--red);
-  }
-
-  .milestone-card strong {
-    display: block;
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    color: var(--red);
-  }
-
-  .milestone-card p {
-    margin-top: 0.25rem;
-    font-family: var(--font-ui);
-    font-size: 0.8rem;
+    font-size: 0.74rem;
+    font-weight: 600;
     color: var(--dark-soft);
-    line-height: 1.5;
-  }
-
-  .month-sync-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .month-sync-copy h3 {
-    font-size: clamp(1.15rem, 1.8vw, 1.4rem);
-  }
-
-  .month-sync-hint,
-  .month-sync-label {
-    font-family: var(--font-ui);
-    color: var(--dark-soft);
-    line-height: 1.5;
-  }
-
-  .month-sync-hint {
-    font-size: 0.85rem;
-  }
-
-  .month-sync-label {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .month-sync-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
   }
 
   .month-input {
-    min-height: 42px;
-    padding: 0.65rem 0.85rem;
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    font-family: var(--font-ui);
-    font-size: 0.88rem;
-    background: white;
+    min-width: 11rem;
+    min-height: 2.4rem;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid rgba(190, 53, 25, 0.18);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
     color: var(--dark);
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
   }
 
   .month-input:focus {
@@ -802,315 +864,400 @@
     box-shadow: 0 0 0 3px rgba(190, 53, 25, 0.12);
   }
 
-  .stats-grid {
+  .dashboard-main-grid,
+  .dashboard-lower-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: clamp(1.25rem, 2vw, 2rem);
-  }
-
-  .stat-card {
-    position: relative;
-    background: white;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    padding: clamp(1.5rem, 2.5vw, 2.5rem);
-    text-align: center;
-    box-shadow: var(--shadow);
-    transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out),
-      border-color 0.2s ease;
-  }
-
-  .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    border-color: var(--border);
-  }
-
-  .stat-card-loading {
-    gap: 0.75rem;
-    display: grid;
-    justify-items: center;
-  }
-
-  .stat-skeleton-value {
-    min-height: 2.8rem;
-  }
-
-  .stat-value {
-    display: block;
-    font-family: var(--font-display);
-    font-size: clamp(2.25rem, 4vw, 3.75rem);
-    color: var(--red);
-    line-height: 1.2;
-  }
-
-  .stat-label {
-    display: block;
-    font-family: var(--font-ui);
-    font-size: clamp(0.7rem, 1vw, 0.9rem);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--dark-soft);
-    margin-top: 0.5rem;
-  }
-
-  .milestone-badge {
-    display: flex;
-    align-items: center;
+    grid-template-columns: minmax(0, 1.4fr) minmax(19rem, 0.9fr);
     gap: 1rem;
-    padding: 0.75rem 1.5rem;
-    background: white;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
   }
 
-  .milestone-label {
-    flex-shrink: 0;
+  .parallax-plane {
+    min-width: 0;
+    will-change: transform;
+  }
+
+  .depth-1 {
+    transform: translate3d(0, calc(var(--parallax-shift) * -0.014), 0);
+  }
+
+  .depth-2 {
+    transform: translate3d(0, calc(var(--parallax-shift) * -0.024), 0);
+  }
+
+  .trajectory-panel,
+  .month-panel,
+  .snapshot-panel,
+  .today-panel,
+  .report-panel,
+  .milestones-panel {
+    padding: 1.15rem 1.2rem 1.25rem;
+  }
+
+  .panel-head,
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .panel-head h2,
+  .section-head h2 {
+    margin: 0;
+    font-size: clamp(1.18rem, 1.7vw, 1.5rem);
+  }
+
+  .panel-head p,
+  .section-head p,
+  .section-meta,
+  .month-panel-note,
+  .snapshot-footnote,
+  .report-status,
+  .today-empty {
     font-family: var(--font-ui);
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--red);
-    min-width: 120px;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--dark-soft);
   }
 
-  .milestone-bar {
-    flex: 1;
-    height: 6px;
-    background: var(--border-light);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .milestone-fill {
-    display: block;
-    height: 100%;
-    background: linear-gradient(90deg, var(--red), var(--red-hover));
-    border-radius: 3px;
-    transition: width 0.7s var(--ease-out);
-    animation: milestoneGlow 1.8s ease-in-out infinite;
-  }
-
-  .milestone-pct {
-    flex-shrink: 0;
-    font-family: var(--font-display);
-    font-size: 0.9rem;
-    color: var(--red);
-    font-weight: 600;
-    min-width: 3rem;
+  .section-meta {
     text-align: right;
   }
 
-  .progress-section {
-    padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  .trajectory-total {
+    display: grid;
+    justify-items: end;
+    align-self: center;
   }
 
-  .progress-section h3 {
-    margin-bottom: 1.25rem;
-    font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+  .trajectory-total-value {
+    font-family: var(--font-display);
+    font-size: clamp(3.8rem, 8vw, 6.5rem);
+    line-height: 0.88;
+    color: var(--red);
   }
 
-  .progress-hint {
+  .trajectory-total-unit {
     font-family: var(--font-ui);
-    font-size: 0.8rem;
-    color: var(--dark-soft);
-    margin-top: 1rem;
-    line-height: 1.5;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dark-muted);
   }
 
-  .quick-access-hint {
+  .trajectory-total-skeleton {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 8rem;
+    justify-items: end;
+  }
+
+  .trajectory-rail {
+    margin-top: 1rem;
+  }
+
+  .trajectory-rail-track {
+    position: relative;
+    height: 1rem;
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.08);
+    overflow: visible;
+  }
+
+  .trajectory-rail-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    display: block;
+    border-radius: 999px;
+    background: var(--red);
+    transition: width 0.5s var(--ease-out);
+  }
+
+  .trajectory-marker {
+    position: absolute;
+    top: -1.15rem;
+    transform: translateX(-50%);
+    display: grid;
+    justify-items: center;
+    gap: 0.18rem;
+    color: rgba(190, 53, 25, 0.48);
+  }
+
+  .trajectory-marker-line {
+    width: 1px;
+    height: 2.15rem;
+    background: currentColor;
+  }
+
+  .trajectory-marker-label {
+    font-family: var(--font-ui);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .trajectory-marker.reached {
+    color: var(--red);
+  }
+
+  .trajectory-ledger {
+    margin-top: 1.65rem;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .trajectory-ledger div,
+  .month-panel-tile,
+  .snapshot-item {
+    padding: 0.9rem 0.95rem;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.64);
+  }
+
+  .trajectory-ledger dt,
+  .month-panel-tile dt {
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dark-muted);
+  }
+
+  .trajectory-ledger dd,
+  .month-panel-tile dd {
+    margin-top: 0.35rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.2rem, 2vw, 1.7rem);
+    color: var(--red);
+    line-height: 1.1;
+  }
+
+  .trajectory-ledger-loading {
+    margin-top: 1.4rem;
+  }
+
+  .trajectory-ledger-loading div,
+  .month-panel-tile-loading {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .trajectory-skeleton-rail {
+    height: 1rem;
+    border-radius: 999px;
+  }
+
+  .month-panel-grid,
+  .snapshot-grid {
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .month-panel-note {
+    margin-top: 0.9rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid rgba(190, 53, 25, 0.1);
+  }
+
+  .milestones-grid {
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .milestone-card {
+    padding: 1rem;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.58);
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+  }
+
+  .milestone-card.reached {
+    background: rgba(190, 53, 25, 0.06);
+    border-color: rgba(190, 53, 25, 0.18);
+  }
+
+  .milestone-card h3 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  .milestone-status {
+    margin-top: 0.35rem;
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--red);
+  }
+
+  .milestone-note {
+    margin-top: 0.45rem;
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--dark-soft);
+  }
+
+  .snapshot-value {
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2vw, 1.8rem);
+    line-height: 1.1;
+    color: var(--red);
+  }
+
+  .snapshot-label {
+    display: block;
+    margin-top: 0.3rem;
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dark-muted);
+  }
+
+  .snapshot-progress {
+    margin-top: 1rem;
+    padding-top: 0.95rem;
+    border-top: 1px solid rgba(190, 53, 25, 0.1);
+  }
+
+  .snapshot-progress-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
     font-family: var(--font-ui);
     font-size: 0.85rem;
     color: var(--dark-soft);
-    margin-bottom: 1rem;
-    line-height: 1.5;
   }
 
-  .completion-banner {
-    text-align: center;
-    border-color: var(--success);
-    background: #f0fdf4;
-    padding: clamp(1.75rem, 3vw, 2.5rem);
+  .snapshot-progress-track {
+    margin-top: 0.55rem;
+    height: 0.7rem;
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.08);
+    overflow: hidden;
   }
 
-  .completion-banner h2 {
-    color: var(--success);
-    margin-bottom: 0.5rem;
-    font-size: clamp(1.5rem, 2.2vw, 2rem);
+  .snapshot-progress-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: rgba(190, 53, 25, 0.85);
+    transition: width 0.5s var(--ease-out);
   }
 
-  .completion-banner p {
-    font-size: clamp(0.95rem, 1.1vw, 1.1rem);
-    color: var(--dark-soft);
-    margin-bottom: 1.25rem;
+  .snapshot-footnote {
+    margin-top: 0.65rem;
   }
 
-  .completion-banner .btn {
-    padding: 0.85rem 1.75rem;
-    font-size: 1rem;
+  .snapshot-loading-track {
+    height: 0.7rem;
+    border-radius: 999px;
   }
 
-  .today-events {
-    padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  .today-quote {
+    margin-top: 1rem;
+    padding: 0.95rem 0 1rem;
+    border-top: 1px solid rgba(190, 53, 25, 0.1);
+    border-bottom: 1px solid rgba(190, 53, 25, 0.1);
   }
 
-  .today-events h3 {
-    font-size: clamp(1.2rem, 1.8vw, 1.5rem);
-    margin-bottom: 1rem;
+  .today-quote blockquote {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    line-height: 1.45;
+    color: var(--dark);
+  }
+
+  .today-quote cite {
+    display: block;
+    margin-top: 0.45rem;
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    color: var(--dark-muted);
+    font-style: normal;
   }
 
   .today-events-list {
     list-style: none;
+    margin: 1rem 0 0;
     padding: 0;
-    margin: 0 0 1rem 0;
+    display: grid;
+    gap: 0.65rem;
   }
 
   .today-event-item {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border-light);
-    font-family: var(--font-body);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.8rem;
+    align-items: start;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid rgba(190, 53, 25, 0.08);
   }
 
   .today-event-item:last-child {
     border-bottom: none;
+    padding-bottom: 0;
   }
 
   .today-event-title {
     display: block;
     font-weight: 600;
     color: var(--dark);
-    font-size: 0.95rem;
+  }
+
+  .today-event-description {
+    display: block;
+    margin-top: 0.18rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--dark-soft);
   }
 
   .today-event-time {
-    display: block;
     font-family: var(--font-ui);
     font-size: 0.78rem;
-    color: var(--dark-soft);
-    letter-spacing: 0.02em;
-    margin-top: 0.15rem;
-  }
-
-  .today-events .btn {
-    padding: 0.5rem 1.25rem;
-    font-size: 0.85rem;
-  }
-
-  .insights-card {
-    padding: clamp(1.5rem, 2.5vw, 2.25rem);
-  }
-
-  .insights-card h3 {
-    font-size: clamp(1.2rem, 1.8vw, 1.5rem);
-    margin-bottom: 1.25rem;
-  }
-
-  .insights-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.25rem;
-  }
-
-  .insight {
-    text-align: center;
-    padding: 0.75rem 0.5rem;
-    background: rgba(190, 53, 25, 0.03);
-    border-radius: var(--radius);
-  }
-
-  .insight-loading {
-    display: grid;
-    gap: 0.5rem;
-    justify-items: center;
-  }
-
-  .insight-value {
-    display: block;
-    font-family: var(--font-display);
-    font-size: clamp(1.25rem, 2vw, 1.75rem);
     color: var(--red);
-    line-height: 1.3;
-    font-weight: 700;
+    white-space: nowrap;
   }
 
-  .insight-label {
-    display: block;
-    font-family: var(--font-ui);
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--dark-soft);
-    margin-top: 0.25rem;
-  }
-
-  .projection {
+  .today-actions,
+  .report-panel-body {
+    margin-top: 1rem;
     display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-light);
     flex-wrap: wrap;
-  }
-
-  .projection-loading {
+    gap: 0.65rem;
     align-items: center;
   }
 
-  .projection-label {
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--dark-soft);
+  .report-panel-body {
+    justify-content: space-between;
   }
 
-  .projection-value {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    color: var(--red);
-    font-weight: 600;
+  .report-status {
+    max-width: 40rem;
   }
 
-  .projection-detail {
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    color: var(--dark-soft);
+  .today-events-skeleton,
+  .snapshot-grid-loading,
+  .month-panel-grid-loading {
+    margin-top: 1rem;
   }
 
-  .quick-access {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: clamp(1.5rem, 2.5vw, 2.25rem);
-  }
-
-  .progress-skeleton,
   .today-events-skeleton {
     display: grid;
-    gap: 0.7rem;
-  }
-
-  @keyframes milestoneGlow {
-    0%, 100% {
-      filter: saturate(1);
-      opacity: 1;
-    }
-    50% {
-      filter: saturate(1.1);
-      opacity: 0.88;
-    }
-  }
-
-  .quick-access h3 {
-    font-size: clamp(1.2rem, 1.8vw, 1.5rem);
-  }
-
-  .quick-access .btn {
-    padding: 0.85rem 1.75rem;
-    font-size: 1rem;
+    gap: 0.55rem;
   }
 
   .celebration-overlay {
@@ -1118,266 +1265,159 @@
   }
 
   .celebration-modal {
-    max-width: 520px;
+    max-width: 460px;
     text-align: center;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 248, 240, 0.96));
+    background: rgba(255, 252, 246, 0.98);
     border-color: rgba(190, 53, 25, 0.16);
+    border-radius: 12px;
   }
 
   .celebration-modal h2 {
-    margin: 0.4rem 0 0.6rem;
-    font-size: clamp(1.8rem, 2.6vw, 2.3rem);
+    margin: 0;
+    font-size: clamp(1.7rem, 2.3vw, 2rem);
   }
 
   .celebration-modal p {
-    margin-bottom: 1rem;
+    margin: 0.75rem 0 1rem;
+    font-family: var(--font-ui);
+    line-height: 1.6;
     color: var(--dark-soft);
-    line-height: 1.65;
   }
 
-  @media (max-width: 992px) {
+  @media (max-width: 1180px) {
     .dashboard {
-      padding: 2.5rem 2rem 3rem;
-      gap: 1.75rem;
+      width: min(100%, calc(100vw - 1rem));
     }
 
-    .dash-header h1 {
-      font-size: 2.75rem;
-    }
-
-    .stat-value {
-      font-size: 2.5rem;
-    }
-
-    .stat-card {
-      padding: 1.5rem;
-    }
-
-    .quote-card {
-      padding: 1.5rem 2rem;
-    }
-
-    .progress-hero,
-    .milestone-shelf-grid {
+    .dashboard-main-grid,
+    .dashboard-lower-grid,
+    .milestones-grid {
       grid-template-columns: 1fr;
     }
+
+    .dashboard-bar {
+      grid-template-columns: 1fr;
+      align-items: start;
+    }
+
+    .section-meta {
+      text-align: left;
+    }
+
+    .trajectory-ledger {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 860px) {
     .dashboard {
-      padding: 2rem 1.5rem 2.5rem;
-      gap: 1.5rem;
+      width: calc(100vw - 0.5rem);
+      padding-inline: 0.7rem;
     }
 
-    .dash-header h1 {
-      font-size: 2.35rem;
+    .parallax-month-word {
+      font-size: clamp(3.2rem, 15vw, 5.4rem);
     }
 
-    .dash-subtitle {
-      font-size: 0.9rem;
+    .parallax-target-word {
+      font-size: clamp(3.3rem, 14vw, 5.6rem);
     }
 
-    .stats-grid {
-      gap: 1.25rem;
+    .parallax-rule-a {
+      top: 7rem;
     }
 
-    .stat-value {
-      font-size: 2.25rem;
-    }
-
-    .stat-label {
-      font-size: 0.75rem;
-    }
-
-    .progress-section h3,
-    .quick-access h3 {
-      font-size: 1.2rem;
-    }
-
-    .milestone-badge {
-      padding: 0.65rem 1rem;
-      gap: 0.75rem;
-    }
-
-    .progress-orbit {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .milestone-label {
-      min-width: 90px;
-      font-size: 0.72rem;
-    }
-
-    .month-sync-controls {
+    .dashboard-bar-controls {
       flex-wrap: wrap;
+      align-items: start;
+    }
+
+    .panel-head,
+    .section-head {
+      flex-direction: column;
+    }
+
+    .trajectory-total {
+      justify-items: start;
+    }
+
+    .trajectory-ledger,
+    .month-panel-grid,
+    .snapshot-grid {
+      grid-template-columns: 1fr 1fr;
     }
   }
 
-  @media (max-width: 600px) {
+  @media (max-width: 640px) {
     .dashboard {
-      padding: 1.75rem 1.25rem 2rem;
-      gap: 1.25rem;
+      padding-top: 1rem;
+      padding-bottom: 2rem;
     }
 
-    .stats-grid,
-    .insights-grid {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
+    .dashboard-bar-copy h1 {
+      font-size: 1.6rem;
     }
 
-    .progress-ring-shell {
-      width: 150px;
-      height: 150px;
+    .dashboard-bar-copy p,
+    .panel-head p,
+    .section-head p,
+    .report-status {
+      font-size: 0.84rem;
     }
 
-    .dash-header h1 {
-      font-size: 2rem;
-    }
-
-    .stat-value {
-      font-size: 2rem;
-    }
-
-    .stat-card {
-      padding: 1.25rem;
-    }
-
-    .month-sync-controls {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .month-sync-controls .btn,
+    .month-picker,
     .month-input {
       width: 100%;
     }
-  }
 
-  @media (max-width: 480px) {
-    .dashboard {
-      padding: 1.5rem 1rem 1.75rem;
-    }
-
-    .dash-header h1 {
-      font-size: 1.75rem;
-    }
-
-    .stat-value {
-      font-size: 1.85rem;
-    }
-
-    .stat-card {
-      padding: 1rem;
-    }
-
-    .completion-banner h2 {
-      font-size: 1.5rem;
-    }
-
-    .quick-access {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 0.75rem;
-    }
-
-    .quick-access .btn {
-      width: 100%;
+    .dashboard-bar-controls .btn {
+      min-width: 5.25rem;
       justify-content: center;
     }
 
-    .quote-card {
-      padding: 1.25rem 1rem;
+    .trajectory-total-value {
+      font-size: 3.25rem;
     }
 
-    .quote-text {
-      font-size: 0.95rem;
+    .trajectory-ledger,
+    .month-panel-grid,
+    .snapshot-grid {
+      grid-template-columns: 1fr;
     }
 
-    .milestone-badge {
-      flex-wrap: wrap;
+    .today-event-item {
+      grid-template-columns: 1fr;
+    }
+
+    .today-event-time {
+      white-space: normal;
+    }
+
+    .today-actions,
+    .report-panel-body {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .today-actions .btn,
+    .report-panel-body .btn {
+      width: 100%;
+      justify-content: center;
     }
   }
 
-  /* Flatter dashboard pass */
-  .dashboard {
-    max-width: 1080px;
-    margin: 0 auto;
-    width: 100%;
-    padding: clamp(1.5rem, 2.6vw, 2.35rem) clamp(1.25rem, 2.8vw, 2.2rem) clamp(2rem, 3.5vw, 2.8rem);
-    gap: clamp(1rem, 2vw, 1.55rem);
-  }
+  @media (prefers-reduced-motion: reduce) {
+    .parallax-plane,
+    .parallax-month-word,
+    .parallax-year-word,
+    .parallax-target-word,
+    .parallax-rule {
+      transform: none !important;
+    }
 
-  .dash-header h1 {
-    font-size: clamp(2.15rem, 4.2vw, 3.35rem);
-  }
-
-  .quote-card,
-  .month-sync,
-  .progress-orbit,
-  .milestone-shelf,
-  .stat-card,
-  .milestone-badge,
-  .insights-card,
-  .progress-section,
-  .today-events,
-  .quick-access,
-  .celebration-modal {
-    background: rgba(255, 254, 248, 0.96);
-  }
-
-  .quote-card {
-    padding: 1.3rem 1.7rem;
-  }
-
-  .month-sync,
-  .progress-orbit,
-  .milestone-shelf,
-  .insights-card,
-  .progress-section,
-  .today-events,
-  .quick-access {
-    padding: 1.25rem 1.35rem;
-  }
-
-  .progress-hero {
-    gap: 1rem;
-  }
-
-  .progress-orbit,
-  .milestone-shelf {
-    background: rgba(255, 254, 248, 0.96);
-  }
-
-  .progress-ring-shell {
-    width: 156px;
-    height: 156px;
-  }
-
-  .progress-ring-value {
-    filter: none;
-  }
-
-  .milestone-card {
-    border-radius: 14px;
-  }
-
-  .milestone-card.reached {
-    background: rgba(45, 122, 58, 0.07);
-  }
-
-  .milestone-fill {
-    background: var(--red);
-    animation: none;
-  }
-
-  .celebration-modal {
-    background: rgba(255, 254, 248, 0.98);
-  }
-
-  @media (max-width: 992px) {
-    .dashboard {
-      padding: 1.4rem 1.25rem 2.2rem;
+    .trajectory-rail-fill,
+    .snapshot-progress-fill {
+      transition: none;
     }
   }
 </style>
