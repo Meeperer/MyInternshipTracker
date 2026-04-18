@@ -50,7 +50,7 @@
 
       options.push({
         key: `${weekStart}:${weekEnd}`,
-        label: `Week ${index} · ${formatRangeLabel(weekStart, weekEnd)}`,
+        label: `Week ${index} - ${formatRangeLabel(weekStart, weekEnd)}`,
         startDate: weekStart,
         endDate: weekEnd
       });
@@ -165,6 +165,10 @@
 
   let monthHours = $derived.by(() =>
     $journal.entries.reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0)
+  );
+
+  let monthFinishedCount = $derived.by(() =>
+    $journal.entries.filter((entry) => entry.status === 'finished').length
   );
 
   let selectedWeek = $derived.by(
@@ -329,132 +333,192 @@
 </script>
 
 <div class="journal-view">
-  <div class="journal-header">
-    <div>
+  <section class="journal-hero">
+    <div class="journal-hero-copy">
+      <span class="eyebrow">Journal workspace</span>
       <h2>Journal Entries</h2>
-      <p class="journal-subtitle">Review one month at a time, export it cleanly, and generate AI summaries for weekly or monthly ranges.</p>
+      <p class="journal-subtitle">
+        Move month by month, export what matters, and turn your notes into a clean weekly or monthly readout.
+      </p>
     </div>
-    <button class="btn btn-sm btn-primary" onclick={openNewEntryForToday}>
-      New Entry
-    </button>
-  </div>
 
-  <div class="journal-controls card">
-    <div class="control-block">
-      <label class="label" for="journal-month">Selected Month</label>
+    <div class="journal-hero-actions">
+      <button type="button" class="nav-chip" onclick={() => selectedMonth.shift(-1)} aria-label="Previous month">
+        Prev
+      </button>
       <input
         id="journal-month"
-        class="month-input"
+        class="hero-month-input"
         type="month"
         bind:value={$selectedMonth}
         aria-label="Select journal month"
       />
-      <p class="control-hint">
-        {formatMonthLabel($selectedMonth)} · {$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'} · {formatHoursValue(monthHours)} hours
-      </p>
-    </div>
-
-    <div class="control-block">
-      <label class="label" for="journal-export-format">Export Selected Month</label>
-      <div class="export-group">
-        <select id="journal-export-format" class="export-select" bind:value={exportFormat} aria-label="Export format">
-          <option value="markdown">Markdown</option>
-          <option value="json">JSON</option>
-        </select>
-        <button
-          class="btn btn-sm"
-          onclick={handleExportMonth}
-          disabled={exportLoading || $journal.loading}
-          title="Download all entries from the selected month"
-        >
-          {exportLoading ? 'Exporting...' : 'Export Month'}
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div class="summary-panel card">
-    <div class="summary-header">
-      <div>
-        <h3>AI Period Summary</h3>
-        <p class="summary-caption">Summarize the selected month, or switch to a week inside that month.</p>
-      </div>
-      <div class="period-toggle" role="tablist" aria-label="AI summary range">
-        <button
-          class:active={summaryMode === 'week'}
-          type="button"
-          onclick={() => (summaryMode = 'week')}
-        >
-          Weekly
-        </button>
-        <button
-          class:active={summaryMode === 'month'}
-          type="button"
-          onclick={() => (summaryMode = 'month')}
-        >
-          Monthly
-        </button>
-      </div>
-    </div>
-
-    <div class="summary-controls">
-      {#if summaryMode === 'week'}
-        <select class="summary-select" bind:value={selectedWeekKey} aria-label="Select week to summarize">
-          {#each weekOptions as week}
-            <option value={week.key}>{week.label}</option>
-          {/each}
-        </select>
-      {:else}
-        <div class="summary-range-chip">{formatMonthLabel($selectedMonth)}</div>
-      {/if}
-
-      <button
-        class="btn btn-sm btn-primary"
-        onclick={handleGenerateSummary}
-        disabled={$journal.loading || summaryLoading || rangeContentCount === 0}
-      >
-        {summaryLoading ? 'Summarizing...' : summaryMode === 'week' ? 'Summarize Week' : 'Summarize Month'}
+      <button type="button" class="nav-chip" onclick={() => selectedMonth.shift(1)} aria-label="Next month">
+        Next
+      </button>
+      <button class="btn btn-sm btn-primary hero-new-entry" onclick={openNewEntryForToday}>
+        New Entry
       </button>
     </div>
+  </section>
 
-    {#if activeSummaryRange}
-      <p class="summary-meta">
-        {activeSummaryRange.label} · {rangeEntries.length} entr{rangeEntries.length === 1 ? 'y' : 'ies'} · {formatHoursValue(rangeHours)} hours · {rangeContentCount} with journal content
+  <section class="overview-strip">
+    <article class="overview-card">
+      <span class="overview-label">Selected month</span>
+      <strong>{formatMonthLabel($selectedMonth)}</strong>
+      <p>{$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'} tracked</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-label">Hours logged</span>
+      <strong>{formatHoursValue(monthHours)}</strong>
+      <p>Across the current month</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-label">Finished days</span>
+      <strong>{monthFinishedCount}</strong>
+      <p>Locked and completed</p>
+    </article>
+  </section>
+
+  <section class="workspace-grid">
+    <div class="journal-controls card glass-card">
+      <div class="panel-header">
+        <div>
+          <span class="panel-kicker">Export</span>
+          <h3>Monthly export</h3>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <div class="control-block">
+          <label class="label" for="journal-export-format">Format</label>
+          <select id="journal-export-format" class="export-select" bind:value={exportFormat} aria-label="Export format">
+            <option value="markdown">Markdown</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+
+        <div class="control-block action-block">
+          <span class="label">Download</span>
+          <button
+            class="btn btn-sm btn-primary action-button"
+            onclick={handleExportMonth}
+            disabled={exportLoading || $journal.loading}
+            title="Download all entries from the selected month"
+          >
+            {exportLoading ? 'Exporting...' : 'Export Month'}
+          </button>
+        </div>
+      </div>
+
+      <p class="control-hint">
+        Pull a clean file for {formatMonthLabel($selectedMonth)} in either readable markdown or raw JSON.
       </p>
-    {/if}
+    </div>
 
-    {#if summaryError}
-      <p class="field-error summary-feedback" role="alert">{summaryError}</p>
-    {:else if summaryFetching}
-      <div class="summary-empty">
-        <p>Loading any saved {summaryMode} summary for this range...</p>
-      </div>
-    {:else if summaryResult}
-      <div class="summary-result">
-        <span class="summary-result-label">{summaryResult.label}</span>
-        <p>{summaryResult.summary}</p>
-        <p class="summary-footnote">
-          Saved {new Date(summaryResult.updated_at || toDateString(new Date())).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-          })} · {summaryResult.entry_count} entr{summaryResult.entry_count === 1 ? 'y' : 'ies'} · {formatHoursValue(summaryResult.total_hours)} hours
-        </p>
-      </div>
-    {:else}
-      <div class="summary-empty">
-        <p>
-          {rangeContentCount > 0
-            ? `Generate a ${summaryMode} summary to get a concise readout of your progress, themes, and next priorities.`
-            : `This ${summaryMode} does not have enough written journal content yet for AI summarization.`}
-        </p>
-      </div>
-    {/if}
-  </div>
+    <div class="summary-panel card glass-card">
+      <div class="summary-topline">
+        <div>
+          <span class="panel-kicker">AI summary</span>
+          <h3>Period summary</h3>
+          <p class="summary-caption">Summarize the whole month or narrow it down to a week inside the current month.</p>
+        </div>
 
-  <div class="search-bar">
+        <div class="period-toggle" role="tablist" aria-label="AI summary range">
+          <button
+            class:active={summaryMode === 'week'}
+            type="button"
+            onclick={() => (summaryMode = 'week')}
+          >
+            Weekly
+          </button>
+          <button
+            class:active={summaryMode === 'month'}
+            type="button"
+            onclick={() => (summaryMode = 'month')}
+          >
+            Monthly
+          </button>
+        </div>
+      </div>
+
+      <div class="summary-controls">
+        {#if summaryMode === 'week'}
+          <select class="summary-select" bind:value={selectedWeekKey} aria-label="Select week to summarize">
+            {#each weekOptions as week}
+              <option value={week.key}>{week.label}</option>
+            {/each}
+          </select>
+        {:else}
+          <div class="summary-range-chip">{formatMonthLabel($selectedMonth)}</div>
+        {/if}
+
+        <button
+          class="btn btn-sm btn-primary action-button"
+          onclick={handleGenerateSummary}
+          disabled={$journal.loading || summaryLoading || rangeContentCount === 0}
+        >
+          {summaryLoading ? 'Summarizing...' : summaryMode === 'week' ? 'Summarize Week' : 'Summarize Month'}
+        </button>
+      </div>
+
+      {#if activeSummaryRange}
+        <div class="summary-stats">
+          <span>{activeSummaryRange.label}</span>
+          <span>{rangeEntries.length} entr{rangeEntries.length === 1 ? 'y' : 'ies'}</span>
+          <span>{formatHoursValue(rangeHours)} hours</span>
+          <span>{rangeContentCount} with content</span>
+        </div>
+      {/if}
+
+      {#if summaryError}
+        <div class="summary-state summary-state-error" role="alert">
+          <strong>Summary unavailable right now</strong>
+          <p>{summaryError}</p>
+        </div>
+      {:else if summaryFetching}
+        <div class="summary-state">
+          <strong>Checking saved summaries</strong>
+          <p>Looking for an existing {summaryMode} summary for this range.</p>
+        </div>
+      {:else if summaryResult}
+        <div class="summary-result">
+          <div class="summary-result-header">
+            <span class="summary-result-label">{summaryResult.label}</span>
+            <span class:summary-live={!summaryResult.persisted} class="summary-save-pill">
+              {summaryResult.persisted === false ? 'Live only' : 'Saved'}
+            </span>
+          </div>
+          <p>{summaryResult.summary}</p>
+          <p class="summary-footnote">
+            Updated {new Date(summaryResult.updated_at || toDateString(new Date())).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })} · {summaryResult.entry_count} entr{summaryResult.entry_count === 1 ? 'y' : 'ies'} · {formatHoursValue(summaryResult.total_hours)} hours
+          </p>
+          {#if summaryResult.persisted === false}
+            <p class="summary-warning">
+              This summary was generated successfully, but automatic saving is not available until the latest database migration is applied.
+            </p>
+          {/if}
+        </div>
+      {:else}
+        <div class="summary-state">
+          <strong>No saved summary yet</strong>
+          <p>
+            {rangeContentCount > 0
+              ? `Generate a ${summaryMode} summary to get a concise readout of your progress, themes, and next priorities.`
+              : `This ${summaryMode} does not have enough written journal content yet for AI summarization.`}
+          </p>
+        </div>
+      {/if}
+    </div>
+  </section>
+
+  <div class="search-shell">
     <input
-      class="input"
+      class="input search-input"
       type="text"
       placeholder="Search entries by content or date..."
       bind:value={searchQuery}
@@ -469,7 +533,7 @@
         <p>Loading {formatMonthLabel($selectedMonth)} entries...</p>
       </div>
     {:else if $journal.entries.length === 0}
-      <div class="empty-state">
+      <div class="empty-state card glass-card">
         <div class="empty-icon" aria-hidden="true">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
@@ -482,7 +546,7 @@
         </button>
       </div>
     {:else if filtered.length === 0}
-      <div class="empty-state">
+      <div class="empty-state card glass-card">
         <p>No entries match "{searchQuery}" in {formatMonthLabel($selectedMonth)}.</p>
         <button class="btn btn-sm" onclick={() => (searchQuery = '')}>Clear search</button>
       </div>
@@ -501,7 +565,7 @@
           </div>
           {#if entry.content_raw}
             <p class="entry-preview">
-              {entry.content_raw.slice(0, 120)}{entry.content_raw.length > 120 ? '...' : ''}
+              {entry.content_raw.slice(0, 160)}{entry.content_raw.length > 160 ? '...' : ''}
             </p>
           {/if}
         </button>
@@ -514,45 +578,190 @@
   .journal-view {
     flex: 1;
     min-height: 0;
-    max-width: 960px;
+    max-width: 1080px;
     margin: 0 auto;
-    padding: 3rem 2.5rem 4rem;
+    padding: 2.75rem 2.5rem 4rem;
     width: 100%;
     display: flex;
     flex-direction: column;
+    gap: 1.25rem;
   }
 
-  .journal-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+  .journal-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
+    gap: 1.25rem;
+    align-items: end;
+    padding: 1.5rem 1.7rem;
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at top left, rgba(190, 53, 25, 0.14), transparent 34%),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 251, 232, 0.96));
+    border: 1px solid rgba(190, 53, 25, 0.14);
+    box-shadow: 0 18px 40px rgba(190, 53, 25, 0.08);
   }
 
-  .journal-header h2 {
-    font-size: 2.25rem;
-    margin-bottom: 0.35rem;
+  .eyebrow,
+  .panel-kicker {
+    display: inline-block;
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+
+  .journal-hero h2 {
+    font-size: clamp(2.1rem, 4vw, 3rem);
+    margin: 0.35rem 0 0.45rem;
   }
 
   .journal-subtitle {
-    max-width: 46rem;
+    max-width: 40rem;
     color: var(--dark-soft);
-    font-size: 0.98rem;
-    line-height: 1.6;
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+
+  .journal-hero-actions {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .hero-new-entry {
+    grid-column: 1 / -1;
+    justify-content: center;
+    min-height: 48px;
+  }
+
+  .hero-month-input,
+  .export-select,
+  .summary-select,
+  .search-input {
+    width: 100%;
+    min-height: 48px;
+    padding: 0.8rem 1rem;
+    border: 1px solid rgba(190, 53, 25, 0.16);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--dark);
+    font-family: var(--font-ui);
+    font-size: 0.95rem;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  }
+
+  .hero-month-input:focus,
+  .export-select:focus,
+  .summary-select:focus,
+  .search-input:focus {
+    outline: none;
+    border-color: var(--red);
+    box-shadow: 0 0 0 4px rgba(190, 53, 25, 0.12);
+  }
+
+  .nav-chip {
+    min-height: 48px;
+    padding: 0 1rem;
+    border: 1px solid rgba(190, 53, 25, 0.16);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.82);
+    color: var(--dark-soft);
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: transform var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  }
+
+  .nav-chip:hover {
+    transform: translateY(-1px);
+    border-color: var(--red);
+    color: var(--red);
+    background: white;
+  }
+
+  .overview-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .overview-card {
+    padding: 1.1rem 1.2rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    box-shadow: 0 10px 24px rgba(34, 24, 8, 0.05);
+  }
+
+  .overview-label {
+    display: inline-block;
+    margin-bottom: 0.45rem;
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dark-soft);
+  }
+
+  .overview-card strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    color: var(--red);
+  }
+
+  .overview-card p {
+    margin-top: 0.2rem;
+    color: var(--dark-soft);
+    font-size: 0.88rem;
+  }
+
+  .workspace-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr);
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .glass-card {
+    border-radius: 22px;
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 253, 245, 0.82));
+    box-shadow: 0 16px 32px rgba(34, 24, 8, 0.06);
+    backdrop-filter: blur(10px);
   }
 
   .journal-controls,
   .summary-panel {
-    margin-bottom: 1.25rem;
     padding: 1.35rem 1.4rem;
   }
 
-  .journal-controls {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  .panel-header,
+  .summary-topline {
+    display: flex;
+    justify-content: space-between;
     gap: 1rem;
-    align-items: end;
+    align-items: flex-start;
+  }
+
+  .panel-header h3,
+  .summary-topline h3 {
+    font-size: 1.5rem;
+    margin-top: 0.35rem;
+  }
+
+  .panel-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+    gap: 0.9rem;
+    margin-top: 1rem;
   }
 
   .control-block {
@@ -561,78 +770,37 @@
     gap: 0.45rem;
   }
 
-  .month-input,
-  .export-select,
-  .summary-select {
-    width: 100%;
-    min-height: 44px;
-    padding: 0.7rem 0.9rem;
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    font-family: var(--font-ui);
-    font-size: 0.88rem;
-    background: white;
-    color: var(--dark);
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  .action-block {
+    justify-content: flex-end;
   }
 
-  .month-input:focus,
-  .export-select:focus,
-  .summary-select:focus {
-    outline: none;
-    border-color: var(--red);
-    box-shadow: 0 0 0 3px rgba(190, 53, 25, 0.12);
-  }
-
-  .control-hint,
-  .summary-caption,
-  .summary-meta,
-  .summary-footnote {
-    color: var(--dark-soft);
-    font-family: var(--font-ui);
-    line-height: 1.55;
-  }
-
-  .control-hint,
-  .summary-caption,
-  .summary-meta,
-  .summary-footnote {
-    font-size: 0.8rem;
-  }
-
-  .export-group {
-    display: flex;
-    gap: 0.65rem;
-    align-items: center;
-  }
-
-  .export-group .btn {
-    min-height: 44px;
+  .action-button {
+    min-height: 48px;
     justify-content: center;
-    white-space: nowrap;
+    width: 100%;
   }
 
-  .summary-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
+  .control-hint,
+  .summary-caption,
+  .summary-footnote,
+  .summary-warning {
+    font-family: var(--font-ui);
+    font-size: 0.84rem;
+    color: var(--dark-soft);
+    line-height: 1.6;
   }
 
-  .summary-header h3 {
-    font-size: 1.35rem;
-    margin-bottom: 0.2rem;
+  .control-hint {
+    margin-top: 1rem;
   }
 
   .period-toggle {
     display: inline-flex;
-    padding: 0.2rem;
-    border: 1px solid var(--border);
+    gap: 0.2rem;
+    padding: 0.22rem;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.72);
-    gap: 0.15rem;
-    flex-shrink: 0;
+    background: rgba(190, 53, 25, 0.08);
+    border: 1px solid rgba(190, 53, 25, 0.1);
   }
 
   .period-toggle button {
@@ -640,12 +808,12 @@
     background: transparent;
     color: var(--dark-soft);
     border-radius: 999px;
-    padding: 0.5rem 0.85rem;
+    padding: 0.55rem 0.95rem;
     font-family: var(--font-ui);
     font-size: 0.74rem;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
   }
 
@@ -655,82 +823,125 @@
   }
 
   .period-toggle button.active {
-    background: var(--red);
+    background: linear-gradient(135deg, var(--red), var(--red-hover));
     color: var(--bg);
-    box-shadow: 0 6px 14px rgba(190, 53, 25, 0.18);
+    box-shadow: 0 8px 18px rgba(190, 53, 25, 0.2);
   }
 
   .summary-controls {
-    display: flex;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(200px, auto);
+    gap: 0.9rem;
     align-items: center;
-  }
-
-  .summary-controls .btn {
-    min-height: 44px;
-    justify-content: center;
-    white-space: nowrap;
+    margin-top: 1rem;
   }
 
   .summary-range-chip {
     display: inline-flex;
     align-items: center;
-    min-height: 44px;
-    padding: 0.7rem 0.95rem;
-    border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px dashed var(--border);
+    min-height: 48px;
+    padding: 0.8rem 1rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px dashed rgba(190, 53, 25, 0.18);
     color: var(--dark);
     font-family: var(--font-ui);
-    font-size: 0.88rem;
+    font-size: 0.95rem;
   }
 
-  .summary-meta {
-    margin-top: 0.8rem;
-  }
-
-  .summary-feedback {
-    margin-top: 0.8rem;
-  }
-
-  .summary-result,
-  .summary-empty {
+  .summary-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
     margin-top: 1rem;
-    padding: 1rem 1.1rem;
-    border-radius: var(--radius-lg);
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid var(--border-light);
   }
 
+  .summary-stats span {
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    color: var(--dark-soft);
+  }
+
+  .summary-state,
+  .summary-result {
+    margin-top: 1rem;
+    padding: 1.15rem 1.2rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(190, 53, 25, 0.1);
+  }
+
+  .summary-state strong,
   .summary-result-label {
     display: inline-block;
-    margin-bottom: 0.55rem;
+    margin-bottom: 0.45rem;
     font-family: var(--font-ui);
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     font-weight: 700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
     color: var(--red);
   }
 
-  .summary-result p,
-  .summary-empty p {
+  .summary-state p,
+  .summary-result p {
     white-space: pre-wrap;
-    line-height: 1.7;
+    line-height: 1.75;
     color: var(--dark);
+  }
+
+  .summary-state-error {
+    background: rgba(190, 53, 25, 0.06);
+    border-color: rgba(190, 53, 25, 0.18);
+  }
+
+  .summary-result-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .summary-save-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(45, 122, 58, 0.12);
+    color: var(--success);
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .summary-save-pill.summary-live {
+    background: rgba(184, 134, 11, 0.14);
+    color: var(--warning);
   }
 
   .summary-footnote {
     margin-top: 0.8rem;
   }
 
-  .search-bar {
-    margin: 0.1rem 0 1.5rem;
+  .summary-warning {
+    margin-top: 0.65rem;
+    color: var(--warning);
   }
 
-  .search-bar .input {
-    padding: 0.9rem 1.2rem;
-    font-size: 1.05rem;
+  .search-shell {
+    padding: 0.2rem 0;
+  }
+
+  .search-input {
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 12px 24px rgba(34, 24, 8, 0.04);
   }
 
   .entries-list {
@@ -740,26 +951,28 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+    padding-bottom: 0.25rem;
   }
 
   .entry-card {
     display: block;
     width: 100%;
     text-align: left;
-    background: white;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    padding: 1.35rem 1.5rem;
+    padding: 1.4rem 1.45rem;
+    border-radius: 20px;
+    border: 1px solid rgba(190, 53, 25, 0.1);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 252, 244, 0.86));
+    box-shadow: 0 16px 30px rgba(34, 24, 8, 0.05);
     cursor: pointer;
-    transition: transform 0.22s var(--ease-out), box-shadow 0.22s var(--ease-out),
-      border-color 0.2s ease, background 0.2s ease;
+    transition: transform 0.22s var(--ease-out), box-shadow 0.22s var(--ease-out), border-color 0.2s ease;
     font-family: inherit;
   }
 
   .entry-card:hover {
-    border-color: var(--red);
-    box-shadow: 0 6px 20px rgba(190, 53, 25, 0.12);
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    border-color: rgba(190, 53, 25, 0.26);
+    box-shadow: 0 22px 40px rgba(190, 53, 25, 0.1);
   }
 
   .entry-card:active {
@@ -770,41 +983,41 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.5rem;
   }
 
   .entry-date {
     font-family: var(--font-ui);
     font-size: 0.95rem;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--dark);
   }
 
   .entry-hours {
-    font-family: var(--font-ui);
-    font-size: 0.95rem;
-    margin-bottom: 0.4rem;
     display: flex;
     align-items: baseline;
-    gap: 0.5rem;
+    gap: 0.55rem;
+    margin-bottom: 0.55rem;
+    font-family: var(--font-ui);
   }
 
   .entry-hours-label {
     color: var(--dark-soft);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
   }
 
   .entry-hours-value {
     color: var(--red);
-    font-weight: 600;
+    font-size: 0.95rem;
+    font-weight: 700;
   }
 
   .entry-preview {
-    font-size: 1rem;
+    font-size: 0.98rem;
     color: var(--dark-soft);
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   .empty-state {
@@ -814,9 +1027,9 @@
     gap: 1rem;
     text-align: center;
     color: var(--dark-soft);
-    padding: 4rem 0;
+    padding: 3rem 1.25rem;
     font-style: italic;
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
 
   .empty-icon {
@@ -836,79 +1049,49 @@
     to { transform: rotate(360deg); }
   }
 
-  @media (max-width: 992px) {
+  @media (max-width: 980px) {
     .journal-view {
-      padding: 2.5rem 2rem 3rem;
+      padding: 2.25rem 1.75rem 3rem;
     }
 
-    .journal-header h2 {
-      font-size: 2rem;
-    }
-
-    .journal-controls {
+    .journal-hero,
+    .workspace-grid,
+    .overview-strip {
       grid-template-columns: 1fr;
     }
 
-    .entry-card {
-      padding: 1.2rem 1.35rem;
-    }
-
-    .entry-date,
-    .entry-hours {
-      font-size: 0.9rem;
-    }
-
-    .entry-preview {
-      font-size: 0.95rem;
+    .journal-hero-actions {
+      grid-template-columns: auto minmax(0, 1fr) auto;
     }
   }
 
   @media (max-width: 768px) {
     .journal-view {
-      padding: 2rem 1.5rem 2.5rem;
+      padding: 1.85rem 1.25rem 2.5rem;
     }
 
-    .journal-header {
-      flex-direction: column;
-      align-items: stretch;
-      margin-bottom: 1.25rem;
+    .journal-hero {
+      padding: 1.2rem;
     }
 
-    .journal-header h2 {
-      font-size: 1.75rem;
+    .journal-hero-actions,
+    .panel-body,
+    .summary-controls {
+      grid-template-columns: 1fr;
     }
 
-    .summary-header,
-    .summary-controls,
-    .export-group {
-      flex-direction: column;
-      align-items: stretch;
+    .journal-hero h2 {
+      font-size: 2rem;
     }
 
     .period-toggle {
-      align-self: flex-start;
-    }
-
-    .summary-controls .btn,
-    .export-group .btn {
       width: 100%;
+      justify-content: space-between;
     }
 
-    .search-bar {
-      margin-bottom: 1.25rem;
-    }
-
-    .search-bar .input {
-      padding: 0.8rem 1rem;
-      font-size: 1rem;
-    }
-
-    .entries-list {
-      gap: 0.85rem;
-    }
-
-    .entry-card {
-      padding: 1.1rem 1.25rem;
+    .period-toggle button {
+      flex: 1;
+      justify-content: center;
     }
   }
 
@@ -917,43 +1100,20 @@
       padding: 1.5rem 1rem 2rem;
     }
 
-    .journal-header h2 {
-      font-size: 1.5rem;
+    .journal-hero-actions {
+      grid-template-columns: 1fr 1fr;
     }
 
-    .journal-subtitle {
-      font-size: 0.92rem;
+    .hero-month-input,
+    .hero-new-entry {
+      grid-column: 1 / -1;
     }
 
-    .journal-controls,
-    .summary-panel {
-      padding: 1rem;
-    }
-
-    .period-toggle {
-      width: 100%;
-    }
-
-    .period-toggle button {
-      flex: 1;
-      justify-content: center;
-    }
-
-    .entry-card {
-      padding: 1rem 1.1rem;
-    }
-
-    .entry-date {
-      font-size: 0.85rem;
-    }
-
-    .entry-preview {
-      font-size: 0.9rem;
-    }
-
-    .empty-state {
-      padding: 3rem 0;
-      font-size: 0.95rem;
+    .entry-card,
+    .summary-panel,
+    .journal-controls {
+      padding-left: 1rem;
+      padding-right: 1rem;
     }
   }
 </style>

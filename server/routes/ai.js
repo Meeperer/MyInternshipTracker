@@ -23,6 +23,11 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_AI_CONTENT = 20_000;
 const VALID_PERIODS = new Set(['week', 'month']);
 
+function isMissingSummaryTableError(error) {
+  const message = error?.message || '';
+  return error?.code === '42P01' || message.includes('journal_period_summaries');
+}
+
 function validateAIInput(req, res) {
   const { journal_id, content } = req.body;
   if (!journal_id || !UUID_RE.test(journal_id)) {
@@ -83,7 +88,12 @@ async function fetchStoredSummary(userId, period, startDate, endDate) {
     .eq('end_date', endDate)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingSummaryTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
 
   if (!data) return null;
 
@@ -249,12 +259,14 @@ router.post('/summary-period', async (req, res) => {
         onConflict: 'user_id,period_type,start_date,end_date'
       });
 
-    if (upsertError) throw upsertError;
+    const persisted = !upsertError;
+    if (upsertError && !isMissingSummaryTableError(upsertError)) throw upsertError;
 
     res.json({
       period,
       start_date,
       end_date,
+      persisted,
       ...payload
     });
   } catch (err) {
