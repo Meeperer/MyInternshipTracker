@@ -207,19 +207,19 @@ function buildFallbackPeriodSummary(entries, { startDate, endDate }) {
   ), 2);
 
   const firstParagraph = [
-    `From ${startDate} to ${endDate}, ${entries.length} journal entr${entries.length === 1 ? 'y was' : 'ies were'} available with written content, covering ${formatRoundedHours(totalHours)} logged hours.`,
+    `From ${startDate} to ${endDate}, I recorded ${entries.length} journal entr${entries.length === 1 ? 'y' : 'ies'} with written content and logged ${formatRoundedHours(totalHours)} hours.`,
     workSnippets.length > 0
-      ? `Recorded work in the notes included ${joinSnippetList(workSnippets)}.`
-      : 'The written notes capture the work completed during this period.'
+      ? `My notes describe work such as ${joinSnippetList(workSnippets)}.`
+      : 'My written notes capture the work I completed during this period.'
   ].join(' ');
 
   const secondParagraph = learningSnippets.length > 0
-    ? `Recurring themes and takeaways mentioned in the entries included ${joinSnippetList(learningSnippets)}.`
-    : 'The entries stay mostly task-focused, with only limited reflection or analysis recorded in the notes.';
+    ? `Across these entries, I highlighted themes and takeaways such as ${joinSnippetList(learningSnippets)}.`
+    : 'These entries stay mostly task-focused, with only limited reflection or analysis captured in my notes.';
 
   const thirdParagraph = followUpSnippets.length > 0
-    ? `Later entries point toward follow-up work around ${joinSnippetList(followUpSnippets)}.`
-    : 'The available entries do not call out clear blockers or next steps, so the period reads as steady documented progress.';
+    ? `My later entries point toward follow-up work around ${joinSnippetList(followUpSnippets)}.`
+    : 'My notes do not call out clear blockers or next steps, so this period reads as steady documented progress.';
 
   return [firstParagraph, secondParagraph, thirdParagraph].join('\n\n');
 }
@@ -249,6 +249,8 @@ STRICT RULES:
 - Do NOT invent events, accomplishments, blockers, or plans.
 - Keep the writing professional, concise, and grounded in the source material.
 - If some information is sparse, say less rather than guessing.
+- Write in first person from the journal owner's point of view using "I" and "my".
+- Never refer to the writer as "the intern", "the user", "they", or any other third-person label.
 - Return exactly three short paragraphs:
   1. Main work completed and overall progress
   2. Key learnings, themes, or patterns

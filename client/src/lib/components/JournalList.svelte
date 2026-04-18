@@ -779,11 +779,9 @@
     align-items: end;
     padding: 1.5rem 1.7rem;
     border-radius: 24px;
-    background:
-      radial-gradient(circle at top left, rgba(190, 53, 25, 0.14), transparent 34%),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 251, 232, 0.96));
+    background: rgba(255, 255, 255, 0.9);
     border: 1px solid rgba(190, 53, 25, 0.14);
-    box-shadow: 0 18px 40px rgba(190, 53, 25, 0.08);
+    box-shadow: 0 14px 28px rgba(34, 24, 8, 0.05);
   }
 
   .eyebrow,
