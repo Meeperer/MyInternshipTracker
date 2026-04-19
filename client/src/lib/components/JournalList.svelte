@@ -503,12 +503,17 @@
 
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
-    const host = document.querySelector('main#main-content');
+    const mainHost = document.querySelector('main#main-content');
+    const rootHost = document.scrollingElement || document.documentElement;
+    const host = mainHost && (mainHost.scrollHeight - mainHost.clientHeight > 2) ? mainHost : rootHost;
+    const eventTarget = host === rootHost ? window : host;
+    const getScrollTop = () => host === rootHost ? (window.scrollY || host.scrollTop || 0) : host.scrollTop;
+    const getViewportHeight = () => host === rootHost ? window.innerHeight : host.clientHeight;
     let frame = 0;
-    let smoothFrame = 0;
-    let smoothCurrent = host?.scrollTop || 0;
-    let smoothTarget = smoothCurrent;
-    let smoothingFromWheel = false;
+    let motionFrame = 0;
+    let wheelImpulse = 0;
+    let scrollMomentum = 0;
+    let lastScrollTop = getScrollTop();
 
     const updateParallax = () => {
       frame = 0;
@@ -524,7 +529,10 @@
         return;
       }
 
-      const viewportHeight = host ? host.clientHeight : window.innerHeight;
+      const viewportHeight = getViewportHeight();
+      const momentumRatio = clamp(scrollMomentum / 34, -1, 1);
+      const forwardBias = Math.max(0, momentumRatio);
+      const retreatBias = Math.max(0, -momentumRatio);
 
       for (const [node, config] of parallaxTargets.entries()) {
         if (!node.isConnected) {
@@ -534,14 +542,19 @@
 
         const rect = node.getBoundingClientRect();
         const start = viewportHeight * config.start;
-        const end = -Math.min(rect.height * 0.34, viewportHeight * 0.24);
+        const end = -Math.min(rect.height * 0.28, viewportHeight * 0.22);
         const progress = clamp((start - rect.top) / (start - end), 0, 1);
         const depth = config.depth;
-        const travelY = ((1 - progress) * (24 + depth * 10)) - (depth * 5.5);
-        const travelZ = -16 + (progress * (20 + depth * 6));
-        const scale = 0.978 + (progress * 0.028) + (depth * 0.0025);
-        const opacity = 0.5 + (progress * 0.5);
-        const blur = (1 - progress) * config.blur;
+        const baseTravelY = ((1 - progress) * (30 + depth * 14)) - (depth * 6.5);
+        const baseTravelZ = -20 + (progress * (24 + depth * 8));
+        const baseScale = 0.972 + (progress * 0.03) + (depth * 0.003);
+        const baseOpacity = 0.56 + (progress * 0.44);
+        const baseBlur = (1 - progress) * config.blur;
+        const travelY = baseTravelY - (momentumRatio * (6 + depth * 5.5));
+        const travelZ = baseTravelZ + (forwardBias * (14 + depth * 11)) - (retreatBias * (5 + depth * 3));
+        const scale = baseScale + (forwardBias * 0.014) - (retreatBias * 0.006);
+        const opacity = clamp(baseOpacity + (forwardBias * 0.09), 0.45, 1);
+        const blur = Math.max(0, baseBlur - (forwardBias * 0.8));
 
         node.style.setProperty('--approach-y', `${travelY.toFixed(2)}px`);
         node.style.setProperty('--approach-z', `${travelZ.toFixed(2)}px`);
@@ -556,44 +569,53 @@
       frame = window.requestAnimationFrame(updateParallax);
     };
 
-    const stopSmoothScroll = () => {
-      if (smoothFrame) {
-        window.cancelAnimationFrame(smoothFrame);
-        smoothFrame = 0;
+    const stopMotionLoop = () => {
+      if (motionFrame) {
+        window.cancelAnimationFrame(motionFrame);
+        motionFrame = 0;
       }
-      smoothingFromWheel = false;
-    };
-
-    const syncSmoothStateFromHost = () => {
-      if (!host) return;
-      smoothCurrent = host.scrollTop;
-      smoothTarget = host.scrollTop;
+      wheelImpulse = 0;
+      scrollMomentum = 0;
     };
 
     const isIgnoredWheelTarget = (target) =>
       target instanceof Element &&
       !!target.closest('input, select, textarea, [role="dialog"], dialog, .modal-overlay, .modal-content, .summary-modal-body');
 
-    const animateSmoothScroll = () => {
+    const runMotionLoop = () => {
+      motionFrame = 0;
+
       if (!host) {
-        smoothFrame = 0;
         return;
       }
 
-      const next = smoothCurrent + ((smoothTarget - smoothCurrent) * 0.14);
-      smoothCurrent = next;
-      host.scrollTop = next;
+      const nextScrollTop = getScrollTop();
+      const scrollDelta = nextScrollTop - lastScrollTop;
+      lastScrollTop = nextScrollTop;
+      wheelImpulse *= 0.82;
+      scrollMomentum = clamp(
+        (scrollMomentum * 0.7) + (scrollDelta * 0.5) + (wheelImpulse * 0.22),
+        -38,
+        38
+      );
       queueUpdate();
 
-      if (Math.abs(smoothTarget - next) <= 0.45) {
-        host.scrollTop = smoothTarget;
-        smoothCurrent = smoothTarget;
-        smoothFrame = 0;
-        smoothingFromWheel = false;
+      if (
+        Math.abs(scrollDelta) <= 0.1 &&
+        Math.abs(scrollMomentum) <= 0.12 &&
+        Math.abs(wheelImpulse) <= 0.12
+      ) {
+        scrollMomentum = 0;
         return;
       }
 
-      smoothFrame = window.requestAnimationFrame(animateSmoothScroll);
+      motionFrame = window.requestAnimationFrame(runMotionLoop);
+    };
+
+    const ensureMotionLoop = () => {
+      if (!motionFrame) {
+        motionFrame = window.requestAnimationFrame(runMotionLoop);
+      }
     };
 
     const handleWheel = (event) => {
@@ -601,31 +623,20 @@
       if (event.ctrlKey || event.defaultPrevented) return;
       if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
       if (isIgnoredWheelTarget(event.target)) return;
-
-      const maxScroll = Math.max(host.scrollHeight - host.clientHeight, 0);
-      if (maxScroll <= 0) return;
-
-      event.preventDefault();
-      smoothingFromWheel = true;
-      smoothTarget = clamp(smoothTarget + (event.deltaY * 0.96), 0, maxScroll);
-
-      if (!smoothFrame) {
-        smoothFrame = window.requestAnimationFrame(animateSmoothScroll);
-      }
+      wheelImpulse = clamp(wheelImpulse + (event.deltaY * 0.085), -28, 28);
+      ensureMotionLoop();
     };
 
     const handleHostScroll = () => {
-      if (!smoothingFromWheel) {
-        syncSmoothStateFromHost();
-      }
+      ensureMotionLoop();
       queueUpdate();
     };
 
     scheduleParallaxUpdate = queueUpdate;
-    syncSmoothStateFromHost();
+    lastScrollTop = getScrollTop();
     updateParallax();
-    host?.addEventListener('scroll', handleHostScroll, { passive: true });
-    host?.addEventListener('wheel', handleWheel, { passive: false });
+    eventTarget?.addEventListener('scroll', handleHostScroll, { passive: true });
+    eventTarget?.addEventListener('wheel', handleWheel, { passive: true });
     window.addEventListener('resize', queueUpdate, { passive: true });
 
     if (typeof motionQuery.addEventListener === 'function') {
@@ -635,15 +646,15 @@
     }
 
     if (typeof coarsePointerQuery.addEventListener === 'function') {
-      coarsePointerQuery.addEventListener('change', stopSmoothScroll);
+      coarsePointerQuery.addEventListener('change', stopMotionLoop);
     } else {
-      coarsePointerQuery.addListener(stopSmoothScroll);
+      coarsePointerQuery.addListener(stopMotionLoop);
     }
 
     return () => {
-      stopSmoothScroll();
-      host?.removeEventListener('scroll', handleHostScroll);
-      host?.removeEventListener('wheel', handleWheel);
+      stopMotionLoop();
+      eventTarget?.removeEventListener('scroll', handleHostScroll);
+      eventTarget?.removeEventListener('wheel', handleWheel);
       window.removeEventListener('resize', queueUpdate);
       scheduleParallaxUpdate = () => {};
 
@@ -654,9 +665,9 @@
       }
 
       if (typeof coarsePointerQuery.removeEventListener === 'function') {
-        coarsePointerQuery.removeEventListener('change', stopSmoothScroll);
+        coarsePointerQuery.removeEventListener('change', stopMotionLoop);
       } else {
-        coarsePointerQuery.removeListener(stopSmoothScroll);
+        coarsePointerQuery.removeListener(stopMotionLoop);
       }
 
       if (frame) {
@@ -1503,7 +1514,8 @@
     flex-direction: column;
     gap: 1.1rem;
     overflow: visible;
-    perspective: 1400px;
+    perspective: 1800px;
+    perspective-origin: center 16vh;
     transform-style: preserve-3d;
   }
 
@@ -1521,6 +1533,7 @@
     filter: blur(var(--approach-blur));
     will-change: transform, opacity, filter;
     backface-visibility: hidden;
+    transform-style: preserve-3d;
   }
 
   .journal-hero {
