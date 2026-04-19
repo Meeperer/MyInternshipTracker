@@ -507,19 +507,14 @@
     const rootHost = document.scrollingElement || document.documentElement;
     const host = mainHost && (mainHost.scrollHeight - mainHost.clientHeight > 2) ? mainHost : rootHost;
     const eventTarget = host === rootHost ? window : host;
-    const getScrollTop = () => host === rootHost ? (window.scrollY || host.scrollTop || 0) : host.scrollTop;
     const getViewportHeight = () => host === rootHost ? window.innerHeight : host.clientHeight;
     let frame = 0;
-    let motionFrame = 0;
-    let wheelImpulse = 0;
-    let scrollVelocity = 0;
-    let actualScrollTop = getScrollTop();
-    let visualScrollTop = actualScrollTop;
-    let lastMeasuredScrollTop = actualScrollTop;
 
     const updateParallax = () => {
       frame = 0;
 
+      // WCAG 2.2: motion is optional. When reduced motion is requested, keep the
+      // journal cards fully settled and readable without depth effects.
       if (motionQuery.matches) {
         for (const node of parallaxTargets.keys()) {
           node.style.setProperty('--approach-y', '0px');
@@ -532,12 +527,6 @@
       }
 
       const viewportHeight = getViewportHeight();
-      const lagDelta = actualScrollTop - visualScrollTop;
-      const lagStrength = clamp(Math.abs(lagDelta) / 140, 0, 1);
-      const velocityStrength = clamp(Math.abs(scrollVelocity) / 34, 0, 1);
-      const motionStrength = clamp(lagStrength + (velocityStrength * 0.65), 0, 1);
-      const forwardBias = clamp(lagDelta / 140, 0, 1);
-      const retreatBias = clamp((-lagDelta) / 170, 0, 1);
 
       for (const [node, config] of parallaxTargets.entries()) {
         if (!node.isConnected) {
@@ -547,20 +536,16 @@
 
         const rect = node.getBoundingClientRect();
         const start = viewportHeight * config.start;
-        const end = -Math.min(rect.height * 0.22, viewportHeight * 0.16);
+        const end = viewportHeight * 0.14;
         const depth = config.depth;
-        const projectedTop = rect.top + (lagDelta * (0.18 + (depth * 0.11)));
-        const progress = clamp((start - projectedTop) / (start - end), 0, 1);
-        const restingLift = ((1 - progress) * (9 + depth * 6)) - (depth * 1.35);
-        const travelY = restingLift - (forwardBias * (14 + depth * 8.5)) + (retreatBias * (4.5 + depth * 3.5));
-        const travelZ = motionStrength > 0.02
-          ? (forwardBias * (18 + depth * 13)) - (retreatBias * (5 + depth * 4))
-          : 0;
-        const scale = 0.997 + (progress * 0.0035) + (forwardBias * (0.0105 + depth * 0.0022)) - (retreatBias * 0.0025);
-        const opacity = 1;
-        const blur = motionStrength > 0.08
-          ? Math.max(0, (1 - progress) * config.blur * 0.12 * (1 - forwardBias))
-          : 0;
+        const denominator = Math.max(1, start - end);
+        const progress = clamp((start - rect.top) / denominator, 0, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const travelY = ((1 - eased) * (30 + depth * 10)) - (eased * (6 + depth * 2.5));
+        const travelZ = (-14 - depth * 6) + (eased * (26 + depth * 18));
+        const scale = 0.978 + (eased * (0.024 + depth * 0.003));
+        const opacity = 0.78 + (eased * 0.22);
+        const blur = (1 - eased) * (1.8 + (config.blur * 0.65));
 
         node.style.setProperty('--approach-y', `${travelY.toFixed(2)}px`);
         node.style.setProperty('--approach-z', `${travelZ.toFixed(2)}px`);
@@ -575,81 +560,13 @@
       frame = window.requestAnimationFrame(updateParallax);
     };
 
-    const stopMotionLoop = () => {
-      if (motionFrame) {
-        window.cancelAnimationFrame(motionFrame);
-        motionFrame = 0;
-      }
-      wheelImpulse = 0;
-      scrollVelocity = 0;
-      visualScrollTop = actualScrollTop;
-    };
-
-    const isIgnoredWheelTarget = (target) =>
-      target instanceof Element &&
-      !!target.closest('input, select, textarea, [role="dialog"], dialog, .modal-overlay, .modal-content, .summary-modal-body');
-
-    const runMotionLoop = () => {
-      motionFrame = 0;
-
-      if (!host) {
-        return;
-      }
-
-      const nextScrollTop = getScrollTop();
-      const scrollDelta = nextScrollTop - lastMeasuredScrollTop;
-      lastMeasuredScrollTop = nextScrollTop;
-      actualScrollTop = nextScrollTop;
-      wheelImpulse *= 0.78;
-      visualScrollTop += (actualScrollTop - visualScrollTop) * 0.12;
-      scrollVelocity = clamp(
-        (scrollVelocity * 0.7) + (scrollDelta * 0.32) + (wheelImpulse * 0.09),
-        -42,
-        42
-      );
-      queueUpdate();
-
-      if (
-        Math.abs(actualScrollTop - visualScrollTop) <= 0.18 &&
-        Math.abs(scrollVelocity) <= 0.14 &&
-        Math.abs(wheelImpulse) <= 0.12
-      ) {
-        visualScrollTop = actualScrollTop;
-        scrollVelocity = 0;
-        return;
-      }
-
-      motionFrame = window.requestAnimationFrame(runMotionLoop);
-    };
-
-    const ensureMotionLoop = () => {
-      if (!motionFrame) {
-        motionFrame = window.requestAnimationFrame(runMotionLoop);
-      }
-    };
-
-    const handleWheel = (event) => {
-      if (!host || motionQuery.matches || coarsePointerQuery.matches) return;
-      if (event.ctrlKey || event.defaultPrevented) return;
-      if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
-      if (isIgnoredWheelTarget(event.target)) return;
-      wheelImpulse = clamp(wheelImpulse + (event.deltaY * 0.12), -46, 46);
-      ensureMotionLoop();
-    };
-
     const handleHostScroll = () => {
-      actualScrollTop = getScrollTop();
-      ensureMotionLoop();
       queueUpdate();
     };
 
     scheduleParallaxUpdate = queueUpdate;
-    actualScrollTop = getScrollTop();
-    visualScrollTop = actualScrollTop;
-    lastMeasuredScrollTop = actualScrollTop;
     updateParallax();
     eventTarget?.addEventListener('scroll', handleHostScroll, { passive: true });
-    eventTarget?.addEventListener('wheel', handleWheel, { passive: true });
     window.addEventListener('resize', queueUpdate, { passive: true });
 
     if (typeof motionQuery.addEventListener === 'function') {
@@ -659,15 +576,13 @@
     }
 
     if (typeof coarsePointerQuery.addEventListener === 'function') {
-      coarsePointerQuery.addEventListener('change', stopMotionLoop);
+      coarsePointerQuery.addEventListener('change', queueUpdate);
     } else {
-      coarsePointerQuery.addListener(stopMotionLoop);
+      coarsePointerQuery.addListener(queueUpdate);
     }
 
     return () => {
-      stopMotionLoop();
       eventTarget?.removeEventListener('scroll', handleHostScroll);
-      eventTarget?.removeEventListener('wheel', handleWheel);
       window.removeEventListener('resize', queueUpdate);
       scheduleParallaxUpdate = () => {};
 
@@ -678,14 +593,12 @@
       }
 
       if (typeof coarsePointerQuery.removeEventListener === 'function') {
-        coarsePointerQuery.removeEventListener('change', stopMotionLoop);
+        coarsePointerQuery.removeEventListener('change', queueUpdate);
       } else {
-        coarsePointerQuery.removeListener(stopMotionLoop);
+        coarsePointerQuery.removeListener(queueUpdate);
       }
 
-      if (frame) {
-        window.cancelAnimationFrame(frame);
-      }
+      if (frame) window.cancelAnimationFrame(frame);
     };
   });
 
