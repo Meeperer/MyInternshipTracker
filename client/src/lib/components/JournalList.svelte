@@ -512,8 +512,10 @@
     let frame = 0;
     let motionFrame = 0;
     let wheelImpulse = 0;
-    let scrollMomentum = 0;
-    let lastScrollTop = getScrollTop();
+    let scrollVelocity = 0;
+    let actualScrollTop = getScrollTop();
+    let visualScrollTop = actualScrollTop;
+    let lastMeasuredScrollTop = actualScrollTop;
 
     const updateParallax = () => {
       frame = 0;
@@ -530,10 +532,12 @@
       }
 
       const viewportHeight = getViewportHeight();
-      const momentumRatio = clamp(scrollMomentum / 34, -1, 1);
-      const motionStrength = Math.min(1, Math.abs(momentumRatio));
-      const forwardBias = Math.max(0, momentumRatio);
-      const retreatBias = Math.max(0, -momentumRatio);
+      const lagDelta = actualScrollTop - visualScrollTop;
+      const lagStrength = clamp(Math.abs(lagDelta) / 140, 0, 1);
+      const velocityStrength = clamp(Math.abs(scrollVelocity) / 34, 0, 1);
+      const motionStrength = clamp(lagStrength + (velocityStrength * 0.65), 0, 1);
+      const forwardBias = clamp(lagDelta / 140, 0, 1);
+      const retreatBias = clamp((-lagDelta) / 170, 0, 1);
 
       for (const [node, config] of parallaxTargets.entries()) {
         if (!node.isConnected) {
@@ -544,19 +548,18 @@
         const rect = node.getBoundingClientRect();
         const start = viewportHeight * config.start;
         const end = -Math.min(rect.height * 0.22, viewportHeight * 0.16);
-        const progress = clamp((start - rect.top) / (start - end), 0, 1);
         const depth = config.depth;
-        const baseTravelY = ((1 - progress) * (10 + depth * 7)) - (depth * 1.6);
-        const restScale = 0.996 + (progress * 0.006);
-        const motionLift = momentumRatio * (5 + depth * 4.5);
-        const travelY = baseTravelY - motionLift;
+        const projectedTop = rect.top + (lagDelta * (0.18 + (depth * 0.11)));
+        const progress = clamp((start - projectedTop) / (start - end), 0, 1);
+        const restingLift = ((1 - progress) * (9 + depth * 6)) - (depth * 1.35);
+        const travelY = restingLift - (forwardBias * (14 + depth * 8.5)) + (retreatBias * (4.5 + depth * 3.5));
         const travelZ = motionStrength > 0.02
-          ? (forwardBias * (8 + depth * 7)) - (retreatBias * (2.5 + depth * 2))
+          ? (forwardBias * (18 + depth * 13)) - (retreatBias * (5 + depth * 4))
           : 0;
-        const scale = restScale + (forwardBias * 0.011) - (retreatBias * 0.003);
+        const scale = 0.997 + (progress * 0.0035) + (forwardBias * (0.0105 + depth * 0.0022)) - (retreatBias * 0.0025);
         const opacity = 1;
         const blur = motionStrength > 0.08
-          ? Math.max(0, (1 - progress) * config.blur * 0.14 * (1 - forwardBias))
+          ? Math.max(0, (1 - progress) * config.blur * 0.12 * (1 - forwardBias))
           : 0;
 
         node.style.setProperty('--approach-y', `${travelY.toFixed(2)}px`);
@@ -578,7 +581,8 @@
         motionFrame = 0;
       }
       wheelImpulse = 0;
-      scrollMomentum = 0;
+      scrollVelocity = 0;
+      visualScrollTop = actualScrollTop;
     };
 
     const isIgnoredWheelTarget = (target) =>
@@ -593,22 +597,25 @@
       }
 
       const nextScrollTop = getScrollTop();
-      const scrollDelta = nextScrollTop - lastScrollTop;
-      lastScrollTop = nextScrollTop;
-      wheelImpulse *= 0.82;
-      scrollMomentum = clamp(
-        (scrollMomentum * 0.7) + (scrollDelta * 0.5) + (wheelImpulse * 0.22),
-        -38,
-        38
+      const scrollDelta = nextScrollTop - lastMeasuredScrollTop;
+      lastMeasuredScrollTop = nextScrollTop;
+      actualScrollTop = nextScrollTop;
+      wheelImpulse *= 0.78;
+      visualScrollTop += (actualScrollTop - visualScrollTop) * 0.12;
+      scrollVelocity = clamp(
+        (scrollVelocity * 0.7) + (scrollDelta * 0.32) + (wheelImpulse * 0.09),
+        -42,
+        42
       );
       queueUpdate();
 
       if (
-        Math.abs(scrollDelta) <= 0.1 &&
-        Math.abs(scrollMomentum) <= 0.12 &&
+        Math.abs(actualScrollTop - visualScrollTop) <= 0.18 &&
+        Math.abs(scrollVelocity) <= 0.14 &&
         Math.abs(wheelImpulse) <= 0.12
       ) {
-        scrollMomentum = 0;
+        visualScrollTop = actualScrollTop;
+        scrollVelocity = 0;
         return;
       }
 
@@ -626,17 +633,20 @@
       if (event.ctrlKey || event.defaultPrevented) return;
       if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
       if (isIgnoredWheelTarget(event.target)) return;
-      wheelImpulse = clamp(wheelImpulse + (event.deltaY * 0.085), -28, 28);
+      wheelImpulse = clamp(wheelImpulse + (event.deltaY * 0.12), -46, 46);
       ensureMotionLoop();
     };
 
     const handleHostScroll = () => {
+      actualScrollTop = getScrollTop();
       ensureMotionLoop();
       queueUpdate();
     };
 
     scheduleParallaxUpdate = queueUpdate;
-    lastScrollTop = getScrollTop();
+    actualScrollTop = getScrollTop();
+    visualScrollTop = actualScrollTop;
+    lastMeasuredScrollTop = actualScrollTop;
     updateParallax();
     eventTarget?.addEventListener('scroll', handleHostScroll, { passive: true });
     eventTarget?.addEventListener('wheel', handleWheel, { passive: true });
@@ -1033,7 +1043,10 @@
   </section>
 
   <section class="workspace-grid animate-rise rise-4">
-    <div class="journal-controls card glass-card">
+    <div
+      class="journal-controls card glass-card journal-parallax"
+      use:registerParallax={{ depth: 1.1, blur: 0.85, start: 0.98 }}
+    >
       <div class="panel-header">
         <div>
           <span class="panel-kicker">Export</span>
@@ -1068,7 +1081,11 @@
       </p>
     </div>
 
-    <div class="summary-panel card glass-card" aria-live="polite">
+    <div
+      class="summary-panel card glass-card journal-parallax"
+      aria-live="polite"
+      use:registerParallax={{ depth: 1.22, blur: 0.85, start: 0.98 }}
+    >
       <div class="summary-topline">
         <div>
           <span class="panel-kicker">AI summary</span>
@@ -1183,7 +1200,11 @@
     </div>
   </section>
 
-  <section class="summary-library-shell card glass-card animate-rise rise-5" bind:this={summaryLibrarySectionEl}>
+  <section
+    class="summary-library-shell card glass-card animate-rise rise-5 journal-parallax"
+    bind:this={summaryLibrarySectionEl}
+    use:registerParallax={{ depth: 1.3, blur: 0.8, start: 0.985 }}
+  >
     <div class="summary-library-header">
       <div>
         <span class="panel-kicker">Summary library</span>
@@ -1245,7 +1266,10 @@
     {/if}
   </section>
 
-  <div class="search-shell animate-rise rise-6">
+  <div
+    class="search-shell animate-rise rise-6 journal-parallax"
+    use:registerParallax={{ depth: 1.36, blur: 0.68, start: 0.99 }}
+  >
     <input
       bind:this={searchInputEl}
       class="input search-input"
@@ -1256,7 +1280,11 @@
     />
   </div>
 
-  <section class="entries-shell card glass-card animate-rise rise-6" aria-live="polite">
+  <section
+    class="entries-shell card glass-card animate-rise rise-6 journal-parallax"
+    aria-live="polite"
+    use:registerParallax={{ depth: 1.42, blur: 0.72, start: 1 }}
+  >
     <div class="entries-toolbar">
       <div>
         <h3>Entries</h3>
