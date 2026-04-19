@@ -531,6 +531,7 @@
 
       const viewportHeight = getViewportHeight();
       const momentumRatio = clamp(scrollMomentum / 34, -1, 1);
+      const motionStrength = Math.min(1, Math.abs(momentumRatio));
       const forwardBias = Math.max(0, momentumRatio);
       const retreatBias = Math.max(0, -momentumRatio);
 
@@ -542,19 +543,21 @@
 
         const rect = node.getBoundingClientRect();
         const start = viewportHeight * config.start;
-        const end = -Math.min(rect.height * 0.28, viewportHeight * 0.22);
+        const end = -Math.min(rect.height * 0.22, viewportHeight * 0.16);
         const progress = clamp((start - rect.top) / (start - end), 0, 1);
         const depth = config.depth;
-        const baseTravelY = ((1 - progress) * (30 + depth * 14)) - (depth * 6.5);
-        const baseTravelZ = -20 + (progress * (24 + depth * 8));
-        const baseScale = 0.972 + (progress * 0.03) + (depth * 0.003);
-        const baseOpacity = 0.56 + (progress * 0.44);
-        const baseBlur = (1 - progress) * config.blur;
-        const travelY = baseTravelY - (momentumRatio * (6 + depth * 5.5));
-        const travelZ = baseTravelZ + (forwardBias * (14 + depth * 11)) - (retreatBias * (5 + depth * 3));
-        const scale = baseScale + (forwardBias * 0.014) - (retreatBias * 0.006);
-        const opacity = clamp(baseOpacity + (forwardBias * 0.09), 0.45, 1);
-        const blur = Math.max(0, baseBlur - (forwardBias * 0.8));
+        const baseTravelY = ((1 - progress) * (10 + depth * 7)) - (depth * 1.6);
+        const restScale = 0.996 + (progress * 0.006);
+        const motionLift = momentumRatio * (5 + depth * 4.5);
+        const travelY = baseTravelY - motionLift;
+        const travelZ = motionStrength > 0.02
+          ? (forwardBias * (8 + depth * 7)) - (retreatBias * (2.5 + depth * 2))
+          : 0;
+        const scale = restScale + (forwardBias * 0.011) - (retreatBias * 0.003);
+        const opacity = 1;
+        const blur = motionStrength > 0.08
+          ? Math.max(0, (1 - progress) * config.blur * 0.14 * (1 - forwardBias))
+          : 0;
 
         node.style.setProperty('--approach-y', `${travelY.toFixed(2)}px`);
         node.style.setProperty('--approach-z', `${travelZ.toFixed(2)}px`);
