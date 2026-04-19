@@ -28,6 +28,8 @@
   });
   const PAGE_SIZE = 5;
   const parallaxTargets = new Map();
+  let journalStageShellEl = $state(null);
+  let journalStageEl = $state(null);
   let journalViewEl = $state(null);
 
   function formatMonthLabel(monthValue) {
@@ -491,16 +493,30 @@
   });
 
   onMount(() => {
-    if (typeof window === 'undefined' || !journalViewEl) return;
+    if (typeof window === 'undefined' || !journalViewEl || !journalStageEl || !journalStageShellEl) return;
 
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const compactQuery = window.matchMedia('(max-width: 980px)');
+    const mainHost = document.querySelector('main#main-content');
+    const rootHost = document.scrollingElement || document.documentElement;
+    const scroller = mainHost && (mainHost.scrollHeight - mainHost.clientHeight > 2) ? mainHost : rootHost;
+    const previousMainOverflow = mainHost?.style.overflow ?? '';
     let cancelled = false;
     let gsapCore = null;
     let scrollTriggerPlugin = null;
     let gsapContext = null;
 
     const clearInlineMotion = () => {
+      journalStageShellEl.style.removeProperty('height');
+      journalStageShellEl.style.removeProperty('min-height');
+      journalStageEl.style.removeProperty('height');
+      journalStageEl.style.removeProperty('min-height');
+      journalStageEl.style.removeProperty('overflow');
+      journalStageEl.style.removeProperty('top');
+      journalViewEl.style.removeProperty('transform');
+      journalViewEl.style.removeProperty('will-change');
+      journalViewEl.style.removeProperty('padding-bottom');
+
       for (const node of parallaxTargets.keys()) {
         if (!(node instanceof HTMLElement)) continue;
         node.style.removeProperty('transform');
@@ -523,6 +539,10 @@
 
     const applyMotion = async () => {
       if (cancelled) return;
+
+      if (mainHost && scroller === rootHost) {
+        mainHost.style.overflow = 'visible';
+      }
 
       // WCAG 2.2: when reduced motion is requested, remove scroll-linked transforms
       // and leave the page in its fully readable resting state.
@@ -548,29 +568,75 @@
       teardownMotion();
 
       gsapContext = gsapCore.context(() => {
+        const getViewportHeight = () => {
+          if (scroller === rootHost) return window.innerHeight;
+          return scroller.clientHeight;
+        };
+
+        const getFlowDistance = () => {
+          const overflow = journalViewEl.scrollHeight - getViewportHeight();
+          return Math.max(0, overflow + 180);
+        };
+
+        gsapCore.set(journalStageEl, {
+          height: () => `${Math.max(620, getViewportHeight())}px`,
+          minHeight: 0,
+          top: 0,
+          overflow: 'clip'
+        });
+
+        gsapCore.set(journalStageShellEl, {
+          minHeight: () => `${Math.max(620, getViewportHeight())}px`,
+          height: () => `${Math.max(620, getViewportHeight()) + getFlowDistance()}px`
+        });
+
         gsapCore.set(journalViewEl, {
           transformPerspective: 1640,
-          transformStyle: 'preserve-3d'
+          transformStyle: 'preserve-3d',
+          willChange: 'transform',
+          paddingBottom: '4rem'
         });
+
+        const timeline = gsapCore.timeline({
+          scrollTrigger: {
+            trigger: journalStageShellEl,
+            scroller: scroller === rootHost ? undefined : scroller,
+            start: 'top top',
+            end: () => `+=${getFlowDistance()}`,
+            scrub: 1.05,
+            invalidateOnRefresh: true
+          }
+        });
+
+        timeline.to(
+          journalViewEl,
+          {
+            y: () => -getFlowDistance(),
+            ease: 'none'
+          },
+          0
+        );
+
+        const flowDistance = Math.max(getFlowDistance(), 1);
+        const viewportHeight = getViewportHeight();
 
         for (const [node, config] of parallaxTargets.entries()) {
           if (!(node instanceof HTMLElement) || !node.isConnected) continue;
 
           const depth = Number(config.depth) || 1;
-          const startPercent = Math.round((config.start ?? 0.94) * 100);
-          const blurFrom = Math.max(4.2, 3.6 + ((Number(config.blur) || 0) * 2.4));
-          const yFrom = 74 + (depth * 22);
-          const yTo = -18 - (depth * 5.4);
-          const zFrom = -210 - (depth * 96);
-          const zTo = 84 + (depth * 30);
-          const rotateFrom = 7.5 + (depth * 2.1);
-          const scaleFrom = Math.max(0.904, 0.972 - (depth * 0.028));
-          const scaleTo = 1.02 + (depth * 0.0045);
-          const opacityFrom = Math.max(0.44, 0.74 - (depth * 0.12));
-          const scrubAmount = 1.18 + (depth * 0.12);
-          const endViewport = Math.max(24, Math.round(40 - (depth * 3.4)));
+          const blurFrom = Math.max(3.2, 2.8 + ((Number(config.blur) || 0) * 2));
+          const yFrom = 66 + (depth * 24);
+          const yTo = -14 - (depth * 4.5);
+          const zFrom = -170 - (depth * 86);
+          const zTo = 78 + (depth * 26);
+          const rotateFrom = 6.5 + (depth * 1.8);
+          const scaleFrom = Math.max(0.916, 0.972 - (depth * 0.024));
+          const scaleTo = 1.018 + (depth * 0.004);
+          const opacityFrom = Math.max(0.5, 0.78 - (depth * 0.11));
+          const revealStart = Math.max(0, Math.min(0.9, (node.offsetTop - viewportHeight * 0.72) / flowDistance));
+          const revealEnd = Math.max(revealStart + 0.12, Math.min(1, revealStart + 0.26));
 
-          gsapCore.fromTo(
+          timeline.fromTo(
             node,
             {
               y: yFrom,
@@ -594,15 +660,9 @@
               filter: 'blur(0px)',
               ease: 'none',
               overwrite: 'auto',
-              scrollTrigger: {
-                trigger: node,
-                start: `top ${startPercent}%`,
-                end: `center ${endViewport}%`,
-                scrub: scrubAmount,
-                fastScrollEnd: true,
-                invalidateOnRefresh: true
-              }
-            }
+              duration: revealEnd - revealStart
+            },
+            revealStart
           );
 
           const cardChildren = Array.from(node.children).filter(
@@ -610,11 +670,11 @@
           );
 
           if (cardChildren.length > 1) {
-            gsapCore.fromTo(
+            timeline.fromTo(
               cardChildren,
               {
-                y: 18 + (depth * 4),
-                autoAlpha: 0.76,
+                y: 26 + (depth * 5),
+                autoAlpha: 0.68,
                 force3D: true
               },
               {
@@ -622,19 +682,13 @@
                 autoAlpha: 1,
                 ease: 'none',
                 stagger: 0.04,
-                scrollTrigger: {
-                  trigger: node,
-                  start: `top ${Math.min(100, startPercent + 4)}%`,
-                  end: `center ${Math.max(28, endViewport + 4)}%`,
-                  scrub: 0.92 + (depth * 0.06),
-                  fastScrollEnd: true,
-                  invalidateOnRefresh: true
-                }
-              }
+                duration: Math.min(0.22, revealEnd - revealStart)
+              },
+              revealStart + 0.02
             );
           }
         }
-      }, journalViewEl);
+      }, journalStageShellEl);
 
       scrollTriggerPlugin.refresh();
     };
@@ -660,6 +714,9 @@
     return () => {
       cancelled = true;
       teardownMotion();
+      if (mainHost) {
+        mainHost.style.overflow = previousMainOverflow;
+      }
 
       if (typeof motionQuery.removeEventListener === 'function') {
         motionQuery.removeEventListener('change', handleMotionPreferenceChange);
@@ -871,7 +928,9 @@
   }
 </script>
 
-<div class="journal-view" bind:this={journalViewEl} aria-busy={$journal.loading || summaryLoading}>
+<div class="journal-stage-shell" bind:this={journalStageShellEl}>
+  <div class="journal-stage" bind:this={journalStageEl}>
+    <div class="journal-view" bind:this={journalViewEl} aria-busy={$journal.loading || summaryLoading}>
   <section
     class="journal-hero journal-parallax animate-rise rise-1"
     use:registerParallax={{ depth: 0.38, blur: 1.4, start: 0.96 }}
@@ -1447,6 +1506,8 @@
       {/if}
     </div>
   </section>
+    </div>
+  </div>
 </div>
 
 {#if showSummaryModal && modalSummary}
@@ -1520,6 +1581,25 @@
 {/if}
 
 <style>
+  .journal-stage-shell {
+    position: relative;
+    width: 100%;
+  }
+
+  .journal-stage {
+    position: relative;
+    top: 0;
+    position: sticky;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    overflow: visible;
+    perspective: 1640px;
+    perspective-origin: center 14vh;
+    transform-style: preserve-3d;
+  }
+
   .journal-view {
     flex: 1;
     min-height: auto;
@@ -1531,8 +1611,6 @@
     flex-direction: column;
     gap: 1.1rem;
     overflow: visible;
-    perspective: 1640px;
-    perspective-origin: center 14vh;
     transform-style: preserve-3d;
   }
 
