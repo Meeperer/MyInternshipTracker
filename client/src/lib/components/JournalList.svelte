@@ -28,7 +28,7 @@
   });
   const PAGE_SIZE = 5;
   const parallaxTargets = new Map();
-  let scheduleParallaxUpdate = () => {};
+  let journalViewEl = $state(null);
 
   function formatMonthLabel(monthValue) {
     const { year, month } = parseMonthValue(monthValue);
@@ -230,10 +230,6 @@
   let summaryLibrarySectionEl = $state(null);
   let summaryLibraryHydrated = $state(false);
 
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
-
   function registerParallax(node, config = {}) {
     parallaxTargets.set(node, {
       depth: 1,
@@ -241,8 +237,6 @@
       start: 0.92,
       ...config
     });
-
-    queueMicrotask(() => scheduleParallaxUpdate());
 
     return {
       update(nextConfig = {}) {
@@ -252,11 +246,9 @@
           start: 0.92,
           ...nextConfig
         });
-        scheduleParallaxUpdate();
       },
       destroy() {
         parallaxTargets.delete(node);
-        scheduleParallaxUpdate();
       }
     };
   }
@@ -499,106 +491,187 @@
   });
 
   onMount(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !journalViewEl) return;
 
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
-    const mainHost = document.querySelector('main#main-content');
-    const rootHost = document.scrollingElement || document.documentElement;
-    const host = mainHost && (mainHost.scrollHeight - mainHost.clientHeight > 2) ? mainHost : rootHost;
-    const eventTarget = host === rootHost ? window : host;
-    const getViewportHeight = () => host === rootHost ? window.innerHeight : host.clientHeight;
-    let frame = 0;
+    const compactQuery = window.matchMedia('(max-width: 980px)');
+    let cancelled = false;
+    let gsapCore = null;
+    let scrollTriggerPlugin = null;
+    let gsapContext = null;
 
-    const updateParallax = () => {
-      frame = 0;
+    const clearInlineMotion = () => {
+      for (const node of parallaxTargets.keys()) {
+        if (!(node instanceof HTMLElement)) continue;
+        node.style.removeProperty('transform');
+        node.style.removeProperty('opacity');
+        node.style.removeProperty('filter');
+        node.style.removeProperty('will-change');
+        node.style.removeProperty('transform-origin');
+        node.style.removeProperty('transform-style');
+        node.style.removeProperty('backface-visibility');
+      }
+    };
 
-      // WCAG 2.2: motion is optional. When reduced motion is requested, keep the
-      // journal cards fully settled and readable without depth effects.
-      if (motionQuery.matches) {
-        for (const node of parallaxTargets.keys()) {
-          node.style.setProperty('--approach-y', '0px');
-          node.style.setProperty('--approach-z', '0px');
-          node.style.setProperty('--approach-scale', '1');
-          node.style.setProperty('--approach-opacity', '1');
-          node.style.setProperty('--approach-blur', '0px');
-        }
+    const teardownMotion = () => {
+      if (gsapContext) {
+        gsapContext.revert();
+        gsapContext = null;
+      }
+      clearInlineMotion();
+    };
+
+    const applyMotion = async () => {
+      if (cancelled) return;
+
+      // WCAG 2.2: when reduced motion is requested, remove scroll-linked transforms
+      // and leave the page in its fully readable resting state.
+      if (motionQuery.matches || compactQuery.matches || parallaxTargets.size === 0) {
+        teardownMotion();
         return;
       }
 
-      const viewportHeight = getViewportHeight();
+      if (!gsapCore || !scrollTriggerPlugin) {
+        const [gsapModule, scrollTriggerModule] = await Promise.all([
+          import('gsap'),
+          import('gsap/ScrollTrigger')
+        ]);
 
-      for (const [node, config] of parallaxTargets.entries()) {
-        if (!node.isConnected) {
-          parallaxTargets.delete(node);
-          continue;
-        }
+        if (cancelled) return;
 
-        const rect = node.getBoundingClientRect();
-        const start = viewportHeight * config.start;
-        const end = viewportHeight * 0.14;
-        const depth = config.depth;
-        const denominator = Math.max(1, start - end);
-        const progress = clamp((start - rect.top) / denominator, 0, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        const travelY = ((1 - eased) * (30 + depth * 10)) - (eased * (6 + depth * 2.5));
-        const travelZ = (-14 - depth * 6) + (eased * (26 + depth * 18));
-        const scale = 0.978 + (eased * (0.024 + depth * 0.003));
-        const opacity = 0.78 + (eased * 0.22);
-        const blur = (1 - eased) * (1.8 + (config.blur * 0.65));
-
-        node.style.setProperty('--approach-y', `${travelY.toFixed(2)}px`);
-        node.style.setProperty('--approach-z', `${travelZ.toFixed(2)}px`);
-        node.style.setProperty('--approach-scale', scale.toFixed(4));
-        node.style.setProperty('--approach-opacity', opacity.toFixed(4));
-        node.style.setProperty('--approach-blur', `${blur.toFixed(2)}px`);
+        gsapCore = gsapModule.gsap || gsapModule.default || gsapModule;
+        scrollTriggerPlugin =
+          scrollTriggerModule.ScrollTrigger || scrollTriggerModule.default || scrollTriggerModule;
+        gsapCore.registerPlugin(scrollTriggerPlugin);
       }
+
+      teardownMotion();
+
+      gsapContext = gsapCore.context(() => {
+        gsapCore.set(journalViewEl, {
+          transformPerspective: 1640,
+          transformStyle: 'preserve-3d'
+        });
+
+        for (const [node, config] of parallaxTargets.entries()) {
+          if (!(node instanceof HTMLElement) || !node.isConnected) continue;
+
+          const depth = Number(config.depth) || 1;
+          const startPercent = Math.round((config.start ?? 0.94) * 100);
+          const blurFrom = Math.max(4.2, 3.6 + ((Number(config.blur) || 0) * 2.4));
+          const yFrom = 74 + (depth * 22);
+          const yTo = -18 - (depth * 5.4);
+          const zFrom = -210 - (depth * 96);
+          const zTo = 84 + (depth * 30);
+          const rotateFrom = 7.5 + (depth * 2.1);
+          const scaleFrom = Math.max(0.904, 0.972 - (depth * 0.028));
+          const scaleTo = 1.02 + (depth * 0.0045);
+          const opacityFrom = Math.max(0.44, 0.74 - (depth * 0.12));
+          const scrubAmount = 1.18 + (depth * 0.12);
+          const endViewport = Math.max(24, Math.round(40 - (depth * 3.4)));
+
+          gsapCore.fromTo(
+            node,
+            {
+              y: yFrom,
+              z: zFrom,
+              rotateX: rotateFrom,
+              scale: scaleFrom,
+              autoAlpha: opacityFrom,
+              filter: `blur(${blurFrom.toFixed(2)}px)`,
+              transformOrigin: '50% 0%',
+              transformStyle: 'preserve-3d',
+              backfaceVisibility: 'hidden',
+              willChange: 'transform, opacity, filter',
+              force3D: true
+            },
+            {
+              y: yTo,
+              z: zTo,
+              rotateX: 0,
+              scale: scaleTo,
+              autoAlpha: 1,
+              filter: 'blur(0px)',
+              ease: 'none',
+              overwrite: 'auto',
+              scrollTrigger: {
+                trigger: node,
+                start: `top ${startPercent}%`,
+                end: `center ${endViewport}%`,
+                scrub: scrubAmount,
+                fastScrollEnd: true,
+                invalidateOnRefresh: true
+              }
+            }
+          );
+
+          const cardChildren = Array.from(node.children).filter(
+            (child) => child instanceof HTMLElement
+          );
+
+          if (cardChildren.length > 1) {
+            gsapCore.fromTo(
+              cardChildren,
+              {
+                y: 18 + (depth * 4),
+                autoAlpha: 0.76,
+                force3D: true
+              },
+              {
+                y: 0,
+                autoAlpha: 1,
+                ease: 'none',
+                stagger: 0.04,
+                scrollTrigger: {
+                  trigger: node,
+                  start: `top ${Math.min(100, startPercent + 4)}%`,
+                  end: `center ${Math.max(28, endViewport + 4)}%`,
+                  scrub: 0.92 + (depth * 0.06),
+                  fastScrollEnd: true,
+                  invalidateOnRefresh: true
+                }
+              }
+            );
+          }
+        }
+      }, journalViewEl);
+
+      scrollTriggerPlugin.refresh();
     };
 
-    const queueUpdate = () => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(updateParallax);
+    const handleMotionPreferenceChange = () => {
+      applyMotion();
     };
 
-    const handleHostScroll = () => {
-      queueUpdate();
-    };
-
-    scheduleParallaxUpdate = queueUpdate;
-    updateParallax();
-    eventTarget?.addEventListener('scroll', handleHostScroll, { passive: true });
-    window.addEventListener('resize', queueUpdate, { passive: true });
+    applyMotion();
 
     if (typeof motionQuery.addEventListener === 'function') {
-      motionQuery.addEventListener('change', queueUpdate);
+      motionQuery.addEventListener('change', handleMotionPreferenceChange);
     } else {
-      motionQuery.addListener(queueUpdate);
+      motionQuery.addListener(handleMotionPreferenceChange);
     }
 
-    if (typeof coarsePointerQuery.addEventListener === 'function') {
-      coarsePointerQuery.addEventListener('change', queueUpdate);
+    if (typeof compactQuery.addEventListener === 'function') {
+      compactQuery.addEventListener('change', handleMotionPreferenceChange);
     } else {
-      coarsePointerQuery.addListener(queueUpdate);
+      compactQuery.addListener(handleMotionPreferenceChange);
     }
 
     return () => {
-      eventTarget?.removeEventListener('scroll', handleHostScroll);
-      window.removeEventListener('resize', queueUpdate);
-      scheduleParallaxUpdate = () => {};
+      cancelled = true;
+      teardownMotion();
 
       if (typeof motionQuery.removeEventListener === 'function') {
-        motionQuery.removeEventListener('change', queueUpdate);
+        motionQuery.removeEventListener('change', handleMotionPreferenceChange);
       } else {
-        motionQuery.removeListener(queueUpdate);
+        motionQuery.removeListener(handleMotionPreferenceChange);
       }
 
-      if (typeof coarsePointerQuery.removeEventListener === 'function') {
-        coarsePointerQuery.removeEventListener('change', queueUpdate);
+      if (typeof compactQuery.removeEventListener === 'function') {
+        compactQuery.removeEventListener('change', handleMotionPreferenceChange);
       } else {
-        coarsePointerQuery.removeListener(queueUpdate);
+        compactQuery.removeListener(handleMotionPreferenceChange);
       }
-
-      if (frame) window.cancelAnimationFrame(frame);
     };
   });
 
@@ -798,7 +871,7 @@
   }
 </script>
 
-<div class="journal-view" aria-busy={$journal.loading || summaryLoading}>
+<div class="journal-view" bind:this={journalViewEl} aria-busy={$journal.loading || summaryLoading}>
   <section
     class="journal-hero journal-parallax animate-rise rise-1"
     use:registerParallax={{ depth: 0.38, blur: 1.4, start: 0.96 }}
@@ -1458,23 +1531,16 @@
     flex-direction: column;
     gap: 1.1rem;
     overflow: visible;
-    perspective: 1800px;
-    perspective-origin: center 16vh;
+    perspective: 1640px;
+    perspective-origin: center 14vh;
     transform-style: preserve-3d;
   }
 
   .journal-parallax {
-    --approach-y: 0px;
-    --approach-z: 0px;
-    --approach-scale: 1;
-    --approach-opacity: 1;
-    --approach-blur: 0px;
-    transform:
-      translate3d(0, var(--approach-y), var(--approach-z))
-      scale(var(--approach-scale));
+    transform: translate3d(0, 0, 0) scale(1);
     transform-origin: center top;
-    opacity: var(--approach-opacity);
-    filter: blur(var(--approach-blur));
+    opacity: 1;
+    filter: blur(0);
     will-change: transform, opacity, filter;
     backface-visibility: hidden;
     transform-style: preserve-3d;
