@@ -521,7 +521,6 @@
         if (!(node instanceof HTMLElement)) continue;
         node.style.removeProperty('transform');
         node.style.removeProperty('opacity');
-        node.style.removeProperty('filter');
         node.style.removeProperty('will-change');
         node.style.removeProperty('transform-origin');
         node.style.removeProperty('transform-style');
@@ -624,15 +623,14 @@
           if (!(node instanceof HTMLElement) || !node.isConnected) continue;
 
           const depth = Number(config.depth) || 1;
-          const blurFrom = Math.max(3.2, 2.8 + ((Number(config.blur) || 0) * 2));
-          const yFrom = 66 + (depth * 24);
-          const yTo = -14 - (depth * 4.5);
-          const zFrom = -170 - (depth * 86);
-          const zTo = 78 + (depth * 26);
-          const rotateFrom = 6.5 + (depth * 1.8);
-          const scaleFrom = Math.max(0.916, 0.972 - (depth * 0.024));
-          const scaleTo = 1.018 + (depth * 0.004);
-          const opacityFrom = Math.max(0.5, 0.78 - (depth * 0.11));
+          const yFrom = 38 + (depth * 16);
+          const yTo = -10 - (depth * 2.8);
+          const zFrom = -104 - (depth * 44);
+          const zTo = 34 + (depth * 12);
+          const rotateFrom = 3.4 + (depth * 0.9);
+          const scaleFrom = Math.max(0.968, 0.994 - (depth * 0.014));
+          const scaleTo = 1.008 + (depth * 0.002);
+          const opacityFrom = Math.max(0.82, 0.94 - (depth * 0.045));
           const revealStart = Math.max(0, Math.min(0.9, (node.offsetTop - viewportHeight * 0.72) / flowDistance));
           const revealEnd = Math.max(revealStart + 0.12, Math.min(1, revealStart + 0.26));
 
@@ -644,11 +642,10 @@
               rotateX: rotateFrom,
               scale: scaleFrom,
               autoAlpha: opacityFrom,
-              filter: `blur(${blurFrom.toFixed(2)}px)`,
               transformOrigin: '50% 0%',
               transformStyle: 'preserve-3d',
               backfaceVisibility: 'hidden',
-              willChange: 'transform, opacity, filter',
+              willChange: 'transform, opacity',
               force3D: true
             },
             {
@@ -657,7 +654,6 @@
               rotateX: 0,
               scale: scaleTo,
               autoAlpha: 1,
-              filter: 'blur(0px)',
               ease: 'none',
               overwrite: 'auto',
               duration: revealEnd - revealStart
@@ -673,8 +669,8 @@
             timeline.fromTo(
               cardChildren,
               {
-                y: 26 + (depth * 5),
-                autoAlpha: 0.68,
+                y: 16 + (depth * 3),
+                autoAlpha: 0.86,
                 force3D: true
               },
               {
@@ -1587,9 +1583,8 @@
   }
 
   .journal-stage {
-    position: relative;
-    top: 0;
     position: sticky;
+    top: 0;
     width: 100%;
     display: flex;
     justify-content: center;
@@ -1618,8 +1613,7 @@
     transform: translate3d(0, 0, 0) scale(1);
     transform-origin: center top;
     opacity: 1;
-    filter: blur(0);
-    will-change: transform, opacity, filter;
+    will-change: transform, opacity;
     backface-visibility: hidden;
     transform-style: preserve-3d;
   }
