@@ -27,6 +27,8 @@
     day: 'numeric'
   });
   const PAGE_SIZE = 5;
+  let activeDeskPanel = $state(0);
+  let deskPanelCount = $state(5);
   let journalStageShellEl = $state(null);
   let journalStageEl = $state(null);
   let journalViewEl = $state(null);
@@ -206,6 +208,28 @@
     }
 
     return lines.join('\n');
+  }
+
+  function getDeskPanels() {
+    if (!journalDeskScrollerEl) return [];
+    return Array.from(journalDeskScrollerEl.querySelectorAll('.journal-scene-panel'));
+  }
+
+  function scrollDeskToPanel(targetIndex, behavior = 'smooth') {
+    const panels = getDeskPanels();
+    if (!journalDeskScrollerEl || panels.length === 0) return;
+
+    const nextIndex = Math.max(0, Math.min(targetIndex, panels.length - 1));
+    const panel = panels[nextIndex];
+    const centeredLeft = Math.max(
+      0,
+      panel.offsetLeft - ((journalDeskScrollerEl.clientWidth - panel.offsetWidth) / 2)
+    );
+
+    journalDeskScrollerEl.scrollTo({
+      left: centeredLeft,
+      behavior
+    });
   }
 
   let exportLoading = $state(false);
@@ -484,42 +508,69 @@
     let resizeObserver = null;
     let ticking = false;
 
-    const updateProgress = () => {
-      if (!journalProgressFillEl || !journalDeskScrollerEl) return;
-      const maxScrollLeft = Math.max(1, journalDeskScrollerEl.scrollWidth - journalDeskScrollerEl.clientWidth);
-      const ratio = Math.min(1, Math.max(0, journalDeskScrollerEl.scrollLeft / maxScrollLeft));
+    const syncDeskState = () => {
+      if (!journalDeskScrollerEl || !journalProgressFillEl) return;
+
+      const panels = getDeskPanels();
+      deskPanelCount = panels.length || 1;
+
+      const maxScrollLeft = Math.max(0, journalDeskScrollerEl.scrollWidth - journalDeskScrollerEl.clientWidth);
+      const viewportCenter = journalDeskScrollerEl.scrollLeft + (journalDeskScrollerEl.clientWidth / 2);
+
+      let nextActivePanel = 0;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+
+      panels.forEach((panel, index) => {
+        const panelCenter = panel.offsetLeft + (panel.offsetWidth / 2);
+        const distance = Math.abs(panelCenter - viewportCenter);
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nextActivePanel = index;
+        }
+      });
+
+      activeDeskPanel = nextActivePanel;
+
+      const ratio = deskPanelCount <= 1
+        ? 1
+        : Math.min(1, Math.max(0, journalDeskScrollerEl.scrollLeft / Math.max(1, maxScrollLeft)));
+
       journalProgressFillEl.style.transform = `scaleX(${ratio})`;
     };
 
-    const queueProgress = () => {
+    const queueDeskState = () => {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        updateProgress();
+        syncDeskState();
       });
     };
 
     const handleWheel = (event) => {
       if (!desktopQuery.matches || motionQuery.matches || !journalDeskScrollerEl) return;
-      const { deltaX, deltaY } = event;
-      if (Math.abs(deltaY) <= Math.abs(deltaX)) return;
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
 
-      const maxScrollLeft = journalDeskScrollerEl.scrollWidth - journalDeskScrollerEl.clientWidth;
+      const unit =
+        event.deltaMode === 1 ? 24 :
+        event.deltaMode === 2 ? journalDeskScrollerEl.clientWidth :
+        1;
+
+      const delta = event.deltaY * unit;
+      const maxScrollLeft = Math.max(0, journalDeskScrollerEl.scrollWidth - journalDeskScrollerEl.clientWidth);
       if (maxScrollLeft <= 0) return;
 
       const currentLeft = journalDeskScrollerEl.scrollLeft;
-      const nextLeft = Math.min(maxScrollLeft, Math.max(0, currentLeft + deltaY));
-      const movingForward = deltaY > 0 && currentLeft < maxScrollLeft;
-      const movingBackward = deltaY < 0 && currentLeft > 0;
+      const nextLeft = Math.min(maxScrollLeft, Math.max(0, currentLeft + delta));
+      const movingForward = delta > 0 && currentLeft < maxScrollLeft;
+      const movingBackward = delta < 0 && currentLeft > 0;
 
       if (!movingForward && !movingBackward) return;
 
       event.preventDefault();
-      journalDeskScrollerEl.scrollTo({
-        left: nextLeft,
-        behavior: motionQuery.matches ? 'auto' : 'smooth'
-      });
+      journalDeskScrollerEl.scrollLeft = nextLeft;
+      queueDeskState();
     };
 
     const syncStageHeight = () => {
@@ -541,14 +592,14 @@
 
     const handleLayoutChange = () => {
       syncStageHeight();
-      queueProgress();
+      queueDeskState();
     };
 
     syncStageHeight();
-    updateProgress();
+    syncDeskState();
 
-    journalDeskScrollerEl.addEventListener('scroll', queueProgress, { passive: true });
-    journalDeskScrollerEl.addEventListener('wheel', handleWheel, { passive: false });
+    journalDeskScrollerEl.addEventListener('scroll', queueDeskState, { passive: true });
+    journalStageEl.addEventListener('wheel', handleWheel, { passive: false });
 
     if (typeof motionQuery.addEventListener === 'function') {
       motionQuery.addEventListener('change', handleLayoutChange);
@@ -568,8 +619,8 @@
 
     return () => {
       resizeObserver?.disconnect();
-      journalDeskScrollerEl?.removeEventListener('scroll', queueProgress);
-      journalDeskScrollerEl?.removeEventListener('wheel', handleWheel);
+      journalDeskScrollerEl?.removeEventListener('scroll', queueDeskState);
+      journalStageEl?.removeEventListener('wheel', handleWheel);
       window.removeEventListener('resize', handleLayoutChange);
 
       if (typeof motionQuery.removeEventListener === 'function') {
@@ -815,7 +866,34 @@
       </div>
 
       <div class="journal-desk">
+        <div class="journal-desk-toolbar">
+          <p class="journal-desk-status">
+            Panel {Math.min(activeDeskPanel + 1, deskPanelCount)} of {deskPanelCount}
+          </p>
+          <div class="journal-desk-actions">
+            <button
+              type="button"
+              class="nav-chip"
+              aria-controls="journal-desk-scroller"
+              disabled={activeDeskPanel === 0}
+              onclick={() => scrollDeskToPanel(activeDeskPanel - 1, prefersReducedMotion() ? 'auto' : 'smooth')}
+            >
+              Previous panel
+            </button>
+            <button
+              type="button"
+              class="nav-chip"
+              aria-controls="journal-desk-scroller"
+              disabled={activeDeskPanel >= deskPanelCount - 1}
+              onclick={() => scrollDeskToPanel(activeDeskPanel + 1, prefersReducedMotion() ? 'auto' : 'smooth')}
+            >
+              Next panel
+            </button>
+          </div>
+        </div>
+
         <div
+          id="journal-desk-scroller"
           class="journal-desk-scroller"
           bind:this={journalDeskScrollerEl}
           role="region"
@@ -1504,8 +1582,31 @@
   .journal-desk {
     flex: 1;
     display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
     min-height: 0;
     padding: 0.4rem 0 0.15rem;
+  }
+
+  .journal-desk-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .journal-desk-status {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: rgba(61, 42, 24, 0.82);
+  }
+
+  .journal-desk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .journal-desk-scroller {
@@ -1513,21 +1614,32 @@
     min-height: 0;
     overflow-x: auto;
     overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scroll-behavior: smooth;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    padding-bottom: 0.35rem;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scroll-behavior: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(190, 53, 25, 0.35) rgba(190, 53, 25, 0.08);
+    padding-bottom: 0.5rem;
   }
 
   .journal-desk-scroller::-webkit-scrollbar {
-    display: none;
+    height: 10px;
+  }
+
+  .journal-desk-scroller::-webkit-scrollbar-track {
+    background: rgba(190, 53, 25, 0.08);
+    border-radius: 999px;
+  }
+
+  .journal-desk-scroller::-webkit-scrollbar-thumb {
+    background: rgba(190, 53, 25, 0.36);
+    border-radius: 999px;
   }
 
   .journal-desk-scroller:focus-visible {
     outline: 2px solid rgba(190, 53, 25, 0.28);
     outline-offset: 6px;
-    border-radius: 24px;
+    border-radius: 12px;
   }
 
   .journal-desk-stack {
@@ -1542,11 +1654,11 @@
     flex: 0 0 min(76vw, 860px);
     min-height: clamp(300px, 50vh, 480px);
     scroll-snap-align: center;
-    scroll-snap-stop: always;
-    border-radius: 20px;
+    scroll-snap-stop: normal;
+    border-radius: 12px;
     border: 1px solid rgba(190, 53, 25, 0.12);
     background: rgba(255, 254, 248, 0.98);
-    box-shadow: 0 16px 28px rgba(34, 24, 8, 0.06);
+    box-shadow: 0 6px 18px rgba(34, 24, 8, 0.05);
     padding: 1.25rem 1.35rem;
   }
 
@@ -2598,6 +2710,10 @@
     .journal-desk {
       display: block;
       padding: 0;
+    }
+
+    .journal-desk-toolbar {
+      display: none;
     }
 
     .journal-desk-scroller {
