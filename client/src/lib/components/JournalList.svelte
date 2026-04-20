@@ -505,6 +505,10 @@
     let gsapCore = null;
     let scrollTriggerPlugin = null;
     let gsapContext = null;
+    let refreshFrame = null;
+    let applyFrame = null;
+    let retryCount = 0;
+    let resizeObserver = null;
 
     const clearInlineMotion = () => {
       journalStageShellEl.style.removeProperty('height');
@@ -528,11 +532,28 @@
     };
 
     const teardownMotion = () => {
+      if (refreshFrame) {
+        cancelAnimationFrame(refreshFrame);
+        refreshFrame = null;
+      }
+
       if (gsapContext) {
         gsapContext.revert();
         gsapContext = null;
       }
       clearInlineMotion();
+    };
+
+    const scheduleRefresh = () => {
+      if (cancelled || !scrollTriggerPlugin) return;
+      if (refreshFrame) {
+        cancelAnimationFrame(refreshFrame);
+      }
+
+      refreshFrame = requestAnimationFrame(() => {
+        refreshFrame = null;
+        scrollTriggerPlugin?.refresh();
+      });
     };
 
     const applyMotion = async () => {
@@ -566,7 +587,11 @@
       gsapContext = gsapCore.context(() => {
         gsapCore.set(journalStageShellEl, { clearProps: 'all' });
         gsapCore.set(journalStageEl, { clearProps: 'all' });
-        gsapCore.set(journalViewEl, { clearProps: 'all' });
+        gsapCore.set(journalViewEl, {
+          clearProps: 'all',
+          perspective: 1600,
+          transformStyle: 'preserve-3d'
+        });
 
         const orderedTargets = Array.from(parallaxTargets.entries());
 
@@ -575,29 +600,44 @@
 
           const depth = Number(config.depth) || 1;
           const startRatio = Number(config.start) || 0.92;
-          const startPoint = Math.round(startRatio * 100);
-          const endPoint = Math.max(26, startPoint - 42);
-          const incomingY = 42 + (depth * 12);
-          const outgoingY = -12 - (depth * 4);
-          const incomingScale = Math.max(0.955, 0.985 - (depth * 0.012));
-          const outgoingScale = 1.006 + (depth * 0.002);
-          const incomingRotate = (index % 2 === 0 ? 0.9 : -0.9) * Math.max(0.4, 1 - (depth * 0.18));
+          const startPoint = Math.round(Math.max(72, Math.min(96, startRatio * 100)));
+          const endPoint = Math.max(8, startPoint - 58);
+          const incomingY = 72 + (depth * 22);
+          const outgoingY = -22 - (depth * 8);
+          const incomingYPercent = 16 + (depth * 3.6);
+          const outgoingYPercent = -5 - (depth * 1.4);
+          const incomingScale = Math.max(0.88, 0.94 - (depth * 0.014));
+          const outgoingScale = 1.02 + (depth * 0.006);
+          const incomingRotateX = Math.max(1.2, 7.4 - (depth * 0.85));
+          const outgoingRotateX = -0.8 - (depth * 0.14);
+          const incomingRotate = (index % 2 === 0 ? 1.2 : -1.2) * Math.max(0.55, 1 - (depth * 0.16));
+          const incomingZ = -140 - (depth * 48);
+          const outgoingZ = 60 + (depth * 18);
           const childNodes = Array.from(node.children).filter((child) => child instanceof HTMLElement);
 
           gsapCore.fromTo(
             node,
             {
               y: incomingY,
+              yPercent: incomingYPercent,
+              z: incomingZ,
               scale: incomingScale,
+              rotateX: incomingRotateX,
               rotateZ: incomingRotate,
-              autoAlpha: 0.26,
+              autoAlpha: 0.44,
+              transformPerspective: 1600,
+              transformStyle: 'preserve-3d',
+              transformOrigin: '50% 40%',
               backfaceVisibility: 'hidden',
               willChange: 'transform, opacity',
               force3D: true
             },
             {
               y: outgoingY,
+              yPercent: outgoingYPercent,
+              z: outgoingZ,
               scale: outgoingScale,
+              rotateX: outgoingRotateX,
               rotateZ: 0,
               autoAlpha: 1,
               ease: 'none',
@@ -606,7 +646,7 @@
                 scroller: scroller === rootHost ? undefined : scroller,
                 start: `top ${startPoint}%`,
                 end: `bottom ${endPoint}%`,
-                scrub: 0.8,
+                scrub: 1.05,
                 invalidateOnRefresh: true
               }
             }
@@ -616,21 +656,21 @@
             gsapCore.fromTo(
               childNodes,
               {
-                y: 18 + (depth * 2),
-                autoAlpha: 0.62,
+                y: 26 + (depth * 4),
+                autoAlpha: 0.54,
                 force3D: true
               },
               {
                 y: 0,
                 autoAlpha: 1,
                 ease: 'none',
-                stagger: 0.035,
+                stagger: 0.055,
                 scrollTrigger: {
                   trigger: node,
                   scroller: scroller === rootHost ? undefined : scroller,
-                  start: `top ${Math.min(96, startPoint + 4)}%`,
-                  end: `center ${Math.max(38, endPoint + 8)}%`,
-                  scrub: 0.7,
+                  start: `top ${Math.min(98, startPoint + 8)}%`,
+                  end: `center ${Math.max(18, endPoint + 18)}%`,
+                  scrub: 0.95,
                   invalidateOnRefresh: true
                 }
               }
@@ -639,14 +679,38 @@
         });
       }, journalStageShellEl);
 
-      scrollTriggerPlugin.refresh();
+      scheduleRefresh();
     };
 
     const handleMotionPreferenceChange = () => {
-      applyMotion();
+      retryCount = 0;
+
+      if (applyFrame) {
+        cancelAnimationFrame(applyFrame);
+      }
+
+      const runMotion = () => {
+        if (cancelled) return;
+
+        if (parallaxTargets.size === 0 && retryCount < 6) {
+          retryCount += 1;
+          applyFrame = requestAnimationFrame(runMotion);
+          return;
+        }
+
+        applyFrame = null;
+        applyMotion();
+      };
+
+      applyFrame = requestAnimationFrame(runMotion);
     };
 
-    applyMotion();
+    handleMotionPreferenceChange();
+
+    resizeObserver = new ResizeObserver(() => {
+      scheduleRefresh();
+    });
+    resizeObserver.observe(journalViewEl);
 
     if (typeof motionQuery.addEventListener === 'function') {
       motionQuery.addEventListener('change', handleMotionPreferenceChange);
@@ -662,6 +726,11 @@
 
     return () => {
       cancelled = true;
+      if (applyFrame) {
+        cancelAnimationFrame(applyFrame);
+        applyFrame = null;
+      }
+      resizeObserver?.disconnect();
       teardownMotion();
       if (mainHost) {
         mainHost.style.overflow = previousMainOverflow;
@@ -1553,6 +1622,8 @@
     flex-direction: column;
     gap: 1.1rem;
     overflow: visible;
+    perspective: 1600px;
+    transform-style: preserve-3d;
   }
 
   .journal-parallax {
@@ -1561,6 +1632,7 @@
     opacity: 1;
     will-change: transform, opacity;
     backface-visibility: hidden;
+    transform-style: preserve-3d;
   }
 
   .journal-hero {
