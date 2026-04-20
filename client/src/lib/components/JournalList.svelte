@@ -27,10 +27,16 @@
     day: 'numeric'
   });
   const PAGE_SIZE = 5;
-  const parallaxTargets = new Map();
   let journalStageShellEl = $state(null);
   let journalStageEl = $state(null);
   let journalViewEl = $state(null);
+  let journalDeskStackEl = $state(null);
+  let journalProgressFillEl = $state(null);
+  let journalStatsPanelEl = $state(null);
+  let journalThemesPanelEl = $state(null);
+  let journalMoodPanelEl = $state(null);
+  let journalWinsPanelEl = $state(null);
+  let journalBlockersPanelEl = $state(null);
 
   function formatMonthLabel(monthValue) {
     const { year, month } = parseMonthValue(monthValue);
@@ -231,29 +237,6 @@
   let searchInputEl = $state(null);
   let summaryLibrarySectionEl = $state(null);
   let summaryLibraryHydrated = $state(false);
-
-  function registerParallax(node, config = {}) {
-    parallaxTargets.set(node, {
-      depth: 1,
-      blur: 0,
-      start: 0.92,
-      ...config
-    });
-
-    return {
-      update(nextConfig = {}) {
-        parallaxTargets.set(node, {
-          depth: 1,
-          blur: 0,
-          start: 0.92,
-          ...nextConfig
-        });
-      },
-      destroy() {
-        parallaxTargets.delete(node);
-      }
-    };
-  }
 
   let weekOptions = $derived.by(() => getWeekOptions($selectedMonth || monthValueFromDate()));
   let filteredEntries = $derived.by(() => {
@@ -493,50 +476,65 @@
   });
 
   onMount(() => {
-    if (typeof window === 'undefined' || !journalViewEl || !journalStageEl || !journalStageShellEl) return;
+    if (
+      typeof window === 'undefined' ||
+      !journalViewEl ||
+      !journalStageEl ||
+      !journalStageShellEl ||
+      !journalDeskStackEl
+    ) {
+      return;
+    }
 
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const compactQuery = window.matchMedia('(max-width: 980px)');
     const mainHost = document.querySelector('main#main-content');
     const rootHost = document.scrollingElement || document.documentElement;
     const scroller = mainHost && (mainHost.scrollHeight - mainHost.clientHeight > 2) ? mainHost : rootHost;
-    const previousMainOverflow = mainHost?.style.overflow ?? '';
     let cancelled = false;
     let gsapCore = null;
     let scrollTriggerPlugin = null;
     let gsapContext = null;
-    let refreshFrame = null;
-    let applyFrame = null;
-    let retryCount = 0;
-    let resizeObserver = null;
+
+    const getPanels = () =>
+      [
+        journalStatsPanelEl,
+        journalThemesPanelEl,
+        journalMoodPanelEl,
+        journalWinsPanelEl,
+        journalBlockersPanelEl
+      ].filter((panel) => panel instanceof HTMLElement && panel.isConnected);
 
     const clearInlineMotion = () => {
       journalStageShellEl.style.removeProperty('height');
       journalStageShellEl.style.removeProperty('min-height');
       journalStageEl.style.removeProperty('height');
       journalStageEl.style.removeProperty('min-height');
+      journalStageEl.style.removeProperty('padding-bottom');
       journalStageEl.style.removeProperty('overflow');
-      journalViewEl.style.removeProperty('transform');
+      journalViewEl.style.removeProperty('min-height');
       journalViewEl.style.removeProperty('will-change');
-      journalViewEl.style.removeProperty('padding-bottom');
+      journalDeskStackEl.style.removeProperty('height');
 
-      for (const node of parallaxTargets.keys()) {
-        if (!(node instanceof HTMLElement)) continue;
-        node.style.removeProperty('transform');
-        node.style.removeProperty('opacity');
-        node.style.removeProperty('will-change');
-        node.style.removeProperty('transform-origin');
-        node.style.removeProperty('transform-style');
-        node.style.removeProperty('backface-visibility');
+      if (journalProgressFillEl) {
+        journalProgressFillEl.style.removeProperty('transform');
+      }
+
+      for (const panel of getPanels()) {
+        panel.style.removeProperty('transform');
+        panel.style.removeProperty('opacity');
+        panel.style.removeProperty('position');
+        panel.style.removeProperty('inset');
+        panel.style.removeProperty('width');
+        panel.style.removeProperty('z-index');
+        panel.style.removeProperty('will-change');
+        panel.style.removeProperty('transform-origin');
+        panel.style.removeProperty('transform-style');
+        panel.style.removeProperty('backface-visibility');
       }
     };
 
     const teardownMotion = () => {
-      if (refreshFrame) {
-        cancelAnimationFrame(refreshFrame);
-        refreshFrame = null;
-      }
-
       if (gsapContext) {
         gsapContext.revert();
         gsapContext = null;
@@ -544,28 +542,12 @@
       clearInlineMotion();
     };
 
-    const scheduleRefresh = () => {
-      if (cancelled || !scrollTriggerPlugin) return;
-      if (refreshFrame) {
-        cancelAnimationFrame(refreshFrame);
-      }
-
-      refreshFrame = requestAnimationFrame(() => {
-        refreshFrame = null;
-        scrollTriggerPlugin?.refresh();
-      });
-    };
-
     const applyMotion = async () => {
       if (cancelled) return;
 
-      if (motionQuery.matches || compactQuery.matches || parallaxTargets.size === 0) {
+      if (motionQuery.matches || compactQuery.matches) {
         teardownMotion();
         return;
-      }
-
-      if (mainHost && scroller === rootHost) {
-        mainHost.style.overflow = 'visible';
       }
 
       if (!gsapCore || !scrollTriggerPlugin) {
@@ -585,132 +567,165 @@
       teardownMotion();
 
       gsapContext = gsapCore.context(() => {
-        gsapCore.set(journalStageShellEl, { clearProps: 'all' });
-        gsapCore.set(journalStageEl, { clearProps: 'all' });
-        gsapCore.set(journalViewEl, {
-          clearProps: 'all',
-          perspective: 1600,
-          transformStyle: 'preserve-3d'
+        const panels = getPanels();
+        if (panels.length === 0) return;
+
+        const scrollerTarget = scroller === rootHost ? undefined : scroller;
+        const getViewportHeight = () => (scroller === rootHost ? window.innerHeight : scroller.clientHeight);
+        const getViewportWidth = () => (scroller === rootHost ? window.innerWidth : scroller.clientWidth);
+        const getDeskHeight = () => {
+          const viewportHeight = getViewportHeight();
+          const viewportWidth = getViewportWidth();
+          const reservedHeight = viewportWidth < 900 ? 268 : 248;
+          return Math.max(320, Math.min(560, viewportHeight - reservedHeight));
+        };
+        const getSceneTravel = () => {
+          const viewportHeight = getViewportHeight();
+          const viewportWidth = getViewportWidth();
+          const stepDistance = viewportWidth < 1280
+            ? Math.max(360, viewportHeight * 0.9)
+            : Math.max(420, viewportHeight);
+          return stepDistance * Math.max(1, panels.length - 1);
+        };
+        const getStackState = (stackIndex) => ({
+          y: -34 - (stackIndex * 18),
+          scale: Math.max(0.9, 0.975 - (stackIndex * 0.02)),
+          rotation: stackIndex % 2 === 0 ? -0.65 : 0.55,
+          autoAlpha: Math.max(0.26, 0.34 - (stackIndex * 0.04)),
+          z: -60 - (stackIndex * 40),
+          zIndex: panels.length - stackIndex
         });
 
-        const orderedTargets = Array.from(parallaxTargets.entries());
+        gsapCore.set(journalStageEl, {
+          minHeight: () => `${getViewportHeight()}px`,
+          overflow: 'clip'
+        });
+        gsapCore.set(journalViewEl, {
+          minHeight: () => `${getViewportHeight()}px`
+        });
+        gsapCore.set(journalDeskStackEl, {
+          height: () => `${getDeskHeight()}px`
+        });
 
-        orderedTargets.forEach(([node, config], index) => {
-          if (!(node instanceof HTMLElement) || !node.isConnected) return;
+        if (journalProgressFillEl) {
+          gsapCore.set(journalProgressFillEl, {
+            scaleX: 0,
+            transformOrigin: '0% 50%'
+          });
+        }
 
-          const depth = Number(config.depth) || 1;
-          const startRatio = Number(config.start) || 0.92;
-          const startPoint = Math.round(Math.max(72, Math.min(96, startRatio * 100)));
-          const endPoint = Math.max(8, startPoint - 58);
-          const incomingY = 72 + (depth * 22);
-          const outgoingY = -22 - (depth * 8);
-          const incomingYPercent = 16 + (depth * 3.6);
-          const outgoingYPercent = -5 - (depth * 1.4);
-          const incomingScale = Math.max(0.88, 0.94 - (depth * 0.014));
-          const outgoingScale = 1.02 + (depth * 0.006);
-          const incomingRotateX = Math.max(1.2, 7.4 - (depth * 0.85));
-          const outgoingRotateX = -0.8 - (depth * 0.14);
-          const incomingRotate = (index % 2 === 0 ? 1.2 : -1.2) * Math.max(0.55, 1 - (depth * 0.16));
-          const incomingZ = -140 - (depth * 48);
-          const outgoingZ = 60 + (depth * 18);
-          const childNodes = Array.from(node.children).filter((child) => child instanceof HTMLElement);
+        gsapCore.set(panels, {
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          willChange: 'transform, opacity',
+          transformOrigin: '50% 18%',
+          transformStyle: 'preserve-3d',
+          backfaceVisibility: 'hidden',
+          force3D: true
+        });
 
-          gsapCore.fromTo(
-            node,
-            {
-              y: incomingY,
-              yPercent: incomingYPercent,
-              z: incomingZ,
-              scale: incomingScale,
-              rotateX: incomingRotateX,
-              rotateZ: incomingRotate,
-              autoAlpha: 0.44,
-              transformPerspective: 1600,
-              transformStyle: 'preserve-3d',
-              transformOrigin: '50% 40%',
-              backfaceVisibility: 'hidden',
-              willChange: 'transform, opacity',
-              force3D: true
-            },
-            {
-              y: outgoingY,
-              yPercent: outgoingYPercent,
-              z: outgoingZ,
-              scale: outgoingScale,
-              rotateX: outgoingRotateX,
-              rotateZ: 0,
-              autoAlpha: 1,
-              ease: 'none',
-              scrollTrigger: {
-                trigger: node,
-                scroller: scroller === rootHost ? undefined : scroller,
-                start: `top ${startPoint}%`,
-                end: `bottom ${endPoint}%`,
-                scrub: 1.05,
-                invalidateOnRefresh: true
-              }
-            }
-          );
+        gsapCore.set(panels[0], {
+          y: 0,
+          scale: 1,
+          rotation: 0,
+          autoAlpha: 1,
+          z: 0,
+          zIndex: panels.length + 12
+        });
 
-          if (childNodes.length > 1) {
-            gsapCore.fromTo(
-              childNodes,
-              {
-                y: 26 + (depth * 4),
-                autoAlpha: 0.54,
-                force3D: true
-              },
-              {
-                y: 0,
-                autoAlpha: 1,
-                ease: 'none',
-                stagger: 0.055,
-                scrollTrigger: {
-                  trigger: node,
-                  scroller: scroller === rootHost ? undefined : scroller,
-                  start: `top ${Math.min(98, startPoint + 8)}%`,
-                  end: `center ${Math.max(18, endPoint + 18)}%`,
-                  scrub: 0.95,
-                  invalidateOnRefresh: true
+        if (panels.length > 1) {
+          gsapCore.set(panels.slice(1), {
+            y: 108,
+            scale: 0.935,
+            rotation: 1,
+            autoAlpha: 0,
+            z: 140,
+            zIndex: 2
+          });
+        }
+
+        const timeline = gsapCore.timeline({
+          scrollTrigger: {
+            trigger: journalStageShellEl,
+            pin: journalStageEl,
+            scroller: scrollerTarget,
+            start: 'top top',
+            end: () => `+=${getSceneTravel()}`,
+            scrub: 1,
+            snap: panels.length > 1
+              ? {
+                  snapTo: 1 / (panels.length - 1),
+                  duration: { min: 0.16, max: 0.32 },
+                  ease: 'power1.inOut'
                 }
-              }
-            );
+              : false,
+            invalidateOnRefresh: true,
+            anticipatePin: 1
           }
         });
-      }, journalStageShellEl);
 
-      scheduleRefresh();
+        if (journalProgressFillEl) {
+          timeline.to(
+            journalProgressFillEl,
+            {
+              scaleX: 1,
+              duration: Math.max(1, panels.length - 1),
+              ease: 'none'
+            },
+            0
+          );
+        }
+
+        for (let step = 1; step < panels.length; step += 1) {
+          const activePanel = panels[step];
+          const stackedPanels = panels.slice(0, step).reverse();
+          const position = step - 1;
+
+          stackedPanels.forEach((panel, stackIndex) => {
+            timeline.to(
+              panel,
+              {
+                ...getStackState(stackIndex),
+                duration: 0.9,
+                ease: 'power2.inOut'
+              },
+              position
+            );
+          });
+
+          timeline.fromTo(
+            activePanel,
+            {
+              y: 96,
+              scale: 0.935,
+              rotation: step % 2 === 0 ? -0.9 : 0.9,
+              autoAlpha: 0,
+              z: 150,
+              zIndex: panels.length + 12 + step
+            },
+            {
+              y: 0,
+              scale: 1,
+              rotation: 0,
+              autoAlpha: 1,
+              z: 0,
+              duration: 0.96,
+              ease: 'power3.out'
+            },
+            position + 0.04
+          );
+        }
+
+        scrollTriggerPlugin.refresh();
+      }, journalStageShellEl);
     };
 
     const handleMotionPreferenceChange = () => {
-      retryCount = 0;
-
-      if (applyFrame) {
-        cancelAnimationFrame(applyFrame);
-      }
-
-      const runMotion = () => {
-        if (cancelled) return;
-
-        if (parallaxTargets.size === 0 && retryCount < 6) {
-          retryCount += 1;
-          applyFrame = requestAnimationFrame(runMotion);
-          return;
-        }
-
-        applyFrame = null;
-        applyMotion();
-      };
-
-      applyFrame = requestAnimationFrame(runMotion);
+      applyMotion();
     };
 
-    handleMotionPreferenceChange();
-
-    resizeObserver = new ResizeObserver(() => {
-      scheduleRefresh();
-    });
-    resizeObserver.observe(journalViewEl);
+    applyMotion();
 
     if (typeof motionQuery.addEventListener === 'function') {
       motionQuery.addEventListener('change', handleMotionPreferenceChange);
@@ -726,15 +741,7 @@
 
     return () => {
       cancelled = true;
-      if (applyFrame) {
-        cancelAnimationFrame(applyFrame);
-        applyFrame = null;
-      }
-      resizeObserver?.disconnect();
       teardownMotion();
-      if (mainHost) {
-        mainHost.style.overflow = previousMainOverflow;
-      }
 
       if (typeof motionQuery.removeEventListener === 'function') {
         motionQuery.removeEventListener('change', handleMotionPreferenceChange);
@@ -949,166 +956,179 @@
 <div class="journal-stage-shell" bind:this={journalStageShellEl}>
   <div class="journal-stage" bind:this={journalStageEl}>
     <div class="journal-view" bind:this={journalViewEl} aria-busy={$journal.loading || summaryLoading}>
-  <section
-    class="journal-hero journal-parallax animate-rise rise-1"
-    use:registerParallax={{ depth: 0.38, blur: 1.4, start: 0.96 }}
-  >
-    <div class="journal-hero-copy">
-      <span class="eyebrow">Journal workspace</span>
-      <h2>Journal Entries</h2>
-      <p class="journal-subtitle">
-        Move month by month, export what matters, and turn your notes into a clean weekly or monthly readout.
-      </p>
-    </div>
-
-    <div class="journal-hero-actions">
-      <button type="button" class="nav-chip" onclick={() => selectedMonth.shift(-1)} aria-label="Previous month">
-        Prev
-      </button>
-      <input
-        id="journal-month"
-        class="hero-month-input"
-        type="month"
-        bind:value={$selectedMonth}
-        aria-label="Select journal month"
-      />
-      <button type="button" class="nav-chip" onclick={() => selectedMonth.shift(1)} aria-label="Next month">
-        Next
-      </button>
-      <button class="btn btn-sm btn-primary hero-new-entry" onclick={openNewEntryForToday}>
-        New Entry
-      </button>
-    </div>
-  </section>
-
-  <section class="overview-strip animate-rise rise-2">
-    <article class="overview-card journal-parallax" use:registerParallax={{ depth: 0.72, blur: 1.1, start: 1 }}>
-      <span class="overview-label">Selected month</span>
-      <strong>{formatMonthLabel($selectedMonth)}</strong>
-      <p>{$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'} tracked</p>
-    </article>
-    <article class="overview-card journal-parallax" use:registerParallax={{ depth: 0.88, blur: 1.1, start: 1 }}>
-      <span class="overview-label">Hours logged</span>
-      <strong>{formatHoursValue(monthHours)}</strong>
-      <p>Across the current month</p>
-    </article>
-    <article class="overview-card journal-parallax" use:registerParallax={{ depth: 1.04, blur: 1.1, start: 1 }}>
-      <span class="overview-label">Finished days</span>
-      <strong>{monthFinishedCount}</strong>
-      <p>Locked and completed</p>
-    </article>
-  </section>
-
-  <section class="insights-grid animate-rise rise-3">
-    <article class="insights-panel card glass-card journal-parallax" use:registerParallax={{ depth: 0.92, blur: 1.35, start: 0.98 }}>
-      <div class="panel-header">
-        <div>
-          <span class="panel-kicker">Recurring themes</span>
-          <h3>What keeps showing up</h3>
+      <section class="journal-hero animate-rise rise-1">
+        <div class="journal-hero-copy">
+          <span class="eyebrow">Journal workspace</span>
+          <h2>Journal Entries</h2>
+          <p class="journal-subtitle">
+            Move month by month, export what matters, and turn your notes into a clean weekly or monthly readout.
+          </p>
         </div>
+
+        <div class="journal-hero-actions">
+          <button type="button" class="nav-chip" onclick={() => selectedMonth.shift(-1)} aria-label="Previous month">
+            Prev
+          </button>
+          <input
+            id="journal-month"
+            class="hero-month-input"
+            type="month"
+            bind:value={$selectedMonth}
+            aria-label="Select journal month"
+          />
+          <button type="button" class="nav-chip" onclick={() => selectedMonth.shift(1)} aria-label="Next month">
+            Next
+          </button>
+          <button class="btn btn-sm btn-primary hero-new-entry" onclick={openNewEntryForToday}>
+            New Entry
+          </button>
+        </div>
+      </section>
+
+      <div class="journal-progress-track" aria-hidden="true">
+        <span class="journal-progress-fill" bind:this={journalProgressFillEl}></span>
       </div>
 
-      {#if journalInsights.recurringThemes.length > 0}
-        <div class="theme-chip-list">
-          {#each journalInsights.recurringThemes as theme}
-            <span class="theme-chip">
-              <strong>{theme.label}</strong>
-              <span>{theme.count}x</span>
-            </span>
-          {/each}
-        </div>
-      {:else}
-        <div class="insights-empty">
-          <strong>Themes appear once your entries have more detail.</strong>
-          <p>Add a few fuller notes and the journal will start surfacing repeated work patterns here.</p>
-        </div>
-      {/if}
-    </article>
+      <div class="journal-desk">
+        <div class="journal-desk-stack" bind:this={journalDeskStackEl}>
+          <section class="journal-scene-panel journal-scene-panel-stats card glass-card" bind:this={journalStatsPanelEl}>
+            <div class="journal-scene-meta">
+              <span class="panel-kicker">Month snapshot</span>
+              <h3>Current desk view</h3>
+            </div>
 
-    <article class="insights-panel card glass-card journal-parallax" use:registerParallax={{ depth: 1.05, blur: 1.35, start: 0.98 }}>
-      <div class="panel-header">
-        <div>
-          <span class="panel-kicker">Mood + workload</span>
-          <h3>How the month feels</h3>
-        </div>
-      </div>
+            <div class="overview-strip desk-overview-strip">
+              <article class="overview-card">
+                <span class="overview-label">Selected month</span>
+                <strong>{formatMonthLabel($selectedMonth)}</strong>
+                <p>{$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'} tracked</p>
+              </article>
+              <article class="overview-card">
+                <span class="overview-label">Hours logged</span>
+                <strong>{formatHoursValue(monthHours)}</strong>
+                <p>Across the current month</p>
+              </article>
+              <article class="overview-card">
+                <span class="overview-label">Finished days</span>
+                <strong>{monthFinishedCount}</strong>
+                <p>Locked and completed</p>
+              </article>
+            </div>
+          </section>
 
-      {#if journalInsights.workloadTrend.length > 0}
-        <div class="trend-list">
-          {#each journalInsights.workloadTrend as week}
-            <div class="trend-row">
-              <div class="trend-copy">
-                <strong>{week.label}</strong>
-                <span>{week.entries} entr{week.entries === 1 ? 'y' : 'ies'} | {week.tone}</span>
+          <article class="journal-scene-panel insights-panel card glass-card" bind:this={journalThemesPanelEl}>
+            <div class="panel-header">
+              <div>
+                <span class="panel-kicker">Recurring themes</span>
+                <h3>What keeps showing up</h3>
               </div>
-              <div class="trend-bar-shell" aria-hidden="true">
-                <span class="trend-bar-fill" style={`width: ${Math.min(100, Math.max(14, week.hours * 10))}%`}></span>
+            </div>
+
+            {#if journalInsights.recurringThemes.length > 0}
+              <div class="theme-chip-list">
+                {#each journalInsights.recurringThemes as theme}
+                  <span class="theme-chip">
+                    <strong>{theme.label}</strong>
+                    <span>{theme.count}x</span>
+                  </span>
+                {/each}
               </div>
-              <span class="trend-hours">{formatHoursValue(week.hours)}h</span>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <div class="insights-empty">
-          <strong>No trend line yet.</strong>
-          <p>Once you log a few entries, this section will show how busy each week looked and how the writing tone shifted.</p>
-        </div>
-      {/if}
-    </article>
+            {:else}
+              <div class="insights-empty">
+                <strong>Themes appear once your entries have more detail.</strong>
+                <p>Add a few fuller notes and the journal will start surfacing repeated work patterns here.</p>
+              </div>
+            {/if}
+          </article>
 
-    <article class="insights-panel card glass-card journal-parallax" use:registerParallax={{ depth: 1.18, blur: 1.45, start: 0.98 }}>
-      <div class="panel-header">
-        <div>
-          <span class="panel-kicker">Top wins</span>
-          <h3>Work worth keeping</h3>
+          <article class="journal-scene-panel insights-panel card glass-card" bind:this={journalMoodPanelEl}>
+            <div class="panel-header">
+              <div>
+                <span class="panel-kicker">Mood + workload</span>
+                <h3>How the month feels</h3>
+              </div>
+            </div>
+
+            {#if journalInsights.workloadTrend.length > 0}
+              <div class="trend-list">
+                {#each journalInsights.workloadTrend as week}
+                  <div class="trend-row">
+                    <div class="trend-copy">
+                      <strong>{week.label}</strong>
+                      <span>{week.entries} entr{week.entries === 1 ? 'y' : 'ies'} | {week.tone}</span>
+                    </div>
+                    <div class="trend-bar-shell" aria-hidden="true">
+                      <span class="trend-bar-fill" style={`width: ${Math.min(100, Math.max(14, week.hours * 10))}%`}></span>
+                    </div>
+                    <span class="trend-hours">{formatHoursValue(week.hours)}h</span>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="insights-empty">
+                <strong>No trend line yet.</strong>
+                <p>Once you log a few entries, this section will show how busy each week looked and how the writing tone shifted.</p>
+              </div>
+            {/if}
+          </article>
+
+          <article class="journal-scene-panel insights-panel card glass-card" bind:this={journalWinsPanelEl}>
+            <div class="panel-header">
+              <div>
+                <span class="panel-kicker">Top wins</span>
+                <h3>Work worth keeping</h3>
+              </div>
+            </div>
+
+            {#if journalInsights.topWins.length > 0}
+              <div class="insight-note-list">
+                {#each journalInsights.topWins as win}
+                  <div class="insight-note insight-note-win">
+                    <p>{win}</p>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="insights-empty">
+                <strong>No wins captured yet.</strong>
+                <p>Use a sentence or two when you finish something meaningful so the month can surface it back to you.</p>
+              </div>
+            {/if}
+          </article>
+
+          <article class="journal-scene-panel insights-panel card glass-card" bind:this={journalBlockersPanelEl}>
+            <div class="panel-header">
+              <div>
+                <span class="panel-kicker">Blockers</span>
+                <h3>What slowed you down</h3>
+              </div>
+            </div>
+
+            {#if journalInsights.blockers.length > 0}
+              <div class="insight-note-list">
+                {#each journalInsights.blockers as blocker}
+                  <div class="insight-note insight-note-blocker">
+                    <p>{blocker}</p>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="insights-empty">
+                <strong>No clear blockers spotted.</strong>
+                <p>Your recent notes read as steady progress, without repeated friction surfacing in the writing.</p>
+              </div>
+            {/if}
+          </article>
         </div>
       </div>
+    </div>
+  </div>
+</div>
 
-      {#if journalInsights.topWins.length > 0}
-        <div class="insight-note-list">
-          {#each journalInsights.topWins as win}
-            <div class="insight-note insight-note-win">
-              <p>{win}</p>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <div class="insights-empty">
-          <strong>No wins captured yet.</strong>
-          <p>Use a sentence or two when you finish something meaningful so the month can surface it back to you.</p>
-        </div>
-      {/if}
-    </article>
-
-    <article class="insights-panel card glass-card journal-parallax" use:registerParallax={{ depth: 1.28, blur: 1.45, start: 0.98 }}>
-      <div class="panel-header">
-        <div>
-          <span class="panel-kicker">Blockers</span>
-          <h3>What slowed you down</h3>
-        </div>
-      </div>
-
-      {#if journalInsights.blockers.length > 0}
-        <div class="insight-note-list">
-          {#each journalInsights.blockers as blocker}
-            <div class="insight-note insight-note-blocker">
-              <p>{blocker}</p>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <div class="insights-empty">
-          <strong>No clear blockers spotted.</strong>
-          <p>Your recent notes read as steady progress, without repeated friction surfacing in the writing.</p>
-        </div>
-      {/if}
-    </article>
-  </section>
-
+<div class="journal-afterflow">
   <section class="workspace-grid animate-rise rise-4">
     <div
-      class="journal-controls card glass-card journal-parallax"
-      use:registerParallax={{ depth: 1.1, blur: 0.85, start: 0.98 }}
+      class="journal-controls card glass-card"
     >
       <div class="panel-header">
         <div>
@@ -1145,9 +1165,8 @@
     </div>
 
     <div
-      class="summary-panel card glass-card journal-parallax"
+      class="summary-panel card glass-card"
       aria-live="polite"
-      use:registerParallax={{ depth: 1.22, blur: 0.85, start: 0.98 }}
     >
       <div class="summary-topline">
         <div>
@@ -1264,9 +1283,8 @@
   </section>
 
   <section
-    class="summary-library-shell card glass-card animate-rise rise-5 journal-parallax"
+    class="summary-library-shell card glass-card animate-rise rise-5"
     bind:this={summaryLibrarySectionEl}
-    use:registerParallax={{ depth: 1.3, blur: 0.8, start: 0.985 }}
   >
     <div class="summary-library-header">
       <div>
@@ -1330,8 +1348,7 @@
   </section>
 
   <div
-    class="search-shell animate-rise rise-6 journal-parallax"
-    use:registerParallax={{ depth: 1.36, blur: 0.68, start: 0.99 }}
+    class="search-shell animate-rise rise-6"
   >
     <input
       bind:this={searchInputEl}
@@ -1344,9 +1361,8 @@
   </div>
 
   <section
-    class="entries-shell card glass-card animate-rise rise-6 journal-parallax"
+    class="entries-shell card glass-card animate-rise rise-6"
     aria-live="polite"
-    use:registerParallax={{ depth: 1.42, blur: 0.72, start: 1 }}
   >
     <div class="entries-toolbar">
       <div>
@@ -1524,8 +1540,6 @@
       {/if}
     </div>
   </section>
-    </div>
-  </div>
 </div>
 
 {#if showSummaryModal && modalSummary}
@@ -1616,23 +1630,12 @@
     flex: 1;
     max-width: 1120px;
     margin: 0 auto;
-    padding: 2rem 2.25rem 5rem;
+    padding: 2rem 2.25rem 1.75rem;
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 1.1rem;
+    gap: 0.9rem;
     overflow: visible;
-    perspective: 1600px;
-    transform-style: preserve-3d;
-  }
-
-  .journal-parallax {
-    transform: translate3d(0, 0, 0) scale(1);
-    transform-origin: center center;
-    opacity: 1;
-    will-change: transform, opacity;
-    backface-visibility: hidden;
-    transform-style: preserve-3d;
   }
 
   .journal-hero {
@@ -1645,6 +1648,74 @@
     background: rgba(255, 255, 255, 0.96);
     border: 1px solid rgba(190, 53, 25, 0.14);
     box-shadow: 0 10px 22px rgba(34, 24, 8, 0.05);
+  }
+
+  .journal-progress-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(190, 53, 25, 0.08);
+  }
+
+  .journal-progress-fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--red);
+    transform: scaleX(0);
+  }
+
+  .journal-desk {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    perspective: 1680px;
+    perspective-origin: center 18%;
+    transform-style: preserve-3d;
+    padding: 0.4rem 0 0.6rem;
+  }
+
+  .journal-desk-stack {
+    position: relative;
+    width: min(100%, 900px);
+  }
+
+  .journal-scene-panel {
+    position: relative;
+    border-radius: 20px;
+    border: 1px solid rgba(190, 53, 25, 0.12);
+    background: rgba(255, 254, 248, 0.98);
+    box-shadow: 0 16px 28px rgba(34, 24, 8, 0.06);
+    padding: 1.25rem 1.35rem;
+  }
+
+  .journal-scene-panel-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .journal-scene-meta h3 {
+    margin: 0.35rem 0 0;
+    font-size: clamp(1.55rem, 2.5vw, 2rem);
+    color: var(--red);
+  }
+
+  .desk-overview-strip .overview-card {
+    min-height: 0;
+  }
+
+  .journal-afterflow {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 2.25rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
 
   .eyebrow,
@@ -1733,12 +1804,6 @@
   .overview-strip {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .insights-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
   }
 
@@ -2657,17 +2722,36 @@
       padding: 2.25rem 1.75rem 3rem;
     }
 
-    .journal-parallax {
-      transform: none !important;
-      filter: none !important;
-      opacity: 1 !important;
-    }
-
     .journal-hero,
-    .insights-grid,
     .workspace-grid,
     .overview-strip {
       grid-template-columns: 1fr;
+    }
+
+    .journal-desk {
+      display: block;
+      padding: 0;
+      perspective: none;
+    }
+
+    .journal-desk-stack {
+      position: static;
+      width: 100%;
+      height: auto !important;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .journal-scene-panel {
+      position: relative !important;
+      inset: auto !important;
+      transform: none !important;
+      opacity: 1 !important;
+      z-index: auto !important;
+    }
+
+    .journal-afterflow {
+      padding: 0 1.75rem 3rem;
     }
 
     .journal-hero-actions {
@@ -2682,6 +2766,10 @@
 
     .journal-hero {
       padding: 1.2rem;
+    }
+
+    .journal-scene-panel {
+      padding: 1.1rem;
     }
 
     .journal-hero-actions,
@@ -2750,6 +2838,10 @@
       flex: 1;
       justify-content: center;
     }
+
+    .journal-afterflow {
+      padding: 0 1.25rem 2.5rem;
+    }
   }
 
   @media (max-width: 480px) {
@@ -2777,6 +2869,10 @@
     .summary-modal-body {
       min-height: 12rem;
       padding: 1rem;
+    }
+
+    .journal-afterflow {
+      padding: 0 1rem 2rem;
     }
   }
 
@@ -2873,9 +2969,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .journal-parallax {
+    .journal-scene-panel {
       transform: none !important;
-      filter: none !important;
       opacity: 1 !important;
       transition: none;
       will-change: auto;
