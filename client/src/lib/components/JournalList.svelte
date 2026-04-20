@@ -30,13 +30,8 @@
   let journalStageShellEl = $state(null);
   let journalStageEl = $state(null);
   let journalViewEl = $state(null);
-  let journalDeskStackEl = $state(null);
+  let journalDeskScrollerEl = $state(null);
   let journalProgressFillEl = $state(null);
-  let journalStatsPanelEl = $state(null);
-  let journalThemesPanelEl = $state(null);
-  let journalMoodPanelEl = $state(null);
-  let journalWinsPanelEl = $state(null);
-  let journalBlockersPanelEl = $state(null);
 
   function formatMonthLabel(monthValue) {
     const { year, month } = parseMonthValue(monthValue);
@@ -478,281 +473,111 @@
   onMount(() => {
     if (
       typeof window === 'undefined' ||
-      !journalViewEl ||
-      !journalStageEl ||
       !journalStageShellEl ||
-      !journalDeskStackEl
-    ) {
-      return;
-    }
+      !journalStageEl ||
+      !journalViewEl ||
+      !journalDeskScrollerEl
+    ) return;
 
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const compactQuery = window.matchMedia('(max-width: 980px)');
-    const mainHost = document.querySelector('main#main-content');
-    const rootHost = document.scrollingElement || document.documentElement;
-    const scroller = mainHost && (mainHost.scrollHeight - mainHost.clientHeight > 2) ? mainHost : rootHost;
-    let cancelled = false;
-    let gsapCore = null;
-    let scrollTriggerPlugin = null;
-    let gsapContext = null;
+    const desktopQuery = window.matchMedia('(min-width: 981px)');
+    let resizeObserver = null;
+    let ticking = false;
 
-    const getPanels = () =>
-      [
-        journalStatsPanelEl,
-        journalThemesPanelEl,
-        journalMoodPanelEl,
-        journalWinsPanelEl,
-        journalBlockersPanelEl
-      ].filter((panel) => panel instanceof HTMLElement && panel.isConnected);
-
-    const clearInlineMotion = () => {
-      journalStageShellEl.style.removeProperty('height');
-      journalStageShellEl.style.removeProperty('min-height');
-      journalStageEl.style.removeProperty('height');
-      journalStageEl.style.removeProperty('min-height');
-      journalStageEl.style.removeProperty('padding-bottom');
-      journalStageEl.style.removeProperty('overflow');
-      journalViewEl.style.removeProperty('min-height');
-      journalViewEl.style.removeProperty('will-change');
-      journalDeskStackEl.style.removeProperty('height');
-
-      if (journalProgressFillEl) {
-        journalProgressFillEl.style.removeProperty('transform');
-      }
-
-      for (const panel of getPanels()) {
-        panel.style.removeProperty('transform');
-        panel.style.removeProperty('opacity');
-        panel.style.removeProperty('position');
-        panel.style.removeProperty('inset');
-        panel.style.removeProperty('width');
-        panel.style.removeProperty('z-index');
-        panel.style.removeProperty('will-change');
-        panel.style.removeProperty('transform-origin');
-        panel.style.removeProperty('transform-style');
-        panel.style.removeProperty('backface-visibility');
-      }
+    const updateProgress = () => {
+      if (!journalProgressFillEl || !journalDeskScrollerEl) return;
+      const maxScrollLeft = Math.max(1, journalDeskScrollerEl.scrollWidth - journalDeskScrollerEl.clientWidth);
+      const ratio = Math.min(1, Math.max(0, journalDeskScrollerEl.scrollLeft / maxScrollLeft));
+      journalProgressFillEl.style.transform = `scaleX(${ratio})`;
     };
 
-    const teardownMotion = () => {
-      if (gsapContext) {
-        gsapContext.revert();
-        gsapContext = null;
-      }
-      clearInlineMotion();
+    const queueProgress = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        updateProgress();
+      });
     };
 
-    const applyMotion = async () => {
-      if (cancelled) return;
+    const handleWheel = (event) => {
+      if (!desktopQuery.matches || motionQuery.matches || !journalDeskScrollerEl) return;
+      const { deltaX, deltaY } = event;
+      if (Math.abs(deltaY) <= Math.abs(deltaX)) return;
 
-      if (motionQuery.matches || compactQuery.matches) {
-        teardownMotion();
+      const maxScrollLeft = journalDeskScrollerEl.scrollWidth - journalDeskScrollerEl.clientWidth;
+      if (maxScrollLeft <= 0) return;
+
+      const currentLeft = journalDeskScrollerEl.scrollLeft;
+      const nextLeft = Math.min(maxScrollLeft, Math.max(0, currentLeft + deltaY));
+      const movingForward = deltaY > 0 && currentLeft < maxScrollLeft;
+      const movingBackward = deltaY < 0 && currentLeft > 0;
+
+      if (!movingForward && !movingBackward) return;
+
+      event.preventDefault();
+      journalDeskScrollerEl.scrollTo({
+        left: nextLeft,
+        behavior: motionQuery.matches ? 'auto' : 'smooth'
+      });
+    };
+
+    const syncStageHeight = () => {
+      if (!journalStageEl || !journalViewEl) return;
+
+      if (!desktopQuery.matches) {
+        journalStageShellEl.style.removeProperty('min-height');
+        journalStageEl.style.removeProperty('min-height');
+        journalViewEl.style.removeProperty('min-height');
         return;
       }
 
-      if (!gsapCore || !scrollTriggerPlugin) {
-        const [gsapModule, scrollTriggerModule] = await Promise.all([
-          import('gsap'),
-          import('gsap/ScrollTrigger')
-        ]);
-
-        if (cancelled) return;
-
-        gsapCore = gsapModule.gsap || gsapModule.default || gsapModule;
-        scrollTriggerPlugin =
-          scrollTriggerModule.ScrollTrigger || scrollTriggerModule.default || scrollTriggerModule;
-        gsapCore.registerPlugin(scrollTriggerPlugin);
-      }
-
-      teardownMotion();
-
-      gsapContext = gsapCore.context(() => {
-        const panels = getPanels();
-        if (panels.length === 0) return;
-
-        const scrollerTarget = scroller === rootHost ? undefined : scroller;
-        const getViewportHeight = () => (scroller === rootHost ? window.innerHeight : scroller.clientHeight);
-        const getViewportWidth = () => (scroller === rootHost ? window.innerWidth : scroller.clientWidth);
-        const getDeskHeight = () => {
-          const viewportHeight = getViewportHeight();
-          const viewportWidth = getViewportWidth();
-          const reservedHeight = viewportWidth < 900 ? 268 : 248;
-          return Math.max(320, Math.min(560, viewportHeight - reservedHeight));
-        };
-        const getSceneTravel = () => {
-          const viewportHeight = getViewportHeight();
-          const viewportWidth = getViewportWidth();
-          const stepDistance = viewportWidth < 1280
-            ? Math.max(360, viewportHeight * 0.9)
-            : Math.max(420, viewportHeight);
-          return stepDistance * Math.max(1, panels.length - 1);
-        };
-        const getStackState = (stackIndex) => ({
-          y: -34 - (stackIndex * 18),
-          scale: Math.max(0.9, 0.975 - (stackIndex * 0.02)),
-          rotation: stackIndex % 2 === 0 ? -0.65 : 0.55,
-          autoAlpha: Math.max(0.26, 0.34 - (stackIndex * 0.04)),
-          z: -60 - (stackIndex * 40),
-          zIndex: panels.length - stackIndex
-        });
-
-        gsapCore.set(journalStageEl, {
-          minHeight: () => `${getViewportHeight()}px`,
-          overflow: 'clip'
-        });
-        gsapCore.set(journalViewEl, {
-          minHeight: () => `${getViewportHeight()}px`
-        });
-        gsapCore.set(journalDeskStackEl, {
-          height: () => `${getDeskHeight()}px`
-        });
-
-        if (journalProgressFillEl) {
-          gsapCore.set(journalProgressFillEl, {
-            scaleX: 0,
-            transformOrigin: '0% 50%'
-          });
-        }
-
-        gsapCore.set(panels, {
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          willChange: 'transform, opacity',
-          transformOrigin: '50% 18%',
-          transformStyle: 'preserve-3d',
-          backfaceVisibility: 'hidden',
-          force3D: true
-        });
-
-        gsapCore.set(panels[0], {
-          y: 0,
-          scale: 1,
-          rotation: 0,
-          autoAlpha: 1,
-          z: 0,
-          zIndex: panels.length + 12
-        });
-
-        if (panels.length > 1) {
-          gsapCore.set(panels.slice(1), {
-            y: 108,
-            scale: 0.935,
-            rotation: 1,
-            autoAlpha: 0,
-            z: 140,
-            zIndex: 2
-          });
-        }
-
-        const timeline = gsapCore.timeline({
-          scrollTrigger: {
-            trigger: journalStageShellEl,
-            pin: journalStageEl,
-            scroller: scrollerTarget,
-            start: 'top top',
-            end: () => `+=${getSceneTravel()}`,
-            scrub: 1,
-            snap: panels.length > 1
-              ? {
-                  snapTo: 1 / (panels.length - 1),
-                  duration: { min: 0.16, max: 0.32 },
-                  ease: 'power1.inOut'
-                }
-              : false,
-            invalidateOnRefresh: true,
-            anticipatePin: 1
-          }
-        });
-
-        if (journalProgressFillEl) {
-          timeline.to(
-            journalProgressFillEl,
-            {
-              scaleX: 1,
-              duration: Math.max(1, panels.length - 1),
-              ease: 'none'
-            },
-            0
-          );
-        }
-
-        for (let step = 1; step < panels.length; step += 1) {
-          const activePanel = panels[step];
-          const stackedPanels = panels.slice(0, step).reverse();
-          const position = step - 1;
-
-          stackedPanels.forEach((panel, stackIndex) => {
-            timeline.to(
-              panel,
-              {
-                ...getStackState(stackIndex),
-                duration: 0.9,
-                ease: 'power2.inOut'
-              },
-              position
-            );
-          });
-
-          timeline.fromTo(
-            activePanel,
-            {
-              y: 96,
-              scale: 0.935,
-              rotation: step % 2 === 0 ? -0.9 : 0.9,
-              autoAlpha: 0,
-              z: 150,
-              zIndex: panels.length + 12 + step
-            },
-            {
-              y: 0,
-              scale: 1,
-              rotation: 0,
-              autoAlpha: 1,
-              z: 0,
-              duration: 0.96,
-              ease: 'power3.out'
-            },
-            position + 0.04
-          );
-        }
-
-        scrollTriggerPlugin.refresh();
-      }, journalStageShellEl);
+      const viewportHeight = window.innerHeight;
+      const stageHeight = Math.max(560, viewportHeight - 20);
+      journalStageShellEl.style.minHeight = `${stageHeight}px`;
+      journalStageEl.style.minHeight = `${stageHeight}px`;
+      journalViewEl.style.minHeight = `${stageHeight - 24}px`;
     };
 
-    const handleMotionPreferenceChange = () => {
-      applyMotion();
+    const handleLayoutChange = () => {
+      syncStageHeight();
+      queueProgress();
     };
 
-    applyMotion();
+    syncStageHeight();
+    updateProgress();
+
+    journalDeskScrollerEl.addEventListener('scroll', queueProgress, { passive: true });
+    journalDeskScrollerEl.addEventListener('wheel', handleWheel, { passive: false });
 
     if (typeof motionQuery.addEventListener === 'function') {
-      motionQuery.addEventListener('change', handleMotionPreferenceChange);
+      motionQuery.addEventListener('change', handleLayoutChange);
+      desktopQuery.addEventListener('change', handleLayoutChange);
     } else {
-      motionQuery.addListener(handleMotionPreferenceChange);
+      motionQuery.addListener(handleLayoutChange);
+      desktopQuery.addListener(handleLayoutChange);
     }
 
-    if (typeof compactQuery.addEventListener === 'function') {
-      compactQuery.addEventListener('change', handleMotionPreferenceChange);
-    } else {
-      compactQuery.addListener(handleMotionPreferenceChange);
-    }
+    resizeObserver = new ResizeObserver(() => {
+      handleLayoutChange();
+    });
+    resizeObserver.observe(journalDeskScrollerEl);
+    resizeObserver.observe(journalViewEl);
+
+    window.addEventListener('resize', handleLayoutChange);
 
     return () => {
-      cancelled = true;
-      teardownMotion();
+      resizeObserver?.disconnect();
+      journalDeskScrollerEl?.removeEventListener('scroll', queueProgress);
+      journalDeskScrollerEl?.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('resize', handleLayoutChange);
 
       if (typeof motionQuery.removeEventListener === 'function') {
-        motionQuery.removeEventListener('change', handleMotionPreferenceChange);
+        motionQuery.removeEventListener('change', handleLayoutChange);
+        desktopQuery.removeEventListener('change', handleLayoutChange);
       } else {
-        motionQuery.removeListener(handleMotionPreferenceChange);
-      }
-
-      if (typeof compactQuery.removeEventListener === 'function') {
-        compactQuery.removeEventListener('change', handleMotionPreferenceChange);
-      } else {
-        compactQuery.removeListener(handleMotionPreferenceChange);
+        motionQuery.removeListener(handleLayoutChange);
+        desktopQuery.removeListener(handleLayoutChange);
       }
     };
   });
@@ -990,8 +815,14 @@
       </div>
 
       <div class="journal-desk">
-        <div class="journal-desk-stack" bind:this={journalDeskStackEl}>
-          <section class="journal-scene-panel journal-scene-panel-stats card glass-card" bind:this={journalStatsPanelEl}>
+        <div
+          class="journal-desk-scroller"
+          bind:this={journalDeskScrollerEl}
+          role="region"
+          aria-label="Journal workspace panels"
+        >
+          <div class="journal-desk-stack">
+          <section class="journal-scene-panel journal-scene-panel-stats card glass-card">
             <div class="journal-scene-meta">
               <span class="panel-kicker">Month snapshot</span>
               <h3>Current desk view</h3>
@@ -1016,7 +847,7 @@
             </div>
           </section>
 
-          <article class="journal-scene-panel insights-panel card glass-card" bind:this={journalThemesPanelEl}>
+          <article class="journal-scene-panel insights-panel card glass-card">
             <div class="panel-header">
               <div>
                 <span class="panel-kicker">Recurring themes</span>
@@ -1041,7 +872,7 @@
             {/if}
           </article>
 
-          <article class="journal-scene-panel insights-panel card glass-card" bind:this={journalMoodPanelEl}>
+          <article class="journal-scene-panel insights-panel card glass-card">
             <div class="panel-header">
               <div>
                 <span class="panel-kicker">Mood + workload</span>
@@ -1072,7 +903,7 @@
             {/if}
           </article>
 
-          <article class="journal-scene-panel insights-panel card glass-card" bind:this={journalWinsPanelEl}>
+          <article class="journal-scene-panel insights-panel card glass-card">
             <div class="panel-header">
               <div>
                 <span class="panel-kicker">Top wins</span>
@@ -1096,7 +927,7 @@
             {/if}
           </article>
 
-          <article class="journal-scene-panel insights-panel card glass-card" bind:this={journalBlockersPanelEl}>
+          <article class="journal-scene-panel insights-panel card glass-card">
             <div class="panel-header">
               <div>
                 <span class="panel-kicker">Blockers</span>
@@ -1119,6 +950,7 @@
               </div>
             {/if}
           </article>
+          </div>
         </div>
       </div>
     </div>
@@ -1616,14 +1448,16 @@
   .journal-stage-shell {
     position: relative;
     width: 100%;
+    min-height: calc(100dvh - 1rem);
   }
 
   .journal-stage {
-    position: relative;
+    position: sticky;
+    top: 0;
     width: 100%;
     display: flex;
     justify-content: center;
-    overflow: visible;
+    overflow: clip;
   }
 
   .journal-view {
@@ -1670,22 +1504,45 @@
   .journal-desk {
     flex: 1;
     display: flex;
-    align-items: center;
-    justify-content: center;
     min-height: 0;
-    perspective: 1680px;
-    perspective-origin: center 18%;
-    transform-style: preserve-3d;
-    padding: 0.4rem 0 0.6rem;
+    padding: 0.4rem 0 0.15rem;
+  }
+
+  .journal-desk-scroller {
+    width: 100%;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0.35rem;
+  }
+
+  .journal-desk-scroller::-webkit-scrollbar {
+    display: none;
+  }
+
+  .journal-desk-scroller:focus-visible {
+    outline: 2px solid rgba(190, 53, 25, 0.28);
+    outline-offset: 6px;
+    border-radius: 24px;
   }
 
   .journal-desk-stack {
-    position: relative;
-    width: min(100%, 900px);
+    display: flex;
+    gap: 1rem;
+    width: max-content;
+    min-width: 100%;
   }
 
   .journal-scene-panel {
     position: relative;
+    flex: 0 0 min(76vw, 860px);
+    min-height: clamp(300px, 50vh, 480px);
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
     border-radius: 20px;
     border: 1px solid rgba(190, 53, 25, 0.12);
     background: rgba(255, 254, 248, 0.98);
@@ -2722,32 +2579,45 @@
       padding: 2.25rem 1.75rem 3rem;
     }
 
+    .journal-stage-shell {
+      min-height: 0;
+    }
+
     .journal-hero,
     .workspace-grid,
     .overview-strip {
       grid-template-columns: 1fr;
     }
 
+    .journal-stage {
+      position: relative;
+      top: auto;
+      overflow: visible;
+    }
+
     .journal-desk {
       display: block;
       padding: 0;
-      perspective: none;
+    }
+
+    .journal-desk-scroller {
+      overflow: visible;
+      scroll-snap-type: none;
+      padding-bottom: 0;
+      scrollbar-width: auto;
     }
 
     .journal-desk-stack {
-      position: static;
       width: 100%;
-      height: auto !important;
+      min-width: 0;
       display: grid;
       gap: 1rem;
     }
 
     .journal-scene-panel {
-      position: relative !important;
-      inset: auto !important;
-      transform: none !important;
-      opacity: 1 !important;
-      z-index: auto !important;
+      flex: none;
+      min-height: 0;
+      scroll-snap-align: none;
     }
 
     .journal-afterflow {
@@ -2969,11 +2839,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .journal-scene-panel {
-      transform: none !important;
-      opacity: 1 !important;
-      transition: none;
-      will-change: auto;
+    .journal-desk-scroller {
+      scroll-behavior: auto;
     }
   }
 </style>
