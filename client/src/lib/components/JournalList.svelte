@@ -482,6 +482,8 @@
     const cleanupFns = [];
 
     const ctx = gsap.context(() => {
+      const parallaxSections = gsap.utils.toArray('[data-journal-parallax-section]');
+
       const heroTimeline = gsap.timeline({
         defaults: {
           duration: 0.78,
@@ -524,146 +526,134 @@
 
       gsap.utils.toArray('[data-journal-accent]').forEach((accent, index) => {
         gsap.to(accent, {
-          yPercent: index % 2 === 0 ? -14 : 14,
-          xPercent: index % 2 === 0 ? 6 : -6,
-          rotate: index % 2 === 0 ? -3 : 3,
+          yPercent: index % 2 === 0 ? -5 : 5,
+          xPercent: index % 2 === 0 ? 2 : -2,
+          rotate: index % 2 === 0 ? -1.1 : 1.1,
           ease: 'none',
           scrollTrigger: {
             trigger: journalPageEl,
-            start: 'top top',
-            end: 'bottom bottom',
-            scrub: 1.2
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 1.4
           }
         });
       });
 
       gsap.to('[data-journal-hero-main]', {
-        yPercent: -7,
+        y: -18,
         ease: 'none',
         scrollTrigger: {
           trigger: journalPageEl,
           start: 'top top',
-          end: 'top+=700 top',
-          scrub: 0.9
+          end: 'top+=520 top',
+          scrub: 1.1
         }
       });
 
       gsap.to('[data-journal-hero-deck]', {
-        yPercent: -4,
-        scale: 1.01,
+        y: -10,
         ease: 'none',
         scrollTrigger: {
           trigger: journalPageEl,
           start: 'top top',
-          end: 'top+=720 top',
-          scrub: 1
+          end: 'top+=520 top',
+          scrub: 1.1
         }
       });
 
-      gsap.utils.toArray('[data-journal-parallax-section]').forEach((section, index) => {
-        const cards = section.querySelectorAll('[data-journal-card]');
-        const targets = cards.length ? cards : [section];
-        const heading = section.querySelector('[data-journal-section-copy]');
-        const supportLayer = section.querySelector('[data-journal-support-layer]');
-        const noteStack = section.querySelector('[data-journal-note-stack]');
+      parallaxSections.forEach((section, index) => {
+        if (section.classList.contains('journal-hero')) {
+          return;
+        }
 
-        const timeline = gsap.timeline({
-          defaults: { ease: 'none' },
+        const cards = gsap.utils.toArray(section.querySelectorAll('[data-journal-card]'));
+        const textLayers = gsap.utils.toArray(
+          section.querySelectorAll(
+            '[data-journal-section-copy], [data-journal-support-layer], [data-journal-note-stack]'
+          )
+        );
+        const motionTargets = cards.length ? cards : [section];
+
+        gsap.timeline({
+          defaults: { ease: 'power2.out' },
           scrollTrigger: {
             trigger: section,
-            start: 'top 88%',
-            end: 'bottom 16%',
-            scrub: 1.05
+            start: 'top 82%',
+            end: 'top 56%',
+            toggleActions: 'play none none reverse'
+          }
+        })
+          .fromTo(
+            textLayers,
+            {
+              y: 18,
+              autoAlpha: 0
+            },
+            {
+              y: 0,
+              autoAlpha: 1,
+              duration: 0.56,
+              stagger: textLayers.length > 1 ? 0.04 : 0
+            },
+            0
+          )
+          .fromTo(
+            motionTargets,
+            {
+              y: 30,
+              autoAlpha: 0,
+              scale: 0.985
+            },
+            {
+              y: 0,
+              autoAlpha: 1,
+              scale: 1,
+              duration: 0.72,
+              ease: 'power3.out',
+              stagger: cards.length > 1 ? 0.06 : 0
+            },
+            0.06
+          );
+
+        gsap.to(motionTargets, {
+          y: -8 - Math.min(index * 1.2, 4),
+          ease: 'none',
+          stagger: cards.length > 1 ? 0.02 : 0,
+          scrollTrigger: {
+            trigger: section,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 1.25
           }
         });
 
-        if (heading) {
-          timeline.fromTo(
-            heading,
-            {
-              y: 40,
-              opacity: 0.38
-            },
-            {
-              y: -10,
-              opacity: 1
-            },
-            0
-          );
-        }
-
-        timeline.fromTo(
-          targets,
-          {
-            y: 78,
-            opacity: 0.56,
-            scale: 0.948,
-            rotate: index % 2 === 0 ? 0.7 : -0.7
-          },
-          {
-            y: 0,
-            opacity: 1,
-            scale: 1,
-            rotate: 0,
-            stagger: cards.length > 1 ? 0.09 : 0
-          },
-          0.04
-        );
-
-        timeline.to(
-          targets,
-          {
-            y: -18,
-            scale: 0.988,
-            opacity: 0.9,
-            stagger: cards.length > 1 ? 0.05 : 0
-          },
-          0.64
-        );
-
-        if (supportLayer) {
-          timeline.fromTo(
-            supportLayer,
-            {
-              y: 24,
-              opacity: 0.55
-            },
-            {
-              y: -8,
-              opacity: 1
-            },
-            0.12
-          );
-        }
-
-        if (noteStack) {
-          timeline.fromTo(
-            noteStack,
-            {
-              y: 30,
-              opacity: 0.6
-            },
-            {
-              y: -12,
-              opacity: 1
-            },
-            0.18
-          );
+        if (textLayers.length) {
+          gsap.to(textLayers, {
+            y: -6,
+            ease: 'none',
+            stagger: textLayers.length > 1 ? 0.02 : 0,
+            scrollTrigger: {
+              trigger: section,
+              start: 'top bottom',
+              end: 'bottom top',
+              scrub: 1.35
+            }
+          });
         }
       });
 
       gsap.utils.toArray('[data-journal-hover-lift]').forEach((panel) => {
         const hoverIn = () =>
           gsap.to(panel, {
-            y: -6,
-            duration: 0.22,
+            y: -3,
+            duration: 0.18,
             ease: 'power2.out'
           });
 
         const hoverOut = () =>
           gsap.to(panel, {
             y: 0,
-            duration: 0.24,
+            duration: 0.2,
             ease: 'power2.out'
           });
 
@@ -1620,7 +1610,7 @@
   .journal-parallax-page {
     position: relative;
     isolation: isolate;
-    perspective: 1200px;
+    perspective: 960px;
     transform-style: preserve-3d;
   }
 
@@ -1639,10 +1629,10 @@
   }
 
   .journal-accent {
-    border: 2px solid rgba(42, 24, 15, 0.18);
+    border: 2px solid rgba(42, 24, 15, 0.12);
     border-radius: 8px;
-    background: rgba(255, 248, 235, 0.76);
-    box-shadow: 0 0 0 1px rgba(190, 53, 25, 0.04);
+    background: rgba(255, 248, 235, 0.52);
+    box-shadow: 0 0 0 1px rgba(190, 53, 25, 0.025);
   }
 
   .journal-accent-a {
@@ -1678,7 +1668,7 @@
   }
 
   .journal-accent-line {
-    background: linear-gradient(90deg, rgba(190, 53, 25, 0), rgba(190, 53, 25, 0.18), rgba(190, 53, 25, 0));
+    background: linear-gradient(90deg, rgba(190, 53, 25, 0), rgba(190, 53, 25, 0.12), rgba(190, 53, 25, 0));
   }
 
   .journal-accent-line-a {
