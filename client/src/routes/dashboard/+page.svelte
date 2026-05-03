@@ -13,28 +13,30 @@
   .dashboard-page-shell {
     flex: 1 1 auto;
     width: 100%;
-    height: 100%;
-    min-height: 0;
+    min-height: 100%;
     min-width: 0;
-    display: flex;
-    overflow: hidden;
+    display: block;
+    overflow: visible;
   }
 
   :global(html),
   :global(body) {
-    overflow: hidden;
+    overflow: auto;
   }
 
   :global(.app-shell) {
-    height: 100dvh;
-    max-height: 100dvh;
-    overflow: hidden;
+    min-height: 100dvh;
+    height: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   :global(main#main-content) {
     flex: 1 1 auto;
-    height: 100%;
+    display: block;
+    height: auto;
+    min-height: 0;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 </style>
