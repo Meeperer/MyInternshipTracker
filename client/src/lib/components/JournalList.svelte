@@ -877,36 +877,29 @@
     <div class="journal-view" bind:this={journalViewEl} aria-busy={$journal.loading || summaryLoading}>
       <section class="journal-hero" data-journal-parallax-section>
         <div class="journal-hero-main" data-journal-hero-main data-journal-section-copy>
-          <p class="journal-hero-mark" data-journal-hero-mark>Journal workspace</p>
+          <p class="journal-hero-mark" data-journal-hero-mark>Journal</p>
           <h1 class="journal-hero-title" data-journal-hero-title>Journal Entries</h1>
-          <p class="journal-subtitle" data-journal-hero-copy>
-            Write your monthly record, read the patterns hiding in your notes, and turn one page of work into a cleaner story.
-          </p>
+          <p class="journal-subtitle" data-journal-hero-copy>Capture the month. Read the patterns.</p>
 
           <div class="journal-capability-strip" data-journal-hero-copy data-journal-support-layer>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
-              <strong>Write today&apos;s entry</strong>
-              <p>Jump straight into the current day and log hours without leaving the workspace.</p>
+              <strong>New entry</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
-              <strong>Move month to month</strong>
-              <p>Shift the archive quickly so your entries, summaries, and progress stay in sync.</p>
+              <strong>Months</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
-              <strong>Read the patterns</strong>
-              <p>Surface recurring themes, weekly workload, wins, and blockers from the notes themselves.</p>
+              <strong>Themes</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
-              <strong>Export or summarize</strong>
-              <p>Generate a reusable readout when you need a cleaner weekly or monthly handoff.</p>
+              <strong>Summaries</strong>
             </article>
           </div>
         </div>
 
         <aside class="journal-control-deck" data-journal-card data-journal-hover-lift data-journal-hero-deck>
           <div class="journal-control-heading" data-journal-hero-control>
-            <span class="journal-control-label">Month controls</span>
-            <p>Keep navigation, capture, and review work in one place.</p>
+            <span class="journal-control-label">Month</span>
           </div>
 
           <div class="journal-hero-actions">
@@ -931,11 +924,11 @@
 
           <div class="journal-control-notes">
             <div class="journal-control-note" data-journal-hero-control>
-              <span>Live month</span>
+              <span>Month</span>
               <strong>{formatMonthLabel($selectedMonth)}</strong>
             </div>
             <div class="journal-control-note" data-journal-hero-control>
-              <span>Days completed</span>
+              <span>Done</span>
               <strong>{monthFinishedCount}</strong>
             </div>
           </div>
@@ -943,25 +936,24 @@
       </section>
 
       <div class="journal-section-heading" data-journal-parallax-section>
-        <h2>Month readout</h2>
-        <p data-journal-section-copy>The clearest signals from this month, arranged so you can scan the record before opening individual entries.</p>
+        <h2>Overview</h2>
       </div>
 
       <section class="journal-metrics-band" data-journal-parallax-section>
         <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
           <span class="overview-label">Selected month</span>
           <strong>{formatMonthLabel($selectedMonth)}</strong>
-          <p>{$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'} tracked</p>
+          <p>{$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'}</p>
         </article>
         <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
           <span class="overview-label">Hours logged</span>
           <strong>{formatHoursValue(monthHours)}</strong>
-          <p>Across the current month</p>
+          <p>This month</p>
         </article>
         <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
           <span class="overview-label">Finished days</span>
           <strong>{monthFinishedCount}</strong>
-          <p>Locked and completed</p>
+          <p>Completed</p>
         </article>
       </section>
 
@@ -970,8 +962,7 @@
           <div class="panel-header" data-journal-section-copy>
             <div>
               <span class="panel-kicker">Recurring themes</span>
-              <h3>What keeps showing up</h3>
-              <p class="panel-support">Repeated names, projects, and patterns pulled from your writing.</p>
+              <h3>Themes</h3>
             </div>
           </div>
 
@@ -986,8 +977,7 @@
             </div>
           {:else}
             <div class="insights-empty">
-              <strong>Themes appear once your entries have more detail.</strong>
-              <p>Add a few fuller notes and the journal will start surfacing repeated work patterns here.</p>
+              <strong>Themes will appear here.</strong>
             </div>
           {/if}
         </article>
@@ -996,8 +986,7 @@
           <div class="panel-header" data-journal-section-copy>
             <div>
               <span class="panel-kicker">Mood + workload</span>
-              <h3>How the month feels</h3>
-              <p class="panel-support">A quick read on busy weeks, lighter weeks, and how the writing tone shifted.</p>
+              <h3>Workload</h3>
             </div>
           </div>
 
@@ -1018,8 +1007,7 @@
             </div>
           {:else}
             <div class="insights-empty">
-              <strong>No trend line yet.</strong>
-              <p>Once you log a few entries, this section will show how busy each week looked and how the writing tone shifted.</p>
+              <strong>More entries will show a trend.</strong>
             </div>
           {/if}
         </article>
@@ -1030,8 +1018,7 @@
           <div class="panel-header" data-journal-section-copy>
             <div>
               <span class="panel-kicker">Top wins</span>
-              <h3>Work worth keeping</h3>
-              <p class="panel-support">The moments worth remembering when you look back at the month later.</p>
+              <h3>Wins</h3>
             </div>
           </div>
 
@@ -1045,8 +1032,7 @@
             </div>
           {:else}
             <div class="insights-empty">
-              <strong>No wins captured yet.</strong>
-              <p>Use a sentence or two when you finish something meaningful so the month can surface it back to you.</p>
+              <strong>No wins yet.</strong>
             </div>
           {/if}
         </article>
@@ -1055,8 +1041,7 @@
           <div class="panel-header" data-journal-section-copy>
             <div>
               <span class="panel-kicker">Blockers</span>
-              <h3>What slowed you down</h3>
-              <p class="panel-support">The friction points, delays, and repeated obstacles that deserve attention.</p>
+              <h3>Blockers</h3>
             </div>
           </div>
 
@@ -1070,8 +1055,7 @@
             </div>
           {:else}
             <div class="insights-empty">
-              <strong>No clear blockers spotted.</strong>
-              <p>Your recent notes read as steady progress, without repeated friction surfacing in the writing.</p>
+              <strong>No blockers yet.</strong>
             </div>
           {/if}
         </article>
@@ -1090,7 +1074,7 @@
       <div class="panel-header" data-journal-section-copy>
         <div>
           <span class="panel-kicker">Export</span>
-          <h3>Monthly export</h3>
+          <h3>Export</h3>
         </div>
       </div>
 
@@ -1116,17 +1100,13 @@
         </div>
       </div>
 
-      <p class="control-hint">
-        Pull a clean file for {formatMonthLabel($selectedMonth)} in either readable markdown or raw JSON.
-      </p>
     </div>
 
     <div class="summary-panel card glass-card" aria-live="polite" data-journal-card data-journal-hover-lift>
       <div class="summary-topline">
         <div data-journal-section-copy>
           <span class="panel-kicker">AI summary</span>
-          <h3>Period summary</h3>
-          <p class="summary-caption">Summarize the whole month or narrow it down to a week inside the current month.</p>
+          <h3>Summary</h3>
         </div>
 
         <div class="period-toggle" role="tablist" aria-label="AI summary range">
@@ -1178,18 +1158,17 @@
 
       {#if summaryError}
         <div class="summary-state summary-state-error" role="alert">
-          <strong>Summary unavailable right now</strong>
+          <strong>Summary unavailable</strong>
           <p>{summaryError}</p>
         </div>
       {:else if summaryFetching}
         <div class="summary-state">
-          <strong>Checking saved summaries</strong>
+          <strong>Checking saved summary</strong>
           <div class="summary-skeleton" aria-hidden="true">
             <div class="skeleton-line medium"></div>
             <div class="skeleton-line long"></div>
             <div class="skeleton-line long"></div>
           </div>
-          <p>Looking for an existing {summaryMode} summary for this range.</p>
         </div>
       {:else if summaryResult}
         <div class="summary-result">
@@ -1199,37 +1178,33 @@
               {summaryResult.persisted === false ? 'Live only' : 'Saved'}
             </span>
           </div>
-          <p class="summary-ready-copy">
-            Your {formatSummaryPeriodLabel(summaryResult.period)} summary is ready. Open it when you want the full readout.
-          </p>
+          <p class="summary-ready-copy">Ready to open.</p>
           <button
             type="button"
             class="btn btn-sm btn-primary summary-open-button"
             onclick={() => openSummaryModal(summaryResult)}
             aria-haspopup="dialog"
           >
-            See summarized {formatSummaryPeriodLabel(summaryResult.period)}
+            Open summary
           </button>
           <p class="summary-footnote">
             Updated {new Date(summaryResult.updated_at || toDateString(new Date())).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'short',
               day: 'numeric'
-            })} | {summaryResult.entry_count} entr{summaryResult.entry_count === 1 ? 'y' : 'ies'} | {formatHoursValue(summaryResult.total_hours)} hours
+            })} / {summaryResult.entry_count} entr{summaryResult.entry_count === 1 ? 'y' : 'ies'} / {formatHoursValue(summaryResult.total_hours)} hours
           </p>
           {#if summaryResult.persisted === false}
-            <p class="summary-warning">
-              This summary was generated successfully, but automatic saving is not available until the latest database migration is applied.
-            </p>
+            <p class="summary-warning">Auto-save needs the latest migration.</p>
           {/if}
         </div>
       {:else}
         <div class="summary-state">
-          <strong>No saved summary yet</strong>
+          <strong>No summary yet</strong>
           <p>
             {rangeContentCount > 0
-              ? `Generate a ${summaryMode} summary to get a concise readout of your progress, themes, and next priorities.`
-              : `This ${summaryMode} does not have enough written journal content yet for AI summarization.`}
+              ? `Generate a ${summaryMode} summary for this range.`
+              : `Not enough journal content yet.`}
           </p>
         </div>
       {/if}
@@ -1244,8 +1219,7 @@
     <div class="summary-library-header" data-journal-section-copy>
       <div>
         <span class="panel-kicker">Summary library</span>
-        <h3>Saved weekly + monthly reads</h3>
-        <p class="summary-caption">Reopen, pin, and export your saved summaries without regenerating them.</p>
+        <h3>Saved summaries</h3>
       </div>
       <span class="summary-library-count">{$journal.summaryLibrary.length} saved</span>
     </div>
@@ -1274,7 +1248,7 @@
               <h4>{getSummaryLabel(item)}</h4>
               <p>{getSummaryPreview(item.summary)}</p>
               <span class="summary-library-footnote">
-                {item.start_date} to {item.end_date} | {item.entry_count} entr{item.entry_count === 1 ? 'y' : 'ies'} | {formatHoursValue(item.total_hours)}h
+                {item.start_date} to {item.end_date} / {item.entry_count} entr{item.entry_count === 1 ? 'y' : 'ies'} / {formatHoursValue(item.total_hours)}h
               </span>
             </div>
             <div class="summary-library-actions">
@@ -1296,8 +1270,7 @@
       </div>
     {:else}
       <div class="insights-empty summary-library-empty">
-        <strong>Your library starts filling as soon as a week or month gets summarized.</strong>
-        <p>Saved summaries stay here so you can reopen them later, pin the best ones, and export them cleanly.</p>
+        <strong>No saved summaries yet.</strong>
       </div>
     {/if}
   </section>
@@ -1307,7 +1280,7 @@
       bind:this={searchInputEl}
       class="input search-input"
       type="text"
-      placeholder="Search entries by content or date..."
+      placeholder="Search entries"
       bind:value={searchQuery}
       aria-label="Search journal entries"
     />
@@ -1322,9 +1295,9 @@
       <div>
         <h3>Entries</h3>
         <p class="entries-summary">
-          {$journal.entries.length} total in {formatMonthLabel($selectedMonth)}
+          {$journal.entries.length} in {formatMonthLabel($selectedMonth)}
           {#if !$journal.loading && filteredEntries.length > 0}
-            | Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredEntries.length)} of {filteredEntries.length}
+            / {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredEntries.length)} shown
           {/if}
         </p>
       </div>
@@ -1356,14 +1329,14 @@
               <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
             </svg>
           </div>
-          <p>No journal entries recorded in {formatMonthLabel($selectedMonth)}.</p>
+          <p>No entries in {formatMonthLabel($selectedMonth)}.</p>
           <button class="btn btn-sm btn-primary" onclick={openNewEntryForToday}>
-            Create a new entry
+            New entry
           </button>
         </div>
       {:else if filteredEntries.length === 0}
         <div class="empty-state">
-          <p>No entries match "{searchQuery}" in {formatMonthLabel($selectedMonth)}.</p>
+          <p>No matches for "{searchQuery}".</p>
           <button class="btn btn-sm" onclick={() => (searchQuery = '')}>Clear search</button>
         </div>
       {:else}
@@ -1981,18 +1954,12 @@
     width: 100%;
   }
 
-  .control-hint,
-  .summary-caption,
   .summary-footnote,
   .summary-warning {
     font-family: var(--font-ui);
     font-size: 0.84rem;
     color: var(--dark-soft);
     line-height: 1.6;
-  }
-
-  .control-hint {
-    margin-top: 1rem;
   }
 
   .period-toggle {
@@ -3032,12 +2999,6 @@
     color: var(--journal-red);
   }
 
-  .journal-capability-card p {
-    color: var(--journal-muted);
-    font-size: 0.89rem;
-    line-height: 1.55;
-  }
-
   .journal-control-deck {
     display: flex;
     flex-direction: column;
@@ -3049,12 +3010,6 @@
     background: var(--journal-paper-soft);
     box-shadow: var(--journal-shadow-tight);
     transform-origin: center center;
-  }
-
-  .journal-control-heading p {
-    margin-top: 0.7rem;
-    color: var(--journal-muted);
-    line-height: 1.55;
   }
 
   .journal-hero-actions {
@@ -3174,13 +3129,6 @@
     font-size: 1.65rem;
   }
 
-  .journal-section-heading p {
-    max-width: 38rem;
-    color: var(--journal-muted);
-    font-size: 0.92rem;
-    line-height: 1.55;
-  }
-
   .journal-metrics-band,
   .journal-insight-grid {
     display: grid;
@@ -3261,9 +3209,6 @@
   }
 
   .overview-card p,
-  .panel-support,
-  .control-hint,
-  .summary-caption,
   .summary-footnote,
   .summary-warning,
   .entries-summary,
@@ -3284,12 +3229,6 @@
   .entries-toolbar h3,
   .summary-library-item h4 {
     color: var(--journal-red);
-  }
-
-  .panel-support {
-    margin-top: 0.55rem;
-    font-size: 0.9rem;
-    line-height: 1.55;
   }
 
   .theme-chip-list,

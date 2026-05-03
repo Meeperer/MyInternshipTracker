@@ -54,7 +54,7 @@
     <span class="clock">{time}</span>
     <span class="clock-label">{dateLabel}</span>
     <label class="timezone-control">
-      <span class="timezone-caption">Time zone</span>
+      <span class="sr-only">Time zone</span>
       <select
         class="timezone-select"
         bind:value={$timezone}
@@ -81,9 +81,9 @@
   </div>
 
   <div class="nav-right">
-    <button class="command-trigger" type="button" onclick={() => appCommands.openPalette()} aria-label="Open quick command palette">
-      <span>Quick Actions</span>
-      <span class="command-trigger-shortcut">Ctrl/Cmd + K</span>
+    <button class="command-trigger" type="button" onclick={() => appCommands.openPalette()} aria-label="Open command palette">
+      <span>Commands</span>
+      <span class="command-trigger-shortcut">Ctrl/Cmd K</span>
     </button>
     <button class="btn btn-sm btn-ghost" onclick={handleLogout}>
       Logout
@@ -140,11 +140,7 @@
     color: var(--dark-soft);
   }
 
-  .timezone-caption {
-    opacity: 0.7;
-  }
-
-  .timezone-select {
+.timezone-select {
     padding: 0.25rem 0.6rem;
     border-radius: 999px;
     border: 1px solid var(--border-light);

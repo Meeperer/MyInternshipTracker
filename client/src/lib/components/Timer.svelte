@@ -55,8 +55,8 @@
 <div class="pomodoro-view-old animate-rise rise-2">
   <div class="timer-ribbon">
     <span class="timer-ribbon-chip">{sessionLabel}</span>
-    <span class="timer-ribbon-chip">{$baseMinutes} minute focus block</span>
-    <span class="timer-ribbon-chip">{Math.max(0, Math.ceil((Number($remaining) || 0) / 60))} minutes left</span>
+    <span class="timer-ribbon-chip">{$baseMinutes} min</span>
+    <span class="timer-ribbon-chip">{Math.max(0, Math.ceil((Number($remaining) || 0) / 60))} left</span>
   </div>
 
   <div class="timer-presets" aria-label="Timer presets">
@@ -75,7 +75,7 @@
   <div class="timer-status animate-rise rise-1">
     <div class="timer-status-copy">
       <span class="timer-status-label">{sessionLabel}</span>
-      <span class="timer-status-detail">{progressPct}% of this session elapsed</span>
+      <span class="timer-status-detail">{progressPct}% elapsed</span>
     </div>
     <div class="timer-status-track" aria-hidden="true">
       <span class="timer-status-fill" style={`width: ${progressPct}%`}></span>
@@ -111,7 +111,7 @@
   </div>
 
   <div class="duration-controls">
-    <div class="duration-label">POMODORO LENGTH</div>
+    <div class="duration-label">LENGTH</div>
     <div class="duration-row">
       <button type="button" class="duration-btn" onclick={() => timer.adjustDuration(-1)} aria-label="Decrease">−</button>
       <input
@@ -139,7 +139,7 @@
         onblur={setFromInput}
         aria-label="Pomodoro length in minutes"
       />
-      <span class="duration-suffix">MINUTES</span>
+      <span class="duration-suffix">MIN</span>
       <button type="button" class="duration-btn" onclick={() => timer.adjustDuration(1)} aria-label="Increase">+</button>
     </div>
   </div>

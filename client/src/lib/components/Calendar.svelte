@@ -154,10 +154,10 @@
 
   let heroSummary = $derived.by(() => {
     if (monthStats.count === 0 && monthStats.eventCount === 0) {
-      return `This month is still open. Use the calendar to place meetings, protect hours, and build the journal record for ${monthHeading}.`;
+      return `${monthHeading} is open for planning.`;
     }
 
-    return `${monthHeading} is carrying ${monthStats.count} journal ${monthStats.count === 1 ? 'day' : 'days'}, ${formatHours(monthStats.hours)} logged, and ${monthStats.eventCount} scheduled ${monthStats.eventCount === 1 ? 'item' : 'items'}.`;
+    return `${monthStats.count} journal ${monthStats.count === 1 ? 'day' : 'days'}, ${formatHours(monthStats.hours)} logged, ${monthStats.eventCount} scheduled.`;
   });
 
   function formatHours(value) {
@@ -242,20 +242,16 @@
   }
 
   function selectedDateSummary() {
-    if (!activeDate) return 'Move across the month grid to inspect a day.';
+    if (!activeDate) return 'Pick a day.';
 
     const entryPreview = getEntryPreview(activeEntry);
     if (entryPreview) return entryPreview;
 
-    if (activeDayEvents.length > 0) {
-      return `This day has ${activeDayEvents.length} scheduled ${activeDayEvents.length === 1 ? 'item' : 'items'} but no written journal note yet.`;
-    }
+    if (activeDayEvents.length > 0) return `${activeDayEvents.length} scheduled ${activeDayEvents.length === 1 ? 'item' : 'items'}.`;
 
-    if (activeEntry?.status === 'finished') {
-      return 'This day has already been wrapped and marked finished.';
-    }
+    if (activeEntry?.status === 'finished') return 'Finished for the day.';
 
-    return 'Nothing has been logged yet. Open the day sheet to write an entry, add hours, or place an event.';
+    return 'No entry or events yet.';
   }
 
   function focusDate(date) {
@@ -437,36 +433,35 @@
 <div class="calendar-view" bind:this={calendarRoot} aria-busy={calendarBusy}>
   <section class="calendar-hero calendar-surface">
     <div class="calendar-hero-copy" data-calendar-animate="hero-copy">
-      <p class="calendar-kicker">Calendar workspace</p>
+      <p class="calendar-kicker">Calendar</p>
       <div class="calendar-title-row">
         <h1>{monthHeading} <span>{currentYear}</span></h1>
-        <span class="calendar-view-tag">Month view</span>
       </div>
       <p class="calendar-hero-summary">{heroSummary}</p>
 
       <div class="calendar-hero-metrics">
         <article class="calendar-mini-stat" data-calendar-animate="metric">
-          <span class="mini-label">Hours logged</span>
+          <span class="mini-label">Hours</span>
           <strong>{formatHours(monthStats.hours)}</strong>
           <span class="mini-note">{monthProgressPercent}% of target</span>
         </article>
 
         <article class="calendar-mini-stat" data-calendar-animate="metric">
-          <span class="mini-label">Finished days</span>
+          <span class="mini-label">Finished</span>
           <strong>{monthStats.finished}</strong>
-          <span class="mini-note">{monthStats.count} journal days tracked</span>
+          <span class="mini-note">{monthStats.count} logged days</span>
         </article>
 
         <article class="calendar-mini-stat" data-calendar-animate="metric">
-          <span class="mini-label">Scheduled days</span>
+          <span class="mini-label">Scheduled</span>
           <strong>{monthStats.scheduledDays}</strong>
-          <span class="mini-note">{monthStats.eventCount} total planned items</span>
+          <span class="mini-note">{monthStats.eventCount} planned</span>
         </article>
 
         <article class="calendar-mini-stat" data-calendar-animate="metric">
-          <span class="mini-label">Current streak</span>
+          <span class="mini-label">Streak</span>
           <strong>{$progress.current_streak || 0}</strong>
-          <span class="mini-note">Keep the journal and hours aligned</span>
+          <span class="mini-note">days in a row</span>
         </article>
       </div>
     </div>
@@ -477,9 +472,9 @@
         <p>{todayLabel}</p>
         <span class="control-subtle">
           {#if currentMonthIsToday}
-            You are planning inside the current month.
+            Current month
           {:else}
-            You are viewing {monthHeading}. Jump back to today at any time.
+            Jump back to today anytime
           {/if}
         </span>
       </div>
@@ -518,9 +513,6 @@
         </button>
       </div>
 
-      <p class="calendar-controls-note">
-        Open any day to write the journal entry, log hours, or place a meeting, reminder, or deadline.
-      </p>
     </div>
   </section>
 
@@ -528,8 +520,8 @@
     <div class="calendar-board calendar-surface" data-calendar-animate="board" data-calendar-month-panel>
       <header class="calendar-board-head">
         <div>
-          <p class="calendar-section-label">Month grid</p>
-          <h2>{monthHeading} in focus</h2>
+          <p class="calendar-section-label">Month</p>
+          <h2>{monthHeading}</h2>
         </div>
 
         <div class="calendar-legend" aria-label="Calendar state legend">
@@ -602,12 +594,8 @@
       {/if}
 
       <footer class="calendar-board-foot">
-        <p>
-          Focus a date to inspect it in the rail. Open the day sheet when you want to write, log time, or schedule something.
-        </p>
-
         <button type="button" class="calendar-foot-btn" onclick={openActiveDay} disabled={!activeDate}>
-          Open active day
+          Open day
         </button>
       </footer>
     </div>
@@ -616,8 +604,8 @@
       <article class="calendar-detail-card calendar-surface" data-calendar-animate="rail" data-calendar-month-panel>
         <div class="rail-card-head">
           <div>
-            <p class="calendar-section-label">Selected day</p>
-            <h3>{activeDate ? formatDateLong(activeDate) : 'Choose a date'}</h3>
+            <p class="calendar-section-label">Day</p>
+            <h3>{activeDate ? formatDateLong(activeDate) : 'Select a day'}</h3>
           </div>
 
           <span class="rail-status-pill">{getStatusLabel(activeEntry)}</span>
@@ -656,17 +644,15 @@
             {/each}
           </div>
         {:else}
-          <div class="calendar-empty-note">
-            No events are attached to this day yet. Open the day sheet to drop in a meeting, reminder, or deadline.
-          </div>
+          <div class="calendar-empty-note">No events yet.</div>
         {/if}
 
         <div class="selected-day-actions">
           <button type="button" class="calendar-primary-btn" onclick={openActiveDay} disabled={!activeDate}>
-            Open day
+            Open
           </button>
           <button type="button" class="calendar-secondary-btn" onclick={() => openPlannerDay(activeDate)} disabled={!activeDate}>
-            Log hours / add event
+            Add hours or event
           </button>
         </div>
       </article>
@@ -674,12 +660,12 @@
       <article class="calendar-agenda-card calendar-surface" data-calendar-animate="rail" data-calendar-month-panel>
         <div class="rail-card-head">
           <div>
-            <p class="calendar-section-label">Next up</p>
+            <p class="calendar-section-label">Upcoming</p>
             <h3>
               {#if upcomingEvents.length > 0}
-                Upcoming in {monthHeading}
+                {monthHeading}
               {:else}
-                Month is quiet
+                Nothing queued
               {/if}
             </h3>
           </div>
@@ -710,22 +696,20 @@
             {/each}
           </div>
         {:else}
-          <div class="calendar-empty-note calendar-empty-note-soft">
-            Nothing is scheduled yet for this month. Use a day sheet to add the first meeting, reminder, or focus block.
-          </div>
+          <div class="calendar-empty-note calendar-empty-note-soft">No upcoming items.</div>
         {/if}
 
         <div class="agenda-footer">
           <div class="agenda-progress">
-            <span class="agenda-progress-label">Internship target</span>
+            <span class="agenda-progress-label">Target</span>
             <div class="agenda-progress-track" aria-hidden="true">
               <span class="agenda-progress-fill" style={`width: ${monthProgressPercent}%`}></span>
             </div>
-            <span class="agenda-progress-meta">{monthProgressPercent}% complete · {formatHours(monthStats.hours)} logged</span>
+            <span class="agenda-progress-meta">{monthProgressPercent}% / {formatHours(monthStats.hours)}</span>
           </div>
 
           <button type="button" class="calendar-foot-btn" onclick={openTodayPlanner}>
-            Add today's entry
+            Add entry
           </button>
         </div>
       </article>
@@ -1313,7 +1297,6 @@
     border-top: 1px solid rgba(190, 53, 25, 0.1);
   }
 
-  .calendar-board-foot p,
   .selected-day-summary,
   .calendar-empty-note,
   .agenda-progress-meta,

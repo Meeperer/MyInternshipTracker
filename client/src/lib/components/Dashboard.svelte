@@ -357,17 +357,17 @@
   let nextMilestone = $derived.by(() => milestoneCards.find((milestone) => !milestone.reached) || null);
 
   let trajectoryLine = $derived.by(() => {
-    if ($progress.is_completed) return 'Target complete. The dashboard now supports report work and final record keeping.';
+    if ($progress.is_completed) return 'Target complete.';
     if (nextMilestone) {
-      return `${formatHours(nextMilestone.remaining)} until the ${nextMilestone.hours}h milestone. Projected finish is ${monthInsights.projectedCompletion}.`;
+      return `${formatHours(nextMilestone.remaining)} until ${nextMilestone.hours}h. Finish: ${monthInsights.projectedCompletion}.`;
     }
-    return `${formatHours($progress.remaining_hours)} remaining toward the target.`;
+    return `${formatHours($progress.remaining_hours)} remaining.`;
   });
 
   let todaySummary = $derived.by(() => {
-    if (eventsLoading) return 'Loading today';
-    if (todayEvents.length === 0) return 'No scheduled events today';
-    return `${todayEvents.length} event${todayEvents.length === 1 ? '' : 's'} scheduled today`;
+    if (eventsLoading) return 'Loading';
+    if (todayEvents.length === 0) return 'No events today';
+    return `${todayEvents.length} event${todayEvents.length === 1 ? '' : 's'} today`;
   });
 
   $effect(() => {
@@ -491,8 +491,7 @@
       </div>
       <h1>Dashboard</h1>
       <p class="hero-summary">
-        {dashboardMonthLabel}: <strong>{formatHours($progress.total_hours)}</strong> logged toward
-        <strong>{formatHours(targetHours)}</strong>, with <strong>{formatHours($progress.remaining_hours)}</strong> still to close.
+        <strong>{formatHours($progress.total_hours)}</strong> of <strong>{formatHours(targetHours)}</strong> logged. <strong>{formatHours($progress.remaining_hours)}</strong> left.
       </p>
     </div>
 
@@ -530,7 +529,7 @@
   <section class="trajectory-board" data-animate="trajectory" aria-labelledby="trajectory-title">
     <div class="trajectory-copy">
       <div class="section-marker">Trajectory</div>
-      <h2 id="trajectory-title">Milestone path</h2>
+      <h2 id="trajectory-title">Path</h2>
       <p>{trajectoryLine}</p>
     </div>
 
@@ -591,12 +590,12 @@
         <div>
           <dt>Current status</dt>
           <dd>{greetingLabel}</dd>
-          <p>{formatPercent(overallProgress)} of the internship target is logged.</p>
+          <p>{formatPercent(overallProgress)} logged.</p>
         </div>
         <div>
           <dt>Projected finish</dt>
           <dd>{monthInsights.projectedCompletion}</dd>
-          <p>{monthInsights.daysNeeded} working day{monthInsights.daysNeeded === 1 ? '' : 's'} needed at the current average.</p>
+          <p>{monthInsights.daysNeeded} workday{monthInsights.daysNeeded === 1 ? '' : 's'} at this pace.</p>
         </div>
       </dl>
     {/if}
@@ -604,7 +603,7 @@
 
   <section class="metric-grid" aria-label="Key dashboard metrics">
     <article class="metric-card metric-card-primary" data-animate="metric">
-      <div class="metric-label">Overall month progress</div>
+      <div class="metric-label">This month</div>
       <strong
         data-count-value={monthInsights.totalHours || 0}
         data-count-display={formatHours(monthInsights.totalHours)}
@@ -612,14 +611,14 @@
       >
         {formatHours(monthInsights.totalHours)}
       </strong>
-      <p>This selected month contributes {monthShare}% of the full internship target.</p>
+      <p>{monthShare}% of target</p>
       <div class="small-track" aria-hidden="true">
         <span data-progress-fill style={`width: ${monthShare}%`}></span>
       </div>
     </article>
 
     <article class="metric-card" data-animate="metric">
-      <div class="metric-label">Average active day</div>
+      <div class="metric-label">Active day avg</div>
       <strong
         data-count-value={monthInsights.averagePerActiveDay || 0}
         data-count-display={formatHours(monthInsights.averagePerActiveDay)}
@@ -627,7 +626,7 @@
       >
         {formatHours(monthInsights.averagePerActiveDay)}
       </strong>
-      <p>{cadenceLabel}. Only days with journal activity are counted here.</p>
+      <p>{cadenceLabel}</p>
     </article>
 
     <article class="metric-card" data-animate="metric">
@@ -639,13 +638,13 @@
       >
         {$progress.current_streak}d
       </strong>
-      <p>Consecutive active days in the running internship record.</p>
+      <p>Consecutive days</p>
     </article>
 
     <article class="metric-card metric-card-red" data-animate="metric">
       <div class="metric-label">Next milestone</div>
       <strong>{nextMilestone ? `${nextMilestone.hours}h` : 'Done'}</strong>
-      <p>{nextMilestone ? `${formatHours(nextMilestone.remaining)} left before this marker turns complete.` : 'Every milestone marker is complete.'}</p>
+      <p>{nextMilestone ? `${formatHours(nextMilestone.remaining)} left` : 'Complete'}</p>
     </article>
   </section>
 
@@ -653,7 +652,7 @@
     <article class="summary-panel" data-animate="summary" aria-labelledby="monthly-summary-title">
       <header class="summary-head">
         <div>
-          <div class="section-marker">Monthly summary</div>
+          <div class="section-marker">Month</div>
           <h2 id="monthly-summary-title">{dashboardMonthLabel}</h2>
         </div>
         <button type="button" class="text-button" onclick={(event) => openDashboardModal('month', event.currentTarget)}>
@@ -684,7 +683,7 @@
     <article class="summary-panel milestones-panel" data-animate="summary" aria-labelledby="milestones-summary-title">
       <header class="summary-head">
         <div>
-          <div class="section-marker">Milestones summary</div>
+          <div class="section-marker">Milestones</div>
           <h2 id="milestones-summary-title">{reachedMilestones}/{milestoneCards.length} reached</h2>
         </div>
         <button type="button" class="text-button" onclick={(event) => openDashboardModal('milestones', event.currentTarget)}>
@@ -705,9 +704,9 @@
 
   <section class="journal-cta" data-animate="cta" aria-labelledby="journal-cta-title">
     <div>
-      <div class="section-marker">Next action</div>
-      <h2 id="journal-cta-title">Write today's journal entry</h2>
-      <p>{todaySummary}. Capture the hours, decisions, and loose ends while the day is still easy to reconstruct.</p>
+      <div class="section-marker">Action</div>
+      <h2 id="journal-cta-title">Today's journal</h2>
+      <p>{todaySummary}. Log it while it's fresh.</p>
     </div>
 
     <button
