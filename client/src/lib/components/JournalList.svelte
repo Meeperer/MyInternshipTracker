@@ -2,6 +2,20 @@
   import { onMount } from 'svelte';
   import gsap from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
+  import {
+    Brain,
+    CalendarBlank,
+    CaretLeft,
+    CaretRight,
+    CheckCircle,
+    DownloadSimple,
+    MagnifyingGlass,
+    Notebook,
+    PencilSimpleLine,
+    Sparkle,
+    TrendUp,
+    WarningCircle
+  } from 'phosphor-svelte';
   import { journal } from '$stores/journal.js';
   import { toast } from '$stores/toast.js';
   import { selectedMonth } from '$stores/selectedMonth.js';
@@ -108,7 +122,7 @@
 
   function getSummaryPreview(summaryText, maxLength = 210) {
     const normalized = String(summaryText || '').trim().replace(/\s+/g, ' ');
-    if (!normalized) return 'No saved summary text yet.';
+    if (!normalized) return 'No saved text yet.';
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3).trimEnd()}...` : normalized;
   }
 
@@ -120,7 +134,7 @@
       entry.aras_action
     ].find((value) => typeof value === 'string' && value.trim());
 
-    if (!preview) return 'No written content yet.';
+    if (!preview) return 'No notes yet.';
 
     const normalized = preview.trim().replace(/\s+/g, ' ');
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3).trimEnd()}...` : normalized;
@@ -877,21 +891,25 @@
     <div class="journal-view" bind:this={journalViewEl} aria-busy={$journal.loading || summaryLoading}>
       <section class="journal-hero" data-journal-parallax-section>
         <div class="journal-hero-main" data-journal-hero-main data-journal-section-copy>
-          <p class="journal-hero-mark" data-journal-hero-mark>Journal</p>
-          <h1 class="journal-hero-title" data-journal-hero-title>Journal Entries</h1>
-          <p class="journal-subtitle" data-journal-hero-copy>Capture the month. Read the patterns.</p>
+          <p class="journal-hero-mark" data-journal-hero-mark><Notebook size={14} weight="bold" />Journal</p>
+          <h1 class="journal-hero-title" data-journal-hero-title>Journal</h1>
+          <p class="journal-subtitle" data-journal-hero-copy>Write, review, and export the month.</p>
 
           <div class="journal-capability-strip" data-journal-hero-copy data-journal-support-layer>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
+              <PencilSimpleLine size={18} weight="bold" />
               <strong>New entry</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
+              <CalendarBlank size={18} weight="bold" />
               <strong>Months</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
+              <TrendUp size={18} weight="bold" />
               <strong>Themes</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
+              <Brain size={18} weight="bold" />
               <strong>Summaries</strong>
             </article>
           </div>
@@ -904,7 +922,8 @@
 
           <div class="journal-hero-actions">
             <button type="button" class="nav-chip" onclick={() => selectedMonth.shift(-1)} aria-label="Previous month" data-journal-hero-control>
-              Prev
+              <CaretLeft size={16} weight="bold" />
+              <span>Prev</span>
             </button>
             <input
               id="journal-month"
@@ -915,10 +934,12 @@
               data-journal-hero-control
             />
             <button type="button" class="nav-chip" onclick={() => selectedMonth.shift(1)} aria-label="Next month" data-journal-hero-control>
-              Next
+              <span>Next</span>
+              <CaretRight size={16} weight="bold" />
             </button>
             <button class="btn btn-sm btn-primary hero-new-entry" onclick={openNewEntryForToday} data-journal-hero-control>
-              New Entry
+              <PencilSimpleLine size={16} weight="bold" />
+              <span>New entry</span>
             </button>
           </div>
 
@@ -936,7 +957,7 @@
       </section>
 
       <div class="journal-section-heading" data-journal-parallax-section>
-        <h2>Overview</h2>
+        <h2><TrendUp size={18} weight="bold" /> Overview</h2>
       </div>
 
       <section class="journal-metrics-band" data-journal-parallax-section>
@@ -961,7 +982,7 @@
         <article class="journal-feature-panel insights-panel card glass-card" data-journal-card data-journal-hover-lift>
           <div class="panel-header" data-journal-section-copy>
             <div>
-              <span class="panel-kicker">Recurring themes</span>
+              <span class="panel-kicker"><TrendUp size={14} weight="bold" /> Themes</span>
               <h3>Themes</h3>
             </div>
           </div>
@@ -985,7 +1006,7 @@
         <article class="journal-feature-panel insights-panel card glass-card" data-journal-card data-journal-hover-lift>
           <div class="panel-header" data-journal-section-copy>
             <div>
-              <span class="panel-kicker">Mood + workload</span>
+              <span class="panel-kicker"><TrendUp size={14} weight="bold" /> Workload</span>
               <h3>Workload</h3>
             </div>
           </div>
@@ -1017,7 +1038,7 @@
         <article class="journal-feature-panel insights-panel card glass-card" data-journal-card data-journal-hover-lift>
           <div class="panel-header" data-journal-section-copy>
             <div>
-              <span class="panel-kicker">Top wins</span>
+              <span class="panel-kicker"><Sparkle size={14} weight="bold" /> Wins</span>
               <h3>Wins</h3>
             </div>
           </div>
@@ -1040,7 +1061,7 @@
         <article class="journal-feature-panel insights-panel card glass-card" data-journal-card data-journal-hover-lift>
           <div class="panel-header" data-journal-section-copy>
             <div>
-              <span class="panel-kicker">Blockers</span>
+              <span class="panel-kicker"><WarningCircle size={14} weight="bold" /> Blockers</span>
               <h3>Blockers</h3>
             </div>
           </div>
@@ -1073,7 +1094,7 @@
     >
       <div class="panel-header" data-journal-section-copy>
         <div>
-          <span class="panel-kicker">Export</span>
+          <span class="panel-kicker"><DownloadSimple size={14} weight="bold" /> Export</span>
           <h3>Export</h3>
         </div>
       </div>
@@ -1095,7 +1116,8 @@
             disabled={exportLoading || $journal.loading}
             title="Download all entries from the selected month"
           >
-            {exportLoading ? 'Exporting...' : 'Export Month'}
+            <DownloadSimple size={16} weight="bold" />
+            <span>{exportLoading ? 'Exporting...' : 'Export month'}</span>
           </button>
         </div>
       </div>
@@ -1105,7 +1127,7 @@
     <div class="summary-panel card glass-card" aria-live="polite" data-journal-card data-journal-hover-lift>
       <div class="summary-topline">
         <div data-journal-section-copy>
-          <span class="panel-kicker">AI summary</span>
+          <span class="panel-kicker"><Brain size={14} weight="bold" /> Summary</span>
           <h3>Summary</h3>
         </div>
 
@@ -1143,7 +1165,8 @@
           onclick={handleGenerateSummary}
           disabled={$journal.loading || summaryLoading || rangeContentCount === 0}
         >
-          {summaryLoading ? 'Summarizing...' : summaryMode === 'week' ? 'Summarize Week' : 'Summarize Month'}
+          <Sparkle size={16} weight="bold" />
+          <span>{summaryLoading ? 'Summarizing...' : summaryMode === 'week' ? 'Summarize week' : 'Summarize month'}</span>
         </button>
       </div>
 
@@ -1185,7 +1208,8 @@
             onclick={() => openSummaryModal(summaryResult)}
             aria-haspopup="dialog"
           >
-            Open summary
+            <Brain size={16} weight="bold" />
+            <span>Open summary</span>
           </button>
           <p class="summary-footnote">
             Updated {new Date(summaryResult.updated_at || toDateString(new Date())).toLocaleDateString('en-US', {
@@ -1218,7 +1242,7 @@
   >
     <div class="summary-library-header" data-journal-section-copy>
       <div>
-        <span class="panel-kicker">Summary library</span>
+        <span class="panel-kicker"><Brain size={14} weight="bold" /> Library</span>
         <h3>Saved summaries</h3>
       </div>
       <span class="summary-library-count">{$journal.summaryLibrary.length} saved</span>
@@ -1276,6 +1300,9 @@
   </section>
 
   <div class="search-shell" data-journal-parallax-section>
+    <span class="search-shell-icon" aria-hidden="true">
+      <MagnifyingGlass size={18} weight="bold" />
+    </span>
     <input
       bind:this={searchInputEl}
       class="input search-input"
@@ -2983,6 +3010,9 @@
   }
 
   .journal-capability-card {
+    display: grid;
+    align-content: start;
+    gap: 0.55rem;
     padding: 0.95rem 1rem;
     border: 2px solid rgba(42, 24, 15, 0.9);
     border-radius: 8px;
@@ -2993,9 +3023,12 @@
 
   .journal-capability-card strong {
     display: block;
-    margin-bottom: 0.32rem;
     font-family: var(--font-ui);
     font-size: 0.98rem;
+    color: var(--journal-red);
+  }
+
+  .journal-capability-card :global(svg) {
     color: var(--journal-red);
   }
 
@@ -3051,6 +3084,10 @@
   .period-toggle button,
   .pagination-button,
   .summary-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
     border-width: 2px;
     border-radius: 6px;
     box-shadow: 3px 3px 0 rgba(42, 24, 15, 0.12);
@@ -3124,6 +3161,9 @@
   }
 
   .journal-section-heading h2 {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
     margin: 0;
     color: var(--journal-red);
     font-size: 1.65rem;
@@ -3190,6 +3230,27 @@
     position: relative;
     z-index: 1;
     transform-style: preserve-3d;
+  }
+
+  .search-shell {
+    position: relative;
+  }
+
+  .search-shell-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(-50%);
+    color: var(--journal-red);
+    pointer-events: none;
+  }
+
+  .search-input {
+    padding-left: 2.8rem;
   }
 
   [data-journal-parallax-section],

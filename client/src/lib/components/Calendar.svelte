@@ -1,6 +1,16 @@
 <script>
   import { onMount, tick } from 'svelte';
   import gsap from 'gsap';
+  import {
+    CalendarBlank,
+    CaretLeft,
+    CaretRight,
+    CheckCircle,
+    ClockCountdown,
+    ListChecks,
+    Plus,
+    TrendUp
+  } from 'phosphor-svelte';
   import { journal } from '$stores/journal.js';
   import { progress } from '$stores/progress.js';
   import { events } from '$stores/events.js';
@@ -154,10 +164,10 @@
 
   let heroSummary = $derived.by(() => {
     if (monthStats.count === 0 && monthStats.eventCount === 0) {
-      return `${monthHeading} is open for planning.`;
+      return `${monthHeading} is open.`;
     }
 
-    return `${monthStats.count} journal ${monthStats.count === 1 ? 'day' : 'days'}, ${formatHours(monthStats.hours)} logged, ${monthStats.eventCount} scheduled.`;
+    return `${monthStats.count} days · ${formatHours(monthStats.hours)} · ${monthStats.eventCount} items`;
   });
 
   function formatHours(value) {
@@ -251,7 +261,7 @@
 
     if (activeEntry?.status === 'finished') return 'Finished for the day.';
 
-    return 'No entry or events yet.';
+    return 'Nothing here yet.';
   }
 
   function focusDate(date) {
@@ -441,25 +451,25 @@
 
       <div class="calendar-hero-metrics">
         <article class="calendar-mini-stat" data-calendar-animate="metric">
-          <span class="mini-label">Hours</span>
+          <span class="mini-label mini-label-row"><ClockCountdown size={14} weight="bold" /> Hours</span>
           <strong>{formatHours(monthStats.hours)}</strong>
           <span class="mini-note">{monthProgressPercent}% of target</span>
         </article>
 
         <article class="calendar-mini-stat" data-calendar-animate="metric">
-          <span class="mini-label">Finished</span>
+          <span class="mini-label mini-label-row"><CheckCircle size={14} weight="bold" /> Done</span>
           <strong>{monthStats.finished}</strong>
           <span class="mini-note">{monthStats.count} logged days</span>
         </article>
 
         <article class="calendar-mini-stat" data-calendar-animate="metric">
-          <span class="mini-label">Scheduled</span>
+          <span class="mini-label mini-label-row"><CalendarBlank size={14} weight="bold" /> Planned</span>
           <strong>{monthStats.scheduledDays}</strong>
           <span class="mini-note">{monthStats.eventCount} planned</span>
         </article>
 
         <article class="calendar-mini-stat" data-calendar-animate="metric">
-          <span class="mini-label">Streak</span>
+          <span class="mini-label mini-label-row"><TrendUp size={14} weight="bold" /> Streak</span>
           <strong>{$progress.current_streak || 0}</strong>
           <span class="mini-note">days in a row</span>
         </article>
@@ -482,7 +492,8 @@
       <label class="calendar-input-label" for="calendar-month-input">Month</label>
       <div class="calendar-switcher">
         <button type="button" class="calendar-nav-btn" onclick={() => shiftMonth(-1)} aria-label="Previous month">
-          Prev
+          <CaretLeft size={16} weight="bold" />
+          <span>Prev</span>
         </button>
 
         <input
@@ -495,7 +506,8 @@
         />
 
         <button type="button" class="calendar-nav-btn" onclick={() => shiftMonth(1)} aria-label="Next month">
-          Next
+          <span>Next</span>
+          <CaretRight size={16} weight="bold" />
         </button>
       </div>
 
@@ -506,10 +518,12 @@
           onclick={jumpToToday}
           disabled={currentMonthIsToday && activeDate === todayString()}
         >
-          Today
+          <CalendarBlank size={16} weight="bold" />
+          <span>Today</span>
         </button>
         <button type="button" class="calendar-primary-btn" onclick={openTodayPlanner}>
-          New entry
+          <Plus size={16} weight="bold" />
+          <span>New entry</span>
         </button>
       </div>
 
@@ -670,8 +684,8 @@
             </h3>
           </div>
 
-          <span class="rail-status-pill">{upcomingEvents.length} queued</span>
-        </div>
+            <span class="rail-status-pill"><ListChecks size={14} weight="bold" /> {upcomingEvents.length}</span>
+          </div>
 
         {#if upcomingEvents.length > 0}
           <div class="agenda-list">
@@ -708,11 +722,12 @@
             <span class="agenda-progress-meta">{monthProgressPercent}% / {formatHours(monthStats.hours)}</span>
           </div>
 
-          <button type="button" class="calendar-foot-btn" onclick={openTodayPlanner}>
-            Add entry
-          </button>
-        </div>
-      </article>
+            <button type="button" class="calendar-foot-btn" onclick={openTodayPlanner}>
+              <Plus size={16} weight="bold" />
+              <span>Add entry</span>
+            </button>
+          </div>
+        </article>
     </aside>
   </section>
 </div>
@@ -805,6 +820,12 @@
     letter-spacing: 0.11em;
     text-transform: uppercase;
     color: var(--red);
+  }
+
+  .mini-label-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 
   .calendar-title-row {
@@ -943,6 +964,10 @@
   .calendar-secondary-btn,
   .calendar-primary-btn,
   .calendar-foot-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
     min-height: 2.9rem;
     padding: 0.7rem 1rem;
     border-radius: 1rem;

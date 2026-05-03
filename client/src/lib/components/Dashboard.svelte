@@ -1,6 +1,16 @@
 <script>
   import { goto } from '$app/navigation';
   import { onMount, tick } from 'svelte';
+  import {
+    CalendarBlank,
+    CheckCircle,
+    FlagBanner,
+    Lightning,
+    PencilSimpleLine,
+    TrendUp,
+    Trophy,
+    Target
+  } from 'phosphor-svelte';
   import { progress } from '$stores/progress.js';
   import { journal } from '$stores/journal.js';
   import { events } from '$stores/events.js';
@@ -328,11 +338,11 @@
 
   let greetingLabel = $derived.by(() => {
     const pct = $progress.percentage;
-    if (pct >= 100) return 'Requirement complete';
-    if (pct >= 75) return 'Closing stretch';
-    if (pct >= 50) return 'Halfway through';
-    if (pct >= 25) return 'Solid start';
-    return 'Early run';
+    if (pct >= 100) return 'Complete';
+    if (pct >= 75) return 'Closing';
+    if (pct >= 50) return 'Halfway';
+    if (pct >= 25) return 'On track';
+    return 'Starting';
   });
 
   let cadenceLabel = $derived.by(() => {
@@ -366,7 +376,7 @@
 
   let todaySummary = $derived.by(() => {
     if (eventsLoading) return 'Loading';
-    if (todayEvents.length === 0) return 'No events today';
+    if (todayEvents.length === 0) return 'No events';
     return `${todayEvents.length} event${todayEvents.length === 1 ? '' : 's'} today`;
   });
 
@@ -486,10 +496,16 @@
   <header class="dashboard-hero" data-animate="hero">
     <div class="hero-copy">
       <div class="hero-topline">
-        <span class="status-block">{greetingLabel}</span>
-        <span>{todaySummary}</span>
+        <span class="status-block">
+          <TrendUp size={14} weight="bold" />
+          {greetingLabel}
+        </span>
+        <span class="hero-topline-meta">
+          <CalendarBlank size={14} weight="regular" />
+          {todaySummary}
+        </span>
       </div>
-      <h1>Dashboard</h1>
+      <h1>Overview</h1>
       <p class="hero-summary">
         <strong>{formatHours($progress.total_hours)}</strong> of <strong>{formatHours(targetHours)}</strong> logged. <strong>{formatHours($progress.remaining_hours)}</strong> left.
       </p>
@@ -528,8 +544,11 @@
 
   <section class="trajectory-board" data-animate="trajectory" aria-labelledby="trajectory-title">
     <div class="trajectory-copy">
-      <div class="section-marker">Trajectory</div>
-      <h2 id="trajectory-title">Path</h2>
+      <div class="section-marker section-marker-icon">
+        <Target size={14} weight="bold" />
+        Trajectory
+      </div>
+      <h2 id="trajectory-title">Milestone path</h2>
       <p>{trajectoryLine}</p>
     </div>
 
@@ -603,7 +622,7 @@
 
   <section class="metric-grid" aria-label="Key dashboard metrics">
     <article class="metric-card metric-card-primary" data-animate="metric">
-      <div class="metric-label">This month</div>
+      <div class="metric-label metric-label-row"><CalendarBlank size={14} weight="bold" /> Month</div>
       <strong
         data-count-value={monthInsights.totalHours || 0}
         data-count-display={formatHours(monthInsights.totalHours)}
@@ -618,7 +637,7 @@
     </article>
 
     <article class="metric-card" data-animate="metric">
-      <div class="metric-label">Active day avg</div>
+      <div class="metric-label metric-label-row"><Lightning size={14} weight="bold" /> Pace</div>
       <strong
         data-count-value={monthInsights.averagePerActiveDay || 0}
         data-count-display={formatHours(monthInsights.averagePerActiveDay)}
@@ -630,7 +649,7 @@
     </article>
 
     <article class="metric-card" data-animate="metric">
-      <div class="metric-label">Current streak</div>
+      <div class="metric-label metric-label-row"><Trophy size={14} weight="bold" /> Streak</div>
       <strong
         data-count-value={$progress.current_streak || 0}
         data-count-display={`${$progress.current_streak}d`}
@@ -642,7 +661,7 @@
     </article>
 
     <article class="metric-card metric-card-red" data-animate="metric">
-      <div class="metric-label">Next milestone</div>
+      <div class="metric-label metric-label-row"><FlagBanner size={14} weight="bold" /> Next</div>
       <strong>{nextMilestone ? `${nextMilestone.hours}h` : 'Done'}</strong>
       <p>{nextMilestone ? `${formatHours(nextMilestone.remaining)} left` : 'Complete'}</p>
     </article>
@@ -652,7 +671,10 @@
     <article class="summary-panel" data-animate="summary" aria-labelledby="monthly-summary-title">
       <header class="summary-head">
         <div>
-          <div class="section-marker">Month</div>
+          <div class="section-marker section-marker-icon">
+            <CalendarBlank size={14} weight="bold" />
+            Month
+          </div>
           <h2 id="monthly-summary-title">{dashboardMonthLabel}</h2>
         </div>
         <button type="button" class="text-button" onclick={(event) => openDashboardModal('month', event.currentTarget)}>
@@ -683,7 +705,10 @@
     <article class="summary-panel milestones-panel" data-animate="summary" aria-labelledby="milestones-summary-title">
       <header class="summary-head">
         <div>
-          <div class="section-marker">Milestones</div>
+          <div class="section-marker section-marker-icon">
+            <CheckCircle size={14} weight="bold" />
+            Milestones
+          </div>
           <h2 id="milestones-summary-title">{reachedMilestones}/{milestoneCards.length} reached</h2>
         </div>
         <button type="button" class="text-button" onclick={(event) => openDashboardModal('milestones', event.currentTarget)}>
@@ -704,9 +729,12 @@
 
   <section class="journal-cta" data-animate="cta" aria-labelledby="journal-cta-title">
     <div>
-      <div class="section-marker">Action</div>
-      <h2 id="journal-cta-title">Today's journal</h2>
-      <p>{todaySummary}. Log it while it's fresh.</p>
+      <div class="section-marker section-marker-icon">
+        <PencilSimpleLine size={14} weight="bold" />
+        Action
+      </div>
+      <h2 id="journal-cta-title">Log today</h2>
+      <p>{todaySummary}. Capture it while it is fresh.</p>
     </div>
 
     <button
@@ -914,15 +942,7 @@
     min-height: 100%;
     padding: 1.25rem;
     color: var(--dash-ink);
-    background:
-      repeating-linear-gradient(
-        0deg,
-        rgba(36, 21, 14, 0.045) 0,
-        rgba(36, 21, 14, 0.045) 1px,
-        transparent 1px,
-        transparent 34px
-      ),
-      var(--dash-canvas);
+    background: var(--dash-canvas);
     overflow: visible;
   }
 
@@ -962,15 +982,15 @@
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(22rem, 0.75fr);
     gap: 1rem;
-    align-items: stretch;
+    align-items: start;
     padding: 1.2rem;
   }
 
   .hero-copy {
     display: grid;
-    align-content: space-between;
-    gap: 1.2rem;
-    min-height: 18rem;
+    align-content: start;
+    gap: 0.95rem;
+    min-height: 0;
     border: 2px solid var(--dash-border);
     border-radius: 4px;
     padding: 1rem;
@@ -987,6 +1007,14 @@
     font-family: var(--font-ui);
     font-size: 0.9rem;
     color: var(--dash-muted);
+  }
+
+  .hero-topline-meta,
+  .metric-label-row,
+  .section-marker-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
   }
 
   .status-block,
@@ -1010,16 +1038,16 @@
   }
 
   .dashboard h1 {
-    font-size: 4.5rem;
-    line-height: 0.92;
+    font-size: clamp(3rem, 6vw, 4.1rem);
+    line-height: 0.96;
     max-width: 12ch;
   }
 
   .hero-summary {
-    max-width: 52rem;
+    max-width: 40rem;
     font-family: var(--font-ui);
-    font-size: 1.08rem;
-    line-height: 1.45;
+    font-size: 1rem;
+    line-height: 1.5;
     color: var(--dash-ink);
   }
 
@@ -1078,7 +1106,7 @@
 
   .quote-strip {
     display: grid;
-    align-content: end;
+    align-content: start;
     gap: 0.75rem;
     padding: 1rem;
     background:
@@ -1088,8 +1116,8 @@
 
   .quote-strip blockquote {
     font-family: var(--font-display);
-    font-size: 1.55rem;
-    line-height: 1.16;
+    font-size: 1.35rem;
+    line-height: 1.18;
     color: var(--dash-red);
   }
 
@@ -1133,8 +1161,8 @@
   .journal-cta h2,
   .report-panel h2,
   .dashboard-dialog-head h2 {
-    font-size: 2.15rem;
-    line-height: 1.02;
+    font-size: 1.85rem;
+    line-height: 1.04;
   }
 
   .trajectory-copy p,
@@ -1303,25 +1331,25 @@
 
   .metric-card {
     display: grid;
-    gap: 0.8rem;
+    gap: 0.65rem;
     align-content: start;
-    min-height: 12.5rem;
+    min-height: 11.25rem;
     padding: 1rem;
   }
 
   .metric-card-primary {
-    min-height: 14rem;
+    min-height: 12rem;
   }
 
   .metric-card strong {
     font-family: var(--font-display);
-    font-size: 2.75rem;
+    font-size: 2.5rem;
     line-height: 0.95;
     color: var(--dash-red);
   }
 
   .metric-card-primary strong {
-    font-size: 3.8rem;
+    font-size: 3.3rem;
   }
 
   .metric-card-red {
@@ -1470,11 +1498,11 @@
   }
 
   .cta-button {
-    min-width: 13rem;
-    min-height: 4rem;
+    min-width: 11.5rem;
+    min-height: 3.4rem;
     background: var(--dash-paper-strong);
     color: var(--dash-red);
-    font-size: 1.15rem;
+    font-size: 1rem;
   }
 
   .block-button:hover,
@@ -1671,7 +1699,7 @@
 
   @media (max-width: 1180px) {
     .dashboard h1 {
-      font-size: 3.55rem;
+      font-size: 3.15rem;
     }
 
     .dashboard-hero,
@@ -1708,11 +1736,11 @@
     }
 
     .dashboard h1 {
-      font-size: 2.65rem;
+      font-size: 2.45rem;
     }
 
     .hero-copy {
-      min-height: 12rem;
+      min-height: 0;
     }
 
     .month-controls,

@@ -22,8 +22,8 @@
 :root {
   --bg: #fbfae9;
   --bg-soft: #fffdf4;
-  --paper: rgba(255, 255, 255, 0.92);
-  --paper-strong: rgba(255, 255, 255, 0.98);
+  --paper: rgba(255, 255, 255, 0.9);
+  --paper-strong: rgba(255, 255, 255, 0.96);
   --red: #be3519;
   --red-hover: #9e2a13;
   --red-soft: rgba(190, 53, 25, 0.12);
@@ -42,11 +42,11 @@
   --font-body: 'Aileron', system-ui, -apple-system, sans-serif;
   --font-mono: 'Moonshine', monospace;
   --font-ui: 'Aileron', 'Segoe UI', sans-serif;
-  --radius: 10px;
-  --radius-lg: 20px;
-  --shadow: 0 10px 24px rgba(34, 24, 8, 0.06);
-  --shadow-lg: 0 24px 54px rgba(34, 24, 8, 0.14);
-  --shadow-soft: 0 18px 36px rgba(34, 24, 8, 0.08);
+  --radius: 12px;
+  --radius-lg: 18px;
+  --shadow: 0 8px 20px rgba(34, 24, 8, 0.05);
+  --shadow-lg: 0 20px 42px rgba(34, 24, 8, 0.12);
+  --shadow-soft: 0 14px 28px rgba(34, 24, 8, 0.07);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --transition-fast: 0.15s var(--ease-out);
@@ -94,7 +94,7 @@ body {
   background: #fbfae9;
   color: var(--dark);
   font-family: var(--font-body);
-  line-height: 1.6;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -135,25 +135,28 @@ h1, h2, h3, h4 {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.6rem 1.4rem;
-  border: 1px solid var(--red);
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.62rem 1.1rem;
+  border: 1px solid rgba(190, 53, 25, 0.2);
   border-radius: var(--radius);
   font-family: var(--font-ui);
   font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   transition: background var(--transition-normal), color var(--transition-normal),
     border-color var(--transition-normal), transform var(--transition-fast),
     box-shadow var(--transition-normal);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.8);
   color: var(--red);
 }
 .btn:hover {
-  background: var(--red);
-  color: var(--bg);
+  background: rgba(190, 53, 25, 0.08);
+  color: var(--red);
+  border-color: rgba(190, 53, 25, 0.28);
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(190, 53, 25, 0.22);
+  box-shadow: 0 10px 18px rgba(34, 24, 8, 0.08);
 }
 .btn:active {
   transform: translateY(0);
@@ -172,11 +175,13 @@ h1, h2, h3, h4 {
 .btn-primary {
   background: var(--red);
   color: var(--bg);
+  border-color: var(--red);
 }
 .btn-primary:hover {
   background: var(--red-hover);
+  color: var(--bg);
   border-color: var(--red-hover);
-  box-shadow: 0 14px 28px rgba(190, 53, 25, 0.28);
+  box-shadow: 0 14px 24px rgba(190, 53, 25, 0.2);
 }
 
 .btn-sm {
@@ -193,12 +198,13 @@ h1, h2, h3, h4 {
 
 .input {
   width: 100%;
-  padding: 0.7rem 1rem;
-  border: 1px solid var(--border);
+  min-height: 2.85rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(190, 53, 25, 0.16);
   border-radius: var(--radius);
   font-family: var(--font-body);
-  font-size: 0.95rem;
-  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.94rem;
+  background: rgba(255, 255, 255, 0.86);
   color: var(--dark);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -211,11 +217,11 @@ h1, h2, h3, h4 {
 .textarea {
   width: 100%;
   padding: 0.7rem 1rem;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(190, 53, 25, 0.16);
   border-radius: var(--radius);
   font-family: var(--font-body);
   font-size: 0.95rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--dark);
   resize: vertical;
   min-height: 120px;
@@ -257,10 +263,10 @@ h1, h2, h3, h4 {
 
 .card {
   position: relative;
-  background: rgba(255, 254, 248, 0.96);
-  border: 1px solid rgba(190, 53, 25, 0.08);
+  background: rgba(255, 254, 248, 0.94);
+  border: 1px solid rgba(190, 53, 25, 0.1);
   border-radius: var(--radius-lg);
-  padding: 1.5rem;
+  padding: 1.35rem;
   box-shadow: var(--shadow);
   transition: box-shadow var(--transition-normal), transform var(--transition-normal),
     border-color var(--transition-fast);
@@ -281,12 +287,12 @@ h1, h2, h3, h4 {
 .label {
   display: block;
   font-family: var(--font-ui);
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--dark-soft);
-  margin-bottom: 0.4rem;
+  letter-spacing: 0.1em;
+  color: var(--dark-muted);
+  margin-bottom: 0.35rem;
 }
 
 .badge {
