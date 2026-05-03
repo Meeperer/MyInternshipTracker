@@ -482,90 +482,74 @@
     const cleanupFns = [];
 
     const ctx = gsap.context(() => {
-      const parallaxSections = gsap.utils.toArray('[data-journal-parallax-section]');
+      const parallaxSections = gsap
+        .utils.toArray('[data-journal-parallax-section]')
+        .filter((section) => !section.classList.contains('journal-hero'));
 
       const heroTimeline = gsap.timeline({
         defaults: {
-          duration: 0.78,
-          ease: 'power3.out'
+          duration: 0.24,
+          ease: 'power1.out'
         }
       });
 
       heroTimeline
-        .from('[data-journal-hero-mark]', {
-          y: 22,
-          opacity: 0
+        .fromTo('[data-journal-accent]', {
+          autoAlpha: 0.82
+        }, {
+          autoAlpha: 1,
+          duration: 0.2,
+          stagger: 0.02
         })
-        .from(
+        .fromTo('[data-journal-hero-mark]', {
+          y: 4,
+          autoAlpha: 0.62
+        }, {
+          y: 0,
+          autoAlpha: 1
+        }, 0)
+        .fromTo(
           '[data-journal-hero-title]',
           {
-            y: 28,
-            opacity: 0,
-            scale: 0.98
+            y: 5,
+            autoAlpha: 0.72
           },
-          '-=0.48'
+          {
+            y: 0,
+            autoAlpha: 1
+          },
+          '-=0.12'
         )
-        .from(
+        .fromTo(
           '[data-journal-hero-copy]',
           {
-            y: 26,
-            opacity: 0,
-            stagger: 0.08
+            y: 4,
+            autoAlpha: 0.76,
+            stagger: 0.03
           },
-          '-=0.42'
+          {
+            y: 0,
+            autoAlpha: 1,
+            stagger: 0.03
+          },
+          '-=0.08'
         )
-        .from(
+        .fromTo(
           '[data-journal-hero-control]',
           {
-            y: 24,
-            opacity: 0,
-            stagger: 0.08
+            y: 4,
+            autoAlpha: 0.82,
+            stagger: 0.03
           },
-          '-=0.48'
+          {
+            y: 0,
+            autoAlpha: 1,
+            stagger: 0.03
+          },
+          '-=0.08'
         );
 
-      gsap.utils.toArray('[data-journal-accent]').forEach((accent, index) => {
-        gsap.to(accent, {
-          yPercent: index % 2 === 0 ? -5 : 5,
-          xPercent: index % 2 === 0 ? 2 : -2,
-          rotate: index % 2 === 0 ? -1.1 : 1.1,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: journalPageEl,
-            start: 'top bottom',
-            end: 'bottom top',
-            scrub: 1.4
-          }
-        });
-      });
-
-      gsap.to('[data-journal-hero-main]', {
-        y: -18,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: journalPageEl,
-          start: 'top top',
-          end: 'top+=520 top',
-          scrub: 1.1
-        }
-      });
-
-      gsap.to('[data-journal-hero-deck]', {
-        y: -10,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: journalPageEl,
-          start: 'top top',
-          end: 'top+=520 top',
-          scrub: 1.1
-        }
-      });
-
-      parallaxSections.forEach((section, index) => {
-        if (section.classList.contains('journal-hero')) {
-          return;
-        }
-
+      parallaxSections.forEach((section) => {
         const cards = gsap.utils.toArray(section.querySelectorAll('[data-journal-card]'));
         const textLayers = gsap.utils.toArray(
           section.querySelectorAll(
@@ -574,86 +558,63 @@
         );
         const motionTargets = cards.length ? cards : [section];
 
-        gsap.timeline({
+        const revealTimeline = gsap.timeline({
           defaults: { ease: 'power2.out' },
           scrollTrigger: {
             trigger: section,
-            start: 'top 82%',
-            end: 'top 56%',
-            toggleActions: 'play none none reverse'
+            start: 'top 84%',
+            once: true
           }
-        })
-          .fromTo(
+        });
+
+        if (textLayers.length) {
+          revealTimeline.fromTo(
             textLayers,
             {
-              y: 18,
+              y: 10,
               autoAlpha: 0
             },
             {
               y: 0,
               autoAlpha: 1,
-              duration: 0.56,
-              stagger: textLayers.length > 1 ? 0.04 : 0
+              duration: 0.42,
+              stagger: textLayers.length > 1 ? 0.03 : 0
             },
             0
-          )
-          .fromTo(
-            motionTargets,
-            {
-              y: 30,
-              autoAlpha: 0,
-              scale: 0.985
-            },
-            {
-              y: 0,
-              autoAlpha: 1,
-              scale: 1,
-              duration: 0.72,
-              ease: 'power3.out',
-              stagger: cards.length > 1 ? 0.06 : 0
-            },
-            0.06
           );
-
-        gsap.to(motionTargets, {
-          y: -8 - Math.min(index * 1.2, 4),
-          ease: 'none',
-          stagger: cards.length > 1 ? 0.02 : 0,
-          scrollTrigger: {
-            trigger: section,
-            start: 'top bottom',
-            end: 'bottom top',
-            scrub: 1.25
-          }
-        });
-
-        if (textLayers.length) {
-          gsap.to(textLayers, {
-            y: -6,
-            ease: 'none',
-            stagger: textLayers.length > 1 ? 0.02 : 0,
-            scrollTrigger: {
-              trigger: section,
-              start: 'top bottom',
-              end: 'bottom top',
-              scrub: 1.35
-            }
-          });
         }
+
+        revealTimeline.fromTo(
+          motionTargets,
+          {
+            y: 14,
+            autoAlpha: 0,
+            scale: 0.994
+          },
+          {
+            y: 0,
+            autoAlpha: 1,
+            scale: 1,
+            duration: 0.5,
+            ease: 'power2.out',
+            stagger: cards.length > 1 ? 0.04 : 0
+          },
+          textLayers.length ? 0.03 : 0
+        );
       });
 
       gsap.utils.toArray('[data-journal-hover-lift]').forEach((panel) => {
         const hoverIn = () =>
           gsap.to(panel, {
-            y: -3,
-            duration: 0.18,
+            y: -2,
+            duration: 0.16,
             ease: 'power2.out'
           });
 
         const hoverOut = () =>
           gsap.to(panel, {
             y: 0,
-            duration: 0.2,
+            duration: 0.16,
             ease: 'power2.out'
           });
 
@@ -668,7 +629,7 @@
           panel.removeEventListener('focusout', hoverOut);
         });
       });
-    }, journalViewEl);
+    }, journalPageEl);
 
     const refresh = () => ScrollTrigger.refresh();
 
@@ -1610,8 +1571,6 @@
   .journal-parallax-page {
     position: relative;
     isolation: isolate;
-    perspective: 960px;
-    transform-style: preserve-3d;
   }
 
   .journal-parallax-backdrop {
@@ -1625,7 +1584,6 @@
   .journal-accent,
   .journal-accent-line {
     position: absolute;
-    will-change: transform;
   }
 
   .journal-accent {
@@ -3292,8 +3250,8 @@
   [data-journal-support-layer],
   [data-journal-note-stack],
   [data-journal-accent] {
-    will-change: transform, opacity;
-    backface-visibility: hidden;
+    will-change: auto;
+    backface-visibility: visible;
   }
 
   .overview-card strong {
