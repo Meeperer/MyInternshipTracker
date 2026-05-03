@@ -14,6 +14,7 @@ import { supabaseAdmin } from './services/supabase.js';
 
 const app = express();
 const isDev = process.env.NODE_ENV !== 'production';
+const LOCAL_DEV_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
 app.use(helmet());
 
@@ -23,7 +24,10 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin && isDev) return cb(null, true);
+    if (isDev) {
+      if (!origin) return cb(null, true);
+      if (LOCAL_DEV_ORIGIN_RE.test(origin)) return cb(null, true);
+    }
     if (origin && allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
