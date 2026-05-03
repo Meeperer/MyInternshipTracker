@@ -30,6 +30,7 @@
   });
   const PAGE_SIZE = 5;
   let journalViewEl = $state(null);
+  let journalPageEl = $state(null);
 
   function formatMonthLabel(monthValue) {
     const { year, month } = parseMonthValue(monthValue);
@@ -469,7 +470,7 @@
   });
 
   onMount(() => {
-    if (typeof window === 'undefined' || !journalViewEl) return;
+    if (typeof window === 'undefined' || !journalViewEl || !journalPageEl) return;
 
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const compactViewportQuery = window.matchMedia('(max-width: 900px)');
@@ -477,6 +478,8 @@
     if (motionQuery.matches || compactViewportQuery.matches) return;
 
     gsap.registerPlugin(ScrollTrigger);
+
+    const cleanupFns = [];
 
     const ctx = gsap.context(() => {
       const heroTimeline = gsap.timeline({
@@ -519,23 +522,160 @@
           '-=0.48'
         );
 
-      gsap.utils.toArray('[data-journal-reveal]').forEach((section, index) => {
+      gsap.utils.toArray('[data-journal-accent]').forEach((accent, index) => {
+        gsap.to(accent, {
+          yPercent: index % 2 === 0 ? -14 : 14,
+          xPercent: index % 2 === 0 ? 6 : -6,
+          rotate: index % 2 === 0 ? -3 : 3,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: journalPageEl,
+            start: 'top top',
+            end: 'bottom bottom',
+            scrub: 1.2
+          }
+        });
+      });
+
+      gsap.to('[data-journal-hero-main]', {
+        yPercent: -7,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: journalPageEl,
+          start: 'top top',
+          end: 'top+=700 top',
+          scrub: 0.9
+        }
+      });
+
+      gsap.to('[data-journal-hero-deck]', {
+        yPercent: -4,
+        scale: 1.01,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: journalPageEl,
+          start: 'top top',
+          end: 'top+=720 top',
+          scrub: 1
+        }
+      });
+
+      gsap.utils.toArray('[data-journal-parallax-section]').forEach((section, index) => {
         const cards = section.querySelectorAll('[data-journal-card]');
         const targets = cards.length ? cards : [section];
+        const heading = section.querySelector('[data-journal-section-copy]');
+        const supportLayer = section.querySelector('[data-journal-support-layer]');
+        const noteStack = section.querySelector('[data-journal-note-stack]');
 
-        gsap.from(targets, {
-          y: 42,
-          opacity: 0,
-          scale: 0.965,
-          rotate: index % 2 === 0 ? 0.6 : -0.6,
-          stagger: cards.length > 1 ? 0.1 : 0,
-          duration: 0.88,
-          ease: 'power3.out',
+        const timeline = gsap.timeline({
+          defaults: { ease: 'none' },
           scrollTrigger: {
             trigger: section,
-            start: 'top 80%',
-            toggleActions: 'play none none reverse'
+            start: 'top 88%',
+            end: 'bottom 16%',
+            scrub: 1.05
           }
+        });
+
+        if (heading) {
+          timeline.fromTo(
+            heading,
+            {
+              y: 40,
+              opacity: 0.38
+            },
+            {
+              y: -10,
+              opacity: 1
+            },
+            0
+          );
+        }
+
+        timeline.fromTo(
+          targets,
+          {
+            y: 78,
+            opacity: 0.56,
+            scale: 0.948,
+            rotate: index % 2 === 0 ? 0.7 : -0.7
+          },
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            rotate: 0,
+            stagger: cards.length > 1 ? 0.09 : 0
+          },
+          0.04
+        );
+
+        timeline.to(
+          targets,
+          {
+            y: -18,
+            scale: 0.988,
+            opacity: 0.9,
+            stagger: cards.length > 1 ? 0.05 : 0
+          },
+          0.64
+        );
+
+        if (supportLayer) {
+          timeline.fromTo(
+            supportLayer,
+            {
+              y: 24,
+              opacity: 0.55
+            },
+            {
+              y: -8,
+              opacity: 1
+            },
+            0.12
+          );
+        }
+
+        if (noteStack) {
+          timeline.fromTo(
+            noteStack,
+            {
+              y: 30,
+              opacity: 0.6
+            },
+            {
+              y: -12,
+              opacity: 1
+            },
+            0.18
+          );
+        }
+      });
+
+      gsap.utils.toArray('[data-journal-hover-lift]').forEach((panel) => {
+        const hoverIn = () =>
+          gsap.to(panel, {
+            y: -6,
+            duration: 0.22,
+            ease: 'power2.out'
+          });
+
+        const hoverOut = () =>
+          gsap.to(panel, {
+            y: 0,
+            duration: 0.24,
+            ease: 'power2.out'
+          });
+
+        panel.addEventListener('mouseenter', hoverIn);
+        panel.addEventListener('mouseleave', hoverOut);
+        panel.addEventListener('focusin', hoverIn);
+        panel.addEventListener('focusout', hoverOut);
+        cleanupFns.push(() => {
+          panel.removeEventListener('mouseenter', hoverIn);
+          panel.removeEventListener('mouseleave', hoverOut);
+          panel.removeEventListener('focusin', hoverIn);
+          panel.removeEventListener('focusout', hoverOut);
         });
       });
     }, journalViewEl);
@@ -557,6 +697,7 @@
     window.addEventListener('resize', refresh);
 
     return () => {
+      cleanupFns.forEach((cleanup) => cleanup());
       ctx.revert();
       window.removeEventListener('resize', refresh);
 
@@ -770,38 +911,48 @@
   }
 </script>
 
-<div class="journal-stage-shell">
-  <div class="journal-stage">
+<div class="journal-parallax-page" bind:this={journalPageEl}>
+  <div class="journal-parallax-backdrop" aria-hidden="true">
+    <span class="journal-accent journal-accent-a" data-journal-accent></span>
+    <span class="journal-accent journal-accent-b" data-journal-accent></span>
+    <span class="journal-accent journal-accent-c" data-journal-accent></span>
+    <span class="journal-accent journal-accent-d" data-journal-accent></span>
+    <span class="journal-accent-line journal-accent-line-a" data-journal-accent></span>
+    <span class="journal-accent-line journal-accent-line-b" data-journal-accent></span>
+  </div>
+
+  <div class="journal-stage-shell">
+    <div class="journal-stage">
     <div class="journal-view" bind:this={journalViewEl} aria-busy={$journal.loading || summaryLoading}>
-      <section class="journal-hero" data-journal-reveal>
-        <div class="journal-hero-main">
+      <section class="journal-hero" data-journal-parallax-section>
+        <div class="journal-hero-main" data-journal-hero-main data-journal-section-copy>
           <p class="journal-hero-mark" data-journal-hero-mark>Journal workspace</p>
           <h1 class="journal-hero-title" data-journal-hero-title>Journal Entries</h1>
           <p class="journal-subtitle" data-journal-hero-copy>
             Write your monthly record, read the patterns hiding in your notes, and turn one page of work into a cleaner story.
           </p>
 
-          <div class="journal-capability-strip" data-journal-hero-copy>
-            <article class="journal-capability-card">
+          <div class="journal-capability-strip" data-journal-hero-copy data-journal-support-layer>
+            <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
               <strong>Write today&apos;s entry</strong>
               <p>Jump straight into the current day and log hours without leaving the workspace.</p>
             </article>
-            <article class="journal-capability-card">
+            <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
               <strong>Move month to month</strong>
               <p>Shift the archive quickly so your entries, summaries, and progress stay in sync.</p>
             </article>
-            <article class="journal-capability-card">
+            <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
               <strong>Read the patterns</strong>
               <p>Surface recurring themes, weekly workload, wins, and blockers from the notes themselves.</p>
             </article>
-            <article class="journal-capability-card">
+            <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
               <strong>Export or summarize</strong>
               <p>Generate a reusable readout when you need a cleaner weekly or monthly handoff.</p>
             </article>
           </div>
         </div>
 
-        <aside class="journal-control-deck" data-journal-card>
+        <aside class="journal-control-deck" data-journal-card data-journal-hover-lift data-journal-hero-deck>
           <div class="journal-control-heading" data-journal-hero-control>
             <span class="journal-control-label">Month controls</span>
             <p>Keep navigation, capture, and review work in one place.</p>
@@ -840,32 +991,32 @@
         </aside>
       </section>
 
-      <div class="journal-section-heading" data-journal-reveal>
+      <div class="journal-section-heading" data-journal-parallax-section>
         <h2>Month readout</h2>
-        <p>The clearest signals from this month, arranged so you can scan the record before opening individual entries.</p>
+        <p data-journal-section-copy>The clearest signals from this month, arranged so you can scan the record before opening individual entries.</p>
       </div>
 
-      <section class="journal-metrics-band" data-journal-reveal>
-        <article class="overview-card journal-metric-card" data-journal-card>
+      <section class="journal-metrics-band" data-journal-parallax-section>
+        <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
           <span class="overview-label">Selected month</span>
           <strong>{formatMonthLabel($selectedMonth)}</strong>
           <p>{$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'} tracked</p>
         </article>
-        <article class="overview-card journal-metric-card" data-journal-card>
+        <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
           <span class="overview-label">Hours logged</span>
           <strong>{formatHoursValue(monthHours)}</strong>
           <p>Across the current month</p>
         </article>
-        <article class="overview-card journal-metric-card" data-journal-card>
+        <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
           <span class="overview-label">Finished days</span>
           <strong>{monthFinishedCount}</strong>
           <p>Locked and completed</p>
         </article>
       </section>
 
-      <section class="journal-insight-grid journal-insight-grid-top" data-journal-reveal>
-        <article class="journal-feature-panel insights-panel card glass-card" data-journal-card>
-          <div class="panel-header">
+      <section class="journal-insight-grid journal-insight-grid-top" data-journal-parallax-section>
+        <article class="journal-feature-panel insights-panel card glass-card" data-journal-card data-journal-hover-lift>
+          <div class="panel-header" data-journal-section-copy>
             <div>
               <span class="panel-kicker">Recurring themes</span>
               <h3>What keeps showing up</h3>
@@ -874,7 +1025,7 @@
           </div>
 
           {#if journalInsights.recurringThemes.length > 0}
-            <div class="theme-chip-list">
+            <div class="theme-chip-list" data-journal-support-layer>
               {#each journalInsights.recurringThemes as theme}
                 <span class="theme-chip">
                   <strong>{theme.label}</strong>
@@ -890,8 +1041,8 @@
           {/if}
         </article>
 
-        <article class="journal-feature-panel insights-panel card glass-card" data-journal-card>
-          <div class="panel-header">
+        <article class="journal-feature-panel insights-panel card glass-card" data-journal-card data-journal-hover-lift>
+          <div class="panel-header" data-journal-section-copy>
             <div>
               <span class="panel-kicker">Mood + workload</span>
               <h3>How the month feels</h3>
@@ -900,7 +1051,7 @@
           </div>
 
           {#if journalInsights.workloadTrend.length > 0}
-            <div class="trend-list">
+            <div class="trend-list" data-journal-support-layer>
               {#each journalInsights.workloadTrend as week}
                 <div class="trend-row">
                   <div class="trend-copy">
@@ -923,9 +1074,9 @@
         </article>
       </section>
 
-      <section class="journal-insight-grid journal-insight-grid-bottom" data-journal-reveal>
-        <article class="journal-feature-panel insights-panel card glass-card" data-journal-card>
-          <div class="panel-header">
+      <section class="journal-insight-grid journal-insight-grid-bottom" data-journal-parallax-section>
+        <article class="journal-feature-panel insights-panel card glass-card" data-journal-card data-journal-hover-lift>
+          <div class="panel-header" data-journal-section-copy>
             <div>
               <span class="panel-kicker">Top wins</span>
               <h3>Work worth keeping</h3>
@@ -934,7 +1085,7 @@
           </div>
 
           {#if journalInsights.topWins.length > 0}
-            <div class="insight-note-list">
+            <div class="insight-note-list" data-journal-note-stack>
               {#each journalInsights.topWins as win}
                 <div class="insight-note insight-note-win">
                   <p>{win}</p>
@@ -949,8 +1100,8 @@
           {/if}
         </article>
 
-        <article class="journal-feature-panel insights-panel card glass-card" data-journal-card>
-          <div class="panel-header">
+        <article class="journal-feature-panel insights-panel card glass-card" data-journal-card data-journal-hover-lift>
+          <div class="panel-header" data-journal-section-copy>
             <div>
               <span class="panel-kicker">Blockers</span>
               <h3>What slowed you down</h3>
@@ -959,7 +1110,7 @@
           </div>
 
           {#if journalInsights.blockers.length > 0}
-            <div class="insight-note-list">
+            <div class="insight-note-list" data-journal-note-stack>
               {#each journalInsights.blockers as blocker}
                 <div class="insight-note insight-note-blocker">
                   <p>{blocker}</p>
@@ -975,16 +1126,17 @@
         </article>
       </section>
     </div>
+    </div>
   </div>
-</div>
 
 <div class="journal-afterflow">
-  <section class="workspace-grid" data-journal-reveal>
+  <section class="workspace-grid" data-journal-parallax-section>
     <div
       class="journal-controls card glass-card"
       data-journal-card
+      data-journal-hover-lift
     >
-      <div class="panel-header">
+      <div class="panel-header" data-journal-section-copy>
         <div>
           <span class="panel-kicker">Export</span>
           <h3>Monthly export</h3>
@@ -1018,9 +1170,9 @@
       </p>
     </div>
 
-    <div class="summary-panel card glass-card" aria-live="polite" data-journal-card>
+    <div class="summary-panel card glass-card" aria-live="polite" data-journal-card data-journal-hover-lift>
       <div class="summary-topline">
-        <div>
+        <div data-journal-section-copy>
           <span class="panel-kicker">AI summary</span>
           <h3>Period summary</h3>
           <p class="summary-caption">Summarize the whole month or narrow it down to a week inside the current month.</p>
@@ -1133,12 +1285,12 @@
     </div>
   </section>
 
-  <section
+      <section
     class="summary-library-shell card glass-card"
     bind:this={summaryLibrarySectionEl}
-    data-journal-reveal
+    data-journal-parallax-section
   >
-    <div class="summary-library-header">
+    <div class="summary-library-header" data-journal-section-copy>
       <div>
         <span class="panel-kicker">Summary library</span>
         <h3>Saved weekly + monthly reads</h3>
@@ -1160,7 +1312,7 @@
     {:else if $journal.summaryLibrary.length > 0}
       <div class="summary-library-list">
         {#each $journal.summaryLibrary as item}
-          <article class:pinned={item.pinned} class="summary-library-item" data-journal-card>
+          <article class:pinned={item.pinned} class="summary-library-item" data-journal-card data-journal-hover-lift>
             <div class="summary-library-copy">
               <div class="summary-library-meta">
                 <span class="summary-library-type">{formatSummaryType(item.period)}</span>
@@ -1199,7 +1351,7 @@
     {/if}
   </section>
 
-  <div class="search-shell" data-journal-reveal>
+  <div class="search-shell" data-journal-parallax-section>
     <input
       bind:this={searchInputEl}
       class="input search-input"
@@ -1213,9 +1365,9 @@
   <section
     class="entries-shell card glass-card"
     aria-live="polite"
-    data-journal-reveal
+    data-journal-parallax-section
   >
-    <div class="entries-toolbar">
+    <div class="entries-toolbar" data-journal-section-copy>
       <div>
         <h3>Entries</h3>
         <p class="entries-summary">
@@ -1266,7 +1418,7 @@
       {:else}
         <div class="accordion-list">
           {#each paginatedEntries as entry}
-            <article class:open={expandedEntryDate === entry.date} class="entry-accordion" data-journal-card>
+            <article class:open={expandedEntryDate === entry.date} class="entry-accordion" data-journal-card data-journal-hover-lift>
               <button
                 type="button"
                 class="entry-trigger"
@@ -1392,6 +1544,7 @@
     </div>
   </section>
 </div>
+</div>
 
 {#if showSummaryModal && modalSummary}
   <div
@@ -1464,19 +1617,97 @@
 {/if}
 
 <style>
+  .journal-parallax-page {
+    position: relative;
+    isolation: isolate;
+    perspective: 1200px;
+    transform-style: preserve-3d;
+  }
+
+  .journal-parallax-backdrop {
+    position: absolute;
+    inset: 0;
+    overflow: clip;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .journal-accent,
+  .journal-accent-line {
+    position: absolute;
+    will-change: transform;
+  }
+
+  .journal-accent {
+    border: 2px solid rgba(42, 24, 15, 0.18);
+    border-radius: 8px;
+    background: rgba(255, 248, 235, 0.76);
+    box-shadow: 0 0 0 1px rgba(190, 53, 25, 0.04);
+  }
+
+  .journal-accent-a {
+    top: 10rem;
+    right: 5%;
+    width: 18rem;
+    height: 12rem;
+    transform: rotate(-4deg);
+  }
+
+  .journal-accent-b {
+    top: 36rem;
+    left: 5%;
+    width: 16rem;
+    height: 10rem;
+    transform: rotate(5deg);
+  }
+
+  .journal-accent-c {
+    top: 74rem;
+    right: 9%;
+    width: 14rem;
+    height: 9rem;
+    transform: rotate(4deg);
+  }
+
+  .journal-accent-d {
+    top: 112rem;
+    left: 8%;
+    width: 12rem;
+    height: 8rem;
+    transform: rotate(-5deg);
+  }
+
+  .journal-accent-line {
+    background: linear-gradient(90deg, rgba(190, 53, 25, 0), rgba(190, 53, 25, 0.18), rgba(190, 53, 25, 0));
+  }
+
+  .journal-accent-line-a {
+    top: 22rem;
+    left: 8%;
+    width: 84%;
+    height: 1px;
+  }
+
+  .journal-accent-line-b {
+    top: 92rem;
+    right: 7%;
+    width: 72%;
+    height: 1px;
+  }
+
   .journal-stage-shell {
     position: relative;
     width: 100%;
-    min-height: calc(100dvh - 1rem);
+    min-height: 0;
+    z-index: 1;
   }
 
   .journal-stage {
-    position: sticky;
-    top: 0;
+    position: relative;
     width: 100%;
     display: flex;
     justify-content: center;
-    overflow: clip;
+    overflow: visible;
   }
 
   .journal-view {
@@ -1510,6 +1741,8 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    position: relative;
+    z-index: 1;
   }
 
   .panel-kicker {
@@ -2769,6 +3002,8 @@
     --journal-shadow-tight: 4px 4px 0 rgba(33, 20, 13, 0.14);
     gap: 1.35rem;
     padding: 2.2rem 1.8rem 1rem;
+    position: relative;
+    z-index: 1;
   }
 
   .journal-hero {
@@ -2780,6 +3015,7 @@
     border-radius: 8px;
     background: var(--journal-paper);
     box-shadow: var(--journal-shadow);
+    transform-style: preserve-3d;
   }
 
   .journal-hero-main,
@@ -2837,6 +3073,7 @@
     border-radius: 8px;
     background: var(--journal-paper-soft);
     box-shadow: var(--journal-shadow-tight);
+    transform-origin: center center;
   }
 
   .journal-capability-card strong {
@@ -2861,8 +3098,9 @@
     padding: 1rem;
     border: 2px solid var(--journal-border);
     border-radius: 8px;
-    background: linear-gradient(180deg, rgba(190, 53, 25, 0.08), rgba(255, 248, 235, 0.95));
+    background: var(--journal-paper-soft);
     box-shadow: var(--journal-shadow-tight);
+    transform-origin: center center;
   }
 
   .journal-control-heading p {
@@ -2979,6 +3217,7 @@
     align-items: flex-end;
     padding: 0.25rem 0.15rem 0;
     border-top: 2px solid rgba(42, 24, 15, 0.28);
+    transform-style: preserve-3d;
   }
 
   .journal-section-heading h2 {
@@ -2998,6 +3237,7 @@
   .journal-insight-grid {
     display: grid;
     gap: 1rem;
+    transform-style: preserve-3d;
   }
 
   .journal-metrics-band {
@@ -3045,6 +3285,25 @@
   .entries-shell,
   .journal-feature-panel {
     padding: 1.25rem;
+  }
+
+  .summary-library-shell,
+  .entries-shell,
+  .search-shell,
+  .workspace-grid {
+    position: relative;
+    z-index: 1;
+    transform-style: preserve-3d;
+  }
+
+  [data-journal-parallax-section],
+  [data-journal-card],
+  [data-journal-section-copy],
+  [data-journal-support-layer],
+  [data-journal-note-stack],
+  [data-journal-accent] {
+    will-change: transform, opacity;
+    backface-visibility: hidden;
   }
 
   .overview-card strong {
@@ -3358,7 +3617,26 @@
     }
   }
 
+  @media (max-width: 900px) {
+    .journal-parallax-backdrop {
+      display: none;
+    }
+
+    [data-journal-parallax-section],
+    [data-journal-card],
+    [data-journal-section-copy],
+    [data-journal-support-layer],
+    [data-journal-note-stack],
+    [data-journal-accent] {
+      will-change: auto;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
+    .journal-parallax-backdrop {
+      display: none;
+    }
+
     .journal-view *,
     .journal-afterflow * {
       transition-duration: 0.01ms !important;
