@@ -1492,6 +1492,127 @@
     background: linear-gradient(90deg, rgba(190, 53, 25, 0.92), rgba(158, 42, 19, 0.82));
   }
 
+  .calendar-surface {
+    border-width: 1px;
+    box-shadow: 0 8px 18px rgba(37, 21, 7, 0.04);
+  }
+
+  .calendar-surface::before {
+    box-shadow: none;
+  }
+
+  .calendar-hero-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem 1.15rem;
+    margin-top: 1rem;
+    padding-top: 0.95rem;
+    border-top: 1px solid rgba(190, 53, 25, 0.12);
+  }
+
+  .calendar-mini-stat {
+    min-width: 8.5rem;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .calendar-board-head,
+  .rail-card-head {
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid rgba(190, 53, 25, 0.08);
+  }
+
+  .legend-chip,
+  .rail-status-pill,
+  .selected-tag {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .calendar-grid-head {
+    gap: 0.3rem;
+  }
+
+  .calendar-day-head {
+    padding: 0.35rem 0.25rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    border-bottom: 1px solid rgba(190, 53, 25, 0.12);
+  }
+
+  .calendar-day-cell,
+  .calendar-skeleton-cell {
+    border-width: 1px;
+    border-radius: 0.82rem;
+    background: rgba(255, 255, 255, 0.58);
+  }
+
+  .calendar-day-cell:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgba(190, 53, 25, 0.05);
+  }
+
+  .calendar-day-cell.selected {
+    box-shadow: inset 0 0 0 1px rgba(190, 53, 25, 0.14);
+  }
+
+  .selected-day-events,
+  .agenda-list {
+    gap: 0;
+  }
+
+  .selected-event-item,
+  .agenda-item {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .selected-event-item + .selected-event-item,
+  .agenda-item + .agenda-item {
+    margin-top: 0.8rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid rgba(190, 53, 25, 0.1);
+  }
+
+  .agenda-item {
+    padding: 0.65rem 0;
+  }
+
+  .agenda-item:hover {
+    transform: none;
+    border-color: transparent;
+    background: rgba(190, 53, 25, 0.03);
+  }
+
+  .selected-event-item {
+    padding: 0.75rem 0;
+  }
+
+  .agenda-date-block {
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    text-align: left;
+  }
+
+  .calendar-empty-note {
+    padding: 0.9rem 0 0;
+    border: 0;
+    border-top: 1px dashed rgba(190, 53, 25, 0.18);
+    border-radius: 0;
+    background: transparent;
+  }
+
   @keyframes calendarPulse {
     from {
       opacity: 0.62;
