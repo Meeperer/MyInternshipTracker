@@ -935,12 +935,13 @@
     --dash-red-dark: #8f2412;
     --dash-ink: #24150e;
     --dash-muted: #725f4c;
-    --dash-border: #24150e;
-    --dash-shadow: 7px 7px 0 var(--dash-ink);
-    --dash-red-shadow: 7px 7px 0 var(--dash-red);
+    --dash-border: rgba(36, 21, 14, 0.18);
+    --dash-divider: rgba(36, 21, 14, 0.12);
+    --dash-shadow: 0 1px 0 rgba(36, 21, 14, 0.08), 0 18px 34px rgba(36, 21, 14, 0.05);
+    --dash-red-shadow: 0 1px 0 rgba(190, 53, 25, 0.12), 0 18px 34px rgba(190, 53, 25, 0.08);
     width: 100%;
     min-height: 100%;
-    padding: 1.25rem;
+    padding: 1.35rem;
     color: var(--dash-ink);
     background: var(--dash-canvas);
     overflow: visible;
@@ -966,14 +967,12 @@
     color: var(--dash-ink);
   }
 
-  .dashboard-hero,
   .trajectory-board,
-  .metric-card,
+  .metric-grid,
   .summary-panel,
-  .journal-cta,
   .report-panel {
-    border: 2px solid var(--dash-border);
-    border-radius: 6px;
+    border: 1px solid var(--dash-border);
+    border-radius: 10px;
     background: var(--dash-paper);
     box-shadow: var(--dash-shadow);
   }
@@ -983,7 +982,8 @@
     grid-template-columns: minmax(0, 1.25fr) minmax(22rem, 0.75fr);
     gap: 1rem;
     align-items: start;
-    padding: 1.2rem;
+    padding: 0 0 1.15rem;
+    border-bottom: 1px solid var(--dash-divider);
   }
 
   .hero-copy {
@@ -991,12 +991,7 @@
     align-content: start;
     gap: 0.95rem;
     min-height: 0;
-    border: 2px solid var(--dash-border);
-    border-radius: 4px;
-    padding: 1rem;
-    background:
-      linear-gradient(90deg, rgba(190, 53, 25, 0.09) 0 0.6rem, transparent 0.6rem),
-      var(--dash-paper-strong);
+    padding: 0.15rem 0;
   }
 
   .hero-topline {
@@ -1025,20 +1020,26 @@
     display: inline-flex;
     width: fit-content;
     align-items: center;
-    min-height: 1.9rem;
-    padding: 0.25rem 0.55rem;
-    border: 2px solid var(--dash-border);
-    border-radius: 3px;
-    background: var(--dash-red);
-    color: var(--dash-paper-strong);
+    gap: 0.35rem;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--dash-muted);
     font-family: var(--font-ui);
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 800;
     line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .status-block {
+    color: var(--dash-red);
   }
 
   .dashboard h1 {
-    font-size: clamp(3rem, 6vw, 4.1rem);
+    font-size: clamp(3rem, 5vw, 3.85rem);
     line-height: 0.96;
     max-width: 12ch;
   }
@@ -1059,20 +1060,20 @@
   .hero-tools {
     display: grid;
     grid-template-rows: auto 1fr;
-    gap: 1rem;
+    gap: 0.85rem;
   }
 
   .month-console,
   .quote-strip {
-    border: 2px solid var(--dash-border);
-    border-radius: 4px;
-    background: var(--dash-paper-strong);
+    border: none;
+    border-radius: 0;
+    background: transparent;
   }
 
   .month-console {
     display: grid;
-    gap: 0.75rem;
-    padding: 0.9rem;
+    gap: 0.55rem;
+    padding: 0;
   }
 
   .month-controls {
@@ -1089,8 +1090,8 @@
   .month-input {
     width: 100%;
     min-height: 2.65rem;
-    border: 2px solid var(--dash-border);
-    border-radius: 3px;
+    border: 1px solid var(--dash-border);
+    border-radius: 8px;
     background: #fffef8;
     color: var(--dash-ink);
     font-family: var(--font-ui);
@@ -1107,16 +1108,14 @@
   .quote-strip {
     display: grid;
     align-content: start;
-    gap: 0.75rem;
-    padding: 1rem;
-    background:
-      linear-gradient(180deg, transparent 0 58%, rgba(190, 53, 25, 0.1) 58% 100%),
-      var(--dash-paper-strong);
+    gap: 0.45rem;
+    padding: 0.85rem 0 0;
+    border-top: 1px solid var(--dash-divider);
   }
 
   .quote-strip blockquote {
     font-family: var(--font-display);
-    font-size: 1.35rem;
+    font-size: 1.25rem;
     line-height: 1.18;
     color: var(--dash-red);
   }
@@ -1133,10 +1132,10 @@
     grid-template-columns: minmax(16rem, 0.75fr) minmax(12rem, 0.45fr) minmax(20rem, 1fr);
     gap: 1rem;
     align-items: stretch;
-    margin-top: 1.35rem;
-    padding: 1.1rem;
+    margin-top: 0.2rem;
+    padding: 1.2rem;
     background: var(--dash-paper-strong);
-    box-shadow: var(--dash-red-shadow);
+    box-shadow: var(--dash-shadow);
   }
 
   .trajectory-copy,
@@ -1144,16 +1143,16 @@
   .trajectory-progress,
   .trajectory-stats > div,
   .trajectory-loading {
-    border: 2px solid var(--dash-border);
-    border-radius: 4px;
-    background: var(--dash-paper);
+    border: none;
+    border-radius: 0;
+    background: transparent;
   }
 
   .trajectory-copy {
     display: grid;
     align-content: space-between;
     gap: 1.1rem;
-    padding: 1rem;
+    padding: 0;
   }
 
   .trajectory-copy h2,
@@ -1183,7 +1182,8 @@
     place-items: center;
     align-content: center;
     gap: 0.35rem;
-    padding: 1rem;
+    padding: 1.15rem 1rem;
+    border-radius: 10px;
     background: var(--dash-red);
     color: var(--dash-paper-strong);
   }
@@ -1205,7 +1205,7 @@
     display: grid;
     align-content: center;
     gap: 0.75rem;
-    padding: 1rem;
+    padding: 0.1rem 0;
   }
 
   .progress-head,
@@ -1226,8 +1226,8 @@
   .small-track {
     position: relative;
     height: 1.25rem;
-    border: 2px solid var(--dash-border);
-    border-radius: 3px;
+    border: 1px solid var(--dash-border);
+    border-radius: 999px;
     background:
       repeating-linear-gradient(
         90deg,
@@ -1253,7 +1253,7 @@
     top: 50%;
     width: 0.7rem;
     height: 1.95rem;
-    border: 2px solid var(--dash-border);
+    border: 1px solid var(--dash-border);
     border-radius: 2px;
     background: var(--dash-paper-strong);
     transform: translate(-50%, -50%);
@@ -1283,7 +1283,8 @@
     display: grid;
     align-content: space-between;
     gap: 0.55rem;
-    padding: 0.85rem;
+    padding: 0.85rem 0 0;
+    border-top: 1px solid var(--dash-divider);
   }
 
   .trajectory-stats dt,
@@ -1327,18 +1328,26 @@
     grid-template-columns: minmax(18rem, 1.4fr) repeat(3, minmax(13rem, 1fr));
     gap: 1rem;
     margin-top: 1.35rem;
+    padding: 1.05rem 1.2rem;
   }
 
   .metric-card {
     display: grid;
     gap: 0.65rem;
     align-content: start;
-    min-height: 11.25rem;
-    padding: 1rem;
+    min-height: 0;
+    padding: 0.1rem 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .metric-card-primary {
-    min-height: 12rem;
+    min-height: 0;
+  }
+
+  .metric-card:not(:first-child) {
+    border-left: 1px solid var(--dash-divider);
+    padding-left: 1rem;
   }
 
   .metric-card strong {
@@ -1353,18 +1362,17 @@
   }
 
   .metric-card-red {
-    background: var(--dash-red);
-    color: var(--dash-paper-strong);
+    border-left-color: var(--dash-red);
+    background: rgba(190, 53, 25, 0.06);
   }
 
   .metric-card-red .metric-label {
-    background: var(--dash-paper-strong);
     color: var(--dash-red);
   }
 
   .metric-card-red strong,
   .metric-card-red p {
-    color: var(--dash-paper-strong);
+    color: var(--dash-ink);
   }
 
   .small-track {
@@ -1382,7 +1390,7 @@
   .summary-panel {
     display: grid;
     gap: 1rem;
-    padding: 1rem;
+    padding: 1.05rem 1.15rem;
   }
 
   .summary-head,
@@ -1403,15 +1411,17 @@
   .summary-list {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.65rem;
+    gap: 0.9rem;
   }
 
   .summary-list > div {
     min-width: 0;
-    border: 2px solid var(--dash-border);
-    border-radius: 4px;
-    background: var(--dash-paper-strong);
-    padding: 0.8rem;
+    padding: 0.1rem 0;
+  }
+
+  .summary-list > div:not(:first-child) {
+    border-left: 1px solid var(--dash-divider);
+    padding-left: 0.9rem;
   }
 
   .summary-list dd {
@@ -1425,23 +1435,22 @@
   .milestone-strip {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.65rem;
+    gap: 0.9rem;
   }
 
   .milestone-block {
     display: grid;
-    gap: 0.35rem;
-    min-height: 7.8rem;
-    align-content: space-between;
-    border: 2px solid var(--dash-border);
-    border-radius: 4px;
-    background: var(--dash-paper-strong);
-    padding: 0.8rem;
+    gap: 0.5rem;
+    min-height: 0;
+    align-content: start;
+    padding: 0.75rem 0 0;
+    border-top: 2px solid var(--dash-divider);
+    background: transparent;
   }
 
   .milestone-block.reached {
-    background: var(--dash-ink);
-    color: var(--dash-paper-strong);
+    color: var(--dash-ink);
+    border-top-color: var(--dash-red);
   }
 
   .milestone-block span,
@@ -1452,6 +1461,15 @@
 
   .milestone-block strong {
     font-size: 0.9rem;
+    color: var(--dash-red);
+  }
+
+  .milestone-block span {
+    color: var(--dash-muted);
+  }
+
+  .milestone-block.reached strong {
+    color: var(--dash-ink);
   }
 
   .journal-cta {
@@ -1463,7 +1481,9 @@
     padding: 1.15rem;
     background: var(--dash-red);
     color: var(--dash-paper-strong);
-    box-shadow: var(--dash-shadow);
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 16px 28px rgba(190, 53, 25, 0.16);
   }
 
   .journal-cta h2,
@@ -1472,8 +1492,7 @@
   }
 
   .journal-cta .section-marker {
-    background: var(--dash-paper-strong);
-    color: var(--dash-red);
+    color: rgba(255, 251, 239, 0.76);
   }
 
   .cta-button,
@@ -1484,8 +1503,8 @@
     justify-content: center;
     align-items: center;
     min-height: 2.65rem;
-    border: 2px solid var(--dash-border);
-    border-radius: 3px;
+    border: 1px solid var(--dash-border);
+    border-radius: 8px;
     background: var(--dash-paper-strong);
     color: var(--dash-ink);
     font-family: var(--font-ui);
@@ -1493,7 +1512,7 @@
     font-weight: 900;
     line-height: 1;
     padding: 0.65rem 0.9rem;
-    box-shadow: 4px 4px 0 var(--dash-ink);
+    box-shadow: none;
     transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
   }
 
@@ -1517,7 +1536,7 @@
   .text-button:active,
   .dashboard-dialog-close:active,
   .cta-button:active {
-    box-shadow: 2px 2px 0 var(--dash-ink);
+    box-shadow: inset 0 0 0 1px rgba(36, 21, 14, 0.12);
   }
 
   .block-button:focus-visible,
@@ -1540,7 +1559,7 @@
 
   .report-panel {
     margin-top: 1.35rem;
-    padding: 1rem;
+    padding: 1.05rem 1.15rem;
   }
 
   .dashboard-dialog {
@@ -1726,13 +1745,11 @@
       padding: 0.8rem;
     }
 
-    .dashboard-hero,
     .trajectory-board,
-    .metric-card,
+    .metric-grid,
     .summary-panel,
-    .journal-cta,
     .report-panel {
-      box-shadow: 5px 5px 0 var(--dash-ink);
+      box-shadow: var(--dash-shadow);
     }
 
     .dashboard h1 {
@@ -1755,6 +1772,23 @@
 
     .month-controls {
       align-items: stretch;
+    }
+
+    .metric-grid {
+      gap: 0.85rem;
+    }
+
+    .metric-card,
+    .metric-card:not(:first-child) {
+      border-left: 0;
+      padding-left: 0;
+    }
+
+    .summary-list > div:not(:first-child) {
+      border-left: 0;
+      border-top: 1px solid var(--dash-divider);
+      padding-left: 0;
+      padding-top: 0.8rem;
     }
 
     .quote-strip blockquote {
