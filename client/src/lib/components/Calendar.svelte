@@ -59,6 +59,8 @@
   let calendarRoot = $state(null);
   let prefersReducedMotion = $state(false);
   let activeDate = $state('');
+  let previewDate = $state('');
+  let previewTray = $state({ x: 0, y: 0 });
   let entranceContext;
   let lastAnimatedKey = '';
 
@@ -142,9 +144,9 @@
     return cells;
   });
 
-  let activeEntry = $derived.by(() => entries[activeDate] || null);
-  let activeDayEvents = $derived.by(() => {
-    const dayEvents = activeDate ? [...(eventsMap[activeDate] || [])] : [];
+  let previewEntry = $derived.by(() => entries[previewDate] || null);
+  let previewDayEvents = $derived.by(() => {
+    const dayEvents = previewDate ? [...(eventsMap[previewDate] || [])] : [];
     return dayEvents.sort(compareEvents);
   });
 
@@ -254,25 +256,53 @@
     return labelParts.join(', ');
   }
 
-  function selectedDateSummary() {
-    if (!activeDate) return 'Pick a day.';
+  function dateSummary(date, entry, dayEvents) {
+    if (!date) return 'Pick a day.';
 
-    const entryPreview = getEntryPreview(activeEntry);
+    const entryPreview = getEntryPreview(entry);
     if (entryPreview) return entryPreview;
 
-    if (activeDayEvents.length > 0) return `${activeDayEvents.length} scheduled ${activeDayEvents.length === 1 ? 'item' : 'items'}.`;
+    if (dayEvents.length > 0) return `${dayEvents.length} scheduled ${dayEvents.length === 1 ? 'item' : 'items'}.`;
 
-    if (activeEntry?.status === 'finished') return 'Finished for the day.';
+    if (entry?.status === 'finished') return 'Finished for the day.';
 
     return 'Nothing here yet.';
   }
 
-  function focusDate(date) {
-    activeDate = date;
+  function updatePreviewPosition(event) {
+    if (typeof window === 'undefined' || !event?.currentTarget) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const trayWidth = 286;
+    const trayHeight = 190;
+    const gap = 12;
+
+    let x = rect.right + gap;
+    if (x + trayWidth > window.innerWidth - gap) {
+      x = rect.left - trayWidth - gap;
+    }
+
+    let y = rect.top + rect.height / 2;
+    y = Math.max(gap + trayHeight / 2, Math.min(window.innerHeight - gap - trayHeight / 2, y));
+
+    previewTray = {
+      x: Math.max(gap, x),
+      y
+    };
+  }
+
+  function showDatePreview(date, event) {
+    previewDate = date;
+    updatePreviewPosition(event);
+  }
+
+  function clearDatePreview() {
+    previewDate = '';
   }
 
   function openDate(date) {
     activeDate = date;
+    previewDate = '';
 
     const monthValue = getMonthValueFromDateString(date);
     if (monthValue !== $selectedMonth) {
@@ -326,6 +356,7 @@
       !cell.isCurrentMonth ? 'other-month' : '',
       isToday(cell.date) ? 'today' : '',
       activeDate === cell.date ? 'selected' : '',
+      previewDate === cell.date ? 'previewed' : '',
       checked ? 'checked' : '',
       hasLoggedHours ? 'has-hours' : '',
       hasEvents ? 'has-events' : '',
@@ -353,17 +384,17 @@
     entranceContext = gsap.context(() => {
       const timeline = gsap.timeline({
         defaults: {
-          duration: 0.56,
-          ease: 'power3.out'
+          duration: 0.34,
+          ease: 'power2.out'
         }
       });
 
       timeline
-        .from('[data-calendar-animate="hero-copy"]', { autoAlpha: 0, y: 18 })
-        .from('[data-calendar-animate="hero-controls"]', { autoAlpha: 0, y: 20 }, '-=0.38')
-        .from('[data-calendar-animate="metric"]', { autoAlpha: 0, y: 12, stagger: 0.055, duration: 0.42 }, '-=0.34')
-        .from('[data-calendar-animate="board"]', { autoAlpha: 0, y: 18, duration: 0.56 }, '-=0.28')
-        .from('[data-calendar-animate="rail"]', { autoAlpha: 0, y: 16, stagger: 0.08, duration: 0.48 }, '-=0.3');
+        .from('[data-calendar-animate="hero-copy"]', { autoAlpha: 0.9, y: 8 })
+        .from('[data-calendar-animate="hero-controls"]', { autoAlpha: 0.9, y: 8 }, '-=0.22')
+        .from('[data-calendar-animate="metric"]', { autoAlpha: 0.9, y: 6, stagger: 0.035, duration: 0.28 }, '-=0.2')
+        .from('[data-calendar-animate="board"]', { autoAlpha: 0.94, y: 8, duration: 0.32 }, '-=0.16')
+        .from('[data-calendar-animate="rail"]', { autoAlpha: 0.94, y: 8, stagger: 0.045, duration: 0.3 }, '-=0.18');
     }, calendarRoot);
   }
 
@@ -445,17 +476,20 @@
 
 <div class="calendar-view" bind:this={calendarRoot} aria-busy={calendarBusy}>
   <section class="calendar-hero calendar-surface">
+    <img
+      class="botanical-cutout calendar-botanical-mark"
+      src="/plants/palm-fan.png"
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      data-tone="cream"
+    />
     <div class="calendar-hero-copy" data-calendar-animate="hero-copy">
       <p class="calendar-kicker">Month plot</p>
       <div class="calendar-title-row">
         <h1>{monthHeading} <span>{currentYear}</span></h1>
       </div>
-      <svg class="calendar-botanical-mark" width="118" height="70" viewBox="0 0 118 70" aria-hidden="true">
-        <path d="M10 58h78" />
-        <path d="M45 58V12" />
-        <path d="M45 28C31 16 21 15 13 20c7 13 18 17 32 8Z" />
-        <path d="M45 39c18-18 34-20 49-12-10 18-25 24-49 12Z" />
-      </svg>
       <p class="calendar-hero-summary">{heroSummary}</p>
 
       <div class="calendar-hero-metrics">
@@ -576,8 +610,11 @@
               type="button"
               class={cellClasses(cell).join(' ')}
               onclick={() => openDate(cell.date)}
-              onmouseenter={() => focusDate(cell.date)}
-              onfocus={() => focusDate(cell.date)}
+              onmouseenter={(event) => showDatePreview(cell.date, event)}
+              onmousemove={updatePreviewPosition}
+              onmouseleave={clearDatePreview}
+              onfocus={(event) => showDatePreview(cell.date, event)}
+              onblur={clearDatePreview}
               aria-current={isToday(cell.date) ? 'date' : undefined}
               aria-pressed={activeDate === cell.date}
               aria-label={getCellAriaLabel(cell)}
@@ -618,68 +655,50 @@
 
       <footer class="calendar-board-foot">
         <button type="button" class="calendar-foot-btn" onclick={openActiveDay} disabled={!activeDate}>
-          Open day
+          Quick log selected day
         </button>
       </footer>
     </div>
 
-    <aside class="calendar-rail">
-      <article class="calendar-detail-card calendar-surface" data-calendar-animate="rail" data-calendar-month-panel>
-        <div class="rail-card-head">
-          <div>
-            <p class="calendar-section-label">Day</p>
-            <h3>{activeDate ? formatDateLong(activeDate) : 'Select a day'}</h3>
-          </div>
-
-          <span class="rail-status-pill">{getStatusLabel(activeEntry)}</span>
+    {#if previewDate}
+      <aside
+        class="calendar-hover-tray"
+        style={`--tray-x: ${previewTray.x}px; --tray-y: ${previewTray.y}px;`}
+        aria-hidden="true"
+      >
+        <div class="hover-tray-head">
+          <span>{formatDateLong(previewDate)}</span>
+          <strong>{getStatusLabel(previewEntry)}</strong>
         </div>
 
-        <div class="selected-day-tags">
-          {#if activeDate && isToday(activeDate)}
-            <span class="selected-tag">Today</span>
+        <div class="hover-tray-tags">
+          {#if previewEntry}
+            <span>{formatHours(previewEntry.hours || 0)} logged</span>
           {/if}
-          {#if activeEntry}
-            <span class="selected-tag">{formatHours(activeEntry.hours || 0)} logged</span>
+          {#if previewDayEvents.length > 0}
+            <span>{previewDayEvents.length} {previewDayEvents.length === 1 ? 'item' : 'items'}</span>
           {/if}
-          {#if activeDayEvents.length > 0}
-            <span class="selected-tag">{activeDayEvents.length} {activeDayEvents.length === 1 ? 'event' : 'events'}</span>
-          {/if}
-          {#if activeDate && getMonthValueFromDateString(activeDate) !== $selectedMonth}
-            <span class="selected-tag">Outside view</span>
+          {#if isToday(previewDate)}
+            <span>Today</span>
           {/if}
         </div>
 
-        <p class="selected-day-summary">{selectedDateSummary()}</p>
+        <p>{dateSummary(previewDate, previewEntry, previewDayEvents)}</p>
 
-        {#if activeDayEvents.length > 0}
-          <div class="selected-day-events">
-            {#each activeDayEvents.slice(0, 3) as event}
-              <article class="selected-event-item">
-                <div class="selected-event-topline">
-                  <span class={`event-type-chip event-type-${event.type || 'meeting'}`}>{getEventTypeLabel(event.type)}</span>
-                  <span class="selected-event-time">{formatEventTimeRange(event)}</span>
-                </div>
+        {#if previewDayEvents.length > 0}
+          <div class="hover-tray-events">
+            {#each previewDayEvents.slice(0, 2) as event}
+              <div>
+                <span>{formatEventTimeRange(event)}</span>
                 <strong>{event.title}</strong>
-                {#if event.description}
-                  <p>{truncate(event.description, 96)}</p>
-                {/if}
-              </article>
+              </div>
             {/each}
           </div>
-        {:else}
-          <div class="calendar-empty-note">No events yet.</div>
         {/if}
+      </aside>
+    {/if}
 
-        <div class="selected-day-actions">
-          <button type="button" class="calendar-primary-btn" onclick={openActiveDay} disabled={!activeDate}>
-            Open
-          </button>
-          <button type="button" class="calendar-secondary-btn" onclick={() => openPlannerDay(activeDate)} disabled={!activeDate}>
-            Add hours or event
-          </button>
-        </div>
-      </article>
-
+    <aside class="calendar-rail">
       <article class="calendar-agenda-card calendar-surface" data-calendar-animate="rail" data-calendar-month-panel>
         <div class="rail-card-head">
           <div>
@@ -807,7 +826,6 @@
   .calendar-hero-copy,
   .calendar-hero-controls,
   .calendar-board,
-  .calendar-detail-card,
   .calendar-agenda-card {
     position: relative;
     z-index: 1;
@@ -853,7 +871,7 @@
     color: var(--red);
     font-size: clamp(2.35rem, 4vw, 3.8rem);
     line-height: 0.94;
-    letter-spacing: -0.05em;
+    letter-spacing: 0;
   }
 
   .calendar-title-row h1 span {
@@ -1053,7 +1071,6 @@
   }
 
   .calendar-board,
-  .calendar-detail-card,
   .calendar-agenda-card {
     padding: 1.05rem;
   }
@@ -1331,10 +1348,8 @@
     border-top: 1px solid rgba(11, 110, 58, 0.1);
   }
 
-  .selected-day-summary,
   .calendar-empty-note,
   .agenda-progress-meta,
-  .selected-event-item p,
   .agenda-copy p {
     color: var(--dark-soft);
     font-size: 0.92rem;
@@ -1346,32 +1361,18 @@
     gap: 1rem;
   }
 
-  .selected-day-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    margin-top: 0.85rem;
-  }
-
-  .selected-day-events,
   .agenda-list {
     display: grid;
     gap: 0.7rem;
     margin-top: 1rem;
   }
 
-  .selected-event-item,
   .agenda-item {
     border: 2px solid rgba(11, 110, 58, 0.1);
     border-radius: 1rem;
     background: rgba(255, 255, 255, 0.74);
   }
 
-  .selected-event-item {
-    padding: 0.8rem 0.85rem;
-  }
-
-  .selected-event-topline,
   .agenda-topline {
     display: flex;
     align-items: center;
@@ -1380,14 +1381,12 @@
     margin-bottom: 0.45rem;
   }
 
-  .selected-event-item strong,
   .agenda-copy strong {
     color: var(--dark);
     font-size: 0.96rem;
     line-height: 1.35;
   }
 
-  .selected-event-time,
   .agenda-time {
     color: var(--dark-muted);
     font-family: var(--font-ui);
@@ -1406,13 +1405,6 @@
   }
 
   .calendar-empty-note-soft {
-    margin-top: 1rem;
-  }
-
-  .selected-day-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.65rem;
     margin-top: 1rem;
   }
 
@@ -1571,19 +1563,16 @@
     box-shadow: inset 0 0 0 1px rgba(11, 110, 58, 0.14);
   }
 
-  .selected-day-events,
   .agenda-list {
     gap: 0;
   }
 
-  .selected-event-item,
   .agenda-item {
     border: 0;
     border-radius: 0;
     background: transparent;
   }
 
-  .selected-event-item + .selected-event-item,
   .agenda-item + .agenda-item {
     margin-top: 0.8rem;
     padding-top: 0.8rem;
@@ -1598,10 +1587,6 @@
     transform: none;
     border-color: transparent;
     background: rgba(11, 110, 58, 0.03);
-  }
-
-  .selected-event-item {
-    padding: 0.75rem 0;
   }
 
   .agenda-date-block {
@@ -1640,20 +1625,20 @@
   .calendar-hero {
     position: relative;
     align-items: stretch;
+    isolation: isolate;
+    overflow: hidden;
   }
 
   .calendar-botanical-mark {
     position: absolute;
-    right: clamp(0.6rem, 2vw, 1rem);
-    bottom: clamp(0.65rem, 2vw, 1rem);
-    width: clamp(5.4rem, 11vw, 7.4rem);
+    right: clamp(-6rem, -5vw, -2.2rem);
+    bottom: clamp(-7rem, -6vw, -3.4rem);
+    z-index: 0;
+    width: clamp(16rem, 28vw, 24rem);
     height: auto;
-    fill: none;
-    stroke: rgba(49, 95, 54, 0.3);
-    stroke-width: 3;
-    stroke-linecap: square;
-    stroke-linejoin: miter;
+    opacity: 0.08;
     pointer-events: none;
+    transform: rotate(-10deg);
   }
 
   .calendar-hero-copy {
@@ -1770,6 +1755,7 @@
 
   .calendar-hero {
     border-color: rgba(36, 24, 15, 0.92);
+    border-radius: 8px;
     background:
       linear-gradient(rgba(248, 239, 212, 0.075) 1px, transparent 1px),
       linear-gradient(90deg, rgba(248, 239, 212, 0.075) 1px, transparent 1px),
@@ -1778,17 +1764,43 @@
     color: var(--cream);
   }
 
-  .calendar-hero::after {
-    content: '';
-    position: absolute;
-    right: clamp(0.9rem, 2vw, 1.4rem);
-    top: clamp(0.9rem, 2vw, 1.35rem);
-    width: clamp(4.5rem, 10vw, 7rem);
-    height: clamp(4.5rem, 10vw, 7rem);
-    border: 2px solid rgba(248, 239, 212, 0.24);
-    background: var(--pollen);
-    clip-path: polygon(50% 0, 92% 25%, 76% 84%, 24% 84%, 8% 25%);
-    pointer-events: none;
+  .calendar-surface,
+  .calendar-mini-stat,
+  .calendar-month-input,
+  .calendar-nav-btn,
+  .calendar-secondary-btn,
+  .calendar-primary-btn,
+  .calendar-foot-btn,
+  .calendar-day-head,
+  .calendar-day-cell,
+  .calendar-skeleton-cell,
+  .legend-chip,
+  .rail-status-pill,
+  .selected-tag {
+    border-radius: 8px;
+  }
+
+  .calendar-surface,
+  .calendar-mini-stat,
+  .calendar-day-cell,
+  .calendar-nav-btn,
+  .calendar-secondary-btn,
+  .calendar-primary-btn,
+  .calendar-foot-btn {
+    transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out),
+      border-color 0.16s var(--ease-out), background-color 0.16s var(--ease-out);
+  }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .calendar-surface:hover {
+      box-shadow: 5px 5px 0 rgba(36, 24, 15, 0.14);
+    }
+
+    .calendar-mini-stat:hover,
+    .calendar-day-cell:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 rgba(36, 24, 15, 0.1);
+    }
   }
 
   .calendar-title-row h1,
@@ -1807,16 +1819,18 @@
   }
 
   .calendar-botanical-mark {
-    stroke: rgba(216, 227, 184, 0.72);
+    opacity: 0.08;
   }
 
   .calendar-mini-stat {
-    padding-right: 1rem;
-    border-right: 1px solid rgba(248, 239, 212, 0.18);
+    min-width: 0;
+    padding: 0.72rem 0.75rem;
+    border: 1px solid rgba(248, 239, 212, 0.22);
+    background: rgba(248, 239, 212, 0.08);
   }
 
   .calendar-mini-stat:last-child {
-    border-right: 0;
+    border-right: 1px solid rgba(248, 239, 212, 0.22);
   }
 
   .calendar-mini-stat strong,
@@ -1827,6 +1841,13 @@
 
   .calendar-hero .mini-note {
     color: rgba(248, 239, 212, 0.78);
+  }
+
+  .calendar-hero-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.55rem;
+    border-top-color: rgba(248, 239, 212, 0.18);
   }
 
   .calendar-hero-controls {
@@ -1904,6 +1925,11 @@
     background: rgba(216, 227, 184, 0.22);
   }
 
+  .calendar-day-cell.previewed:not(.selected) {
+    background: rgba(216, 227, 184, 0.26);
+    border-color: rgba(36, 24, 15, 0.72);
+  }
+
   .calendar-day-cell.today {
     background: rgba(216, 227, 184, 0.32);
     border-color: rgba(36, 24, 15, 0.88);
@@ -1945,6 +1971,145 @@
     color: var(--canopy);
   }
 
+  .calendar-workspace {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-board.calendar-surface {
+    overflow: visible;
+  }
+
+  .calendar-rail {
+    display: block;
+  }
+
+  .calendar-agenda-card {
+    padding: 0.95rem 1rem;
+  }
+
+  .calendar-agenda-card .agenda-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+  }
+
+  .calendar-agenda-card .agenda-item {
+    padding: 0.75rem;
+    border: 1px solid rgba(36, 24, 15, 0.16);
+    border-radius: 8px;
+    background: rgba(255, 252, 240, 0.58);
+  }
+
+  .calendar-agenda-card .agenda-item + .agenda-item {
+    margin-top: 0;
+    border-top: 1px solid rgba(36, 24, 15, 0.16);
+  }
+
+  .calendar-hover-tray {
+    position: fixed;
+    left: var(--tray-x);
+    top: var(--tray-y);
+    z-index: 200;
+    width: min(17.875rem, calc(100vw - 1.5rem));
+    padding: 0.85rem;
+    border: 2px solid rgba(36, 24, 15, 0.9);
+    border-radius: 8px;
+    background: var(--paper-strong);
+    color: var(--canopy);
+    box-shadow: 6px 6px 0 rgba(36, 24, 15, 0.16);
+    pointer-events: none;
+    transform: translateY(-50%);
+    animation: calendarTrayIn 0.14s var(--ease-out) both;
+  }
+
+  .hover-tray-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid rgba(36, 24, 15, 0.14);
+  }
+
+  .hover-tray-head span,
+  .hover-tray-events span {
+    color: var(--moss);
+    font-family: var(--font-ui);
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .hover-tray-head strong {
+    flex-shrink: 0;
+    color: var(--leaf);
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .hover-tray-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+  }
+
+  .hover-tray-tags span {
+    display: inline-flex;
+    padding: 0.22rem 0.48rem;
+    border: 1px solid rgba(36, 24, 15, 0.18);
+    border-radius: 999px;
+    background: var(--pollen-soft);
+    color: var(--canopy);
+    font-family: var(--font-ui);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .calendar-hover-tray p {
+    margin-top: 0.7rem;
+    color: var(--dark-soft);
+    font-size: 0.88rem;
+    line-height: 1.42;
+  }
+
+  .hover-tray-events {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 0.75rem;
+  }
+
+  .hover-tray-events div {
+    display: grid;
+    gap: 0.18rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid rgba(36, 24, 15, 0.12);
+  }
+
+  .hover-tray-events strong {
+    color: var(--canopy);
+    font-size: 0.9rem;
+    line-height: 1.25;
+  }
+
+  @keyframes calendarTrayIn {
+    from {
+      opacity: 0;
+      transform: translateY(calc(-50% + 4px)) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(-50%) scale(1);
+    }
+  }
+
   @keyframes calendarPulse {
     from {
       opacity: 0.62;
@@ -1972,6 +2137,10 @@
   @media (max-width: 1120px) {
     .calendar-workspace {
       grid-template-columns: 1fr;
+    }
+
+    .calendar-agenda-card .agenda-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .calendar-hero-metrics {
@@ -2016,7 +2185,6 @@
 
     .calendar-hero,
     .calendar-board,
-    .calendar-detail-card,
     .calendar-agenda-card {
       padding: 0.9rem;
     }
@@ -2027,7 +2195,7 @@
 
     .calendar-switcher,
     .calendar-hero-actions,
-    .selected-day-actions {
+    .calendar-agenda-card .agenda-list {
       grid-template-columns: 1fr;
     }
 
@@ -2132,6 +2300,405 @@
       transition: none !important;
       animation: none !important;
       transform: none !important;
+    }
+
+    .calendar-hover-tray {
+      animation: none !important;
+    }
+  }
+
+  @media (hover: none) {
+    .calendar-hover-tray {
+      display: none;
+    }
+  }
+
+  /* Viewport calendar pass */
+  .calendar-view {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.75rem;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .calendar-hero {
+    margin-bottom: 0;
+    grid-template-columns: minmax(0, 1.1fr) minmax(20rem, 0.72fr);
+    gap: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .calendar-hero-copy {
+    min-height: 0;
+    padding-right: 0;
+  }
+
+  .calendar-hero-summary {
+    margin-top: 0.45rem;
+    font-size: 0.9rem;
+  }
+
+  .calendar-hero-metrics {
+    display: none;
+  }
+
+  .calendar-mini-stat {
+    padding: 0.58rem 0.65rem;
+  }
+
+  .calendar-mini-stat strong {
+    font-size: clamp(1.2rem, 1.65vw, 1.55rem);
+  }
+
+  .mini-note {
+    font-size: 0.74rem;
+  }
+
+  .calendar-hero-controls {
+    gap: 0.55rem;
+    padding: 0.85rem;
+  }
+
+  .calendar-controls-copy,
+  .calendar-hero-actions {
+    display: none;
+  }
+
+  .calendar-workspace {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-rail {
+    display: none;
+  }
+
+  .calendar-board {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .calendar-board-foot {
+    display: none;
+  }
+
+  .calendar-grid {
+    min-height: 0;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+  }
+
+  .calendar-grid-skeleton {
+    min-height: 0;
+  }
+
+  .calendar-day-cell,
+  .calendar-skeleton-cell {
+    aspect-ratio: auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  @media (min-width: 761px) and (max-width: 980px) {
+    .calendar-view {
+      gap: 0.6rem;
+      padding: 0.65rem;
+    }
+
+    .calendar-hero {
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.7fr);
+      gap: 0.65rem;
+      padding: 0.75rem;
+    }
+
+    .calendar-hero-copy {
+      min-height: 0;
+      padding-right: 0;
+    }
+
+    .calendar-hero-summary,
+    .calendar-controls-copy,
+    .calendar-botanical-mark {
+      display: none;
+    }
+
+    .calendar-title-row {
+      margin-top: 0;
+    }
+
+    .calendar-title-row h1 {
+      font-size: clamp(2.1rem, 5vw, 3rem);
+    }
+
+    .calendar-hero-metrics {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.45rem;
+      margin-top: 0.65rem;
+      padding-top: 0.65rem;
+    }
+
+    .calendar-mini-stat {
+      padding: 0.55rem;
+    }
+
+    .calendar-mini-stat strong {
+      font-size: 1.35rem;
+    }
+
+    .mini-note {
+      font-size: 0.72rem;
+    }
+
+    .calendar-hero-controls {
+      gap: 0.5rem;
+      padding: 0.75rem;
+    }
+
+    .calendar-hero-actions {
+      display: none;
+    }
+
+    .calendar-board {
+      padding: 0.7rem;
+    }
+
+    .calendar-board-head {
+      padding-bottom: 0.5rem;
+    }
+
+    .calendar-grid-head {
+      margin-top: 0.45rem;
+      margin-bottom: 0.35rem;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .calendar-view {
+      gap: 0.45rem;
+      padding: 0.45rem;
+    }
+
+    .calendar-hero {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+      padding: 0.55rem;
+    }
+
+    .calendar-hero-copy {
+      min-height: 0;
+      padding-right: 0;
+    }
+
+    .calendar-kicker,
+    .calendar-hero-summary,
+    .calendar-hero-metrics,
+    .calendar-controls-copy,
+    .calendar-input-label,
+    .calendar-botanical-mark {
+      display: none;
+    }
+
+    .calendar-title-row {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-top: 0;
+    }
+
+    .calendar-title-row h1 {
+      display: flex;
+      align-items: baseline;
+      gap: 0.45rem;
+      font-size: clamp(1.45rem, 8vw, 1.95rem);
+      line-height: 0.95;
+      white-space: nowrap;
+    }
+
+    .calendar-title-row h1 span {
+      display: inline;
+      margin-top: 0;
+      font-size: 0.72rem;
+    }
+
+    .calendar-hero-controls {
+      display: grid;
+      gap: 0.45rem;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .calendar-switcher {
+      grid-template-columns: 2.55rem minmax(0, 1fr) 2.55rem;
+      gap: 0.35rem;
+    }
+
+    .calendar-nav-btn,
+    .calendar-month-input,
+    .calendar-primary-btn,
+    .calendar-secondary-btn {
+      min-height: 2.35rem;
+      border-radius: 6px;
+    }
+
+    .calendar-nav-btn {
+      padding: 0;
+    }
+
+    .calendar-nav-btn span {
+      display: none;
+    }
+
+    .calendar-month-input {
+      padding: 0.42rem 0.55rem;
+      font-size: 0.82rem;
+    }
+
+    .calendar-hero-actions {
+      display: none;
+    }
+
+    .calendar-board {
+      grid-template-rows: auto auto minmax(0, 1fr);
+      padding: 0.45rem;
+      border-width: 1px;
+      box-shadow: none;
+    }
+
+    .calendar-board-head {
+      align-items: center;
+      padding-bottom: 0.35rem;
+      border-bottom-color: rgba(36, 24, 15, 0.12);
+    }
+
+    .calendar-section-label,
+    .calendar-legend,
+    .calendar-board-foot {
+      display: none;
+    }
+
+    .calendar-board-head h2 {
+      margin: 0;
+      font-size: 1.15rem;
+    }
+
+    .calendar-grid-head {
+      gap: 0.18rem;
+      margin: 0.28rem 0;
+    }
+
+    .calendar-day-head {
+      padding: 0.08rem 0;
+      border: 0;
+      border-radius: 0;
+      font-size: 0.54rem;
+      line-height: 1.2;
+    }
+
+    .day-head-full {
+      display: none;
+    }
+
+    .day-head-short {
+      display: inline;
+    }
+
+    .calendar-grid {
+      gap: 0.18rem;
+    }
+
+    .calendar-day-cell,
+    .calendar-skeleton-cell {
+      border-radius: 6px;
+    }
+
+    .calendar-day-cell {
+      gap: 0.12rem;
+      padding: 0.25rem;
+      border-width: 1px;
+    }
+
+    .calendar-day-cell:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .calendar-cell-topline {
+      align-items: center;
+    }
+
+    .calendar-day-number {
+      font-size: clamp(0.78rem, 3.5vw, 0.98rem);
+      line-height: 1;
+    }
+
+    .calendar-day-flag,
+    .calendar-cell-body,
+    .calendar-cell-meta,
+    .calendar-cell-status {
+      display: none;
+    }
+
+    .calendar-cell-indicators {
+      position: absolute;
+      left: 0.25rem;
+      right: 0.25rem;
+      bottom: 0.25rem;
+      display: flex;
+      justify-content: flex-start;
+      gap: 0.16rem;
+    }
+
+    .calendar-cell-pill {
+      width: 0.38rem;
+      height: 0.38rem;
+      padding: 0;
+      border-radius: 999px;
+      overflow: hidden;
+      text-indent: 150%;
+      white-space: nowrap;
+    }
+  }
+
+  @media (max-width: 390px), (max-height: 760px) and (max-width: 760px) {
+    .calendar-view {
+      gap: 0.32rem;
+      padding: 0.35rem;
+    }
+
+    .calendar-hero {
+      padding: 0.45rem;
+    }
+
+    .calendar-title-row h1 {
+      font-size: 1.35rem;
+    }
+
+    .calendar-switcher {
+      grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+    }
+
+    .calendar-nav-btn,
+    .calendar-month-input {
+      min-height: 2.1rem;
+    }
+
+    .calendar-board {
+      padding: 0.35rem;
+    }
+
+    .calendar-board-head h2 {
+      font-size: 1rem;
+    }
+
+    .calendar-day-number {
+      font-size: 0.76rem;
     }
   }
 </style>

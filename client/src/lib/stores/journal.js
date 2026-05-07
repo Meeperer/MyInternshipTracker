@@ -160,6 +160,23 @@ function createJournalStore() {
       return result;
     },
 
+    async completeDay(data) {
+      const result = await api.post('/journals/complete-day', data);
+      update(s => {
+        const entries = [...s.entries];
+        const idx = entries.findIndex(e => e.date === data.date);
+        if (idx >= 0) {
+          entries[idx] = result;
+        } else {
+          entries.push(result);
+          entries.sort((a, b) => a.date.localeCompare(b.date));
+        }
+        return { ...s, entries, currentEntry: result };
+      });
+      syncProgress();
+      return result;
+    },
+
     async refineWithAI(journalId, content) {
       return await api.post('/ai/refine', { journal_id: journalId, content });
     },

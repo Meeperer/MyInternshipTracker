@@ -25,7 +25,7 @@
 </AuthShell>
 
 {#if selectedDate}
-  <DayModal date={selectedDate} onClose={closeModal} />
+  <DayModal date={selectedDate} intent="quick" onClose={closeModal} />
 {/if}
 
 <style>

@@ -91,7 +91,7 @@
 </script>
 
 <svelte:head>
-  <title>JOURNAL by lord</title>
+  <title>JOURNAL by LORD</title>
 </svelte:head>
 
 <div class="site-shell">

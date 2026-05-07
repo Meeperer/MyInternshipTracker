@@ -73,8 +73,9 @@
 
 <main id="main-content" class="auth-page page-enter">
   <div class="auth-container animate-rise rise-2">
-    <h1>Internship Tracker</h1>
-    <p class="auth-subtitle">Create your account</p>
+    <p class="auth-kicker">by lord</p>
+    <h1>JOURNAL</h1>
+    <p class="auth-subtitle">Create account</p>
 
     <form onsubmit={handleRegister} novalidate>
       <div class="field">
@@ -183,29 +184,58 @@
     justify-content: center;
     min-height: 100vh;
     padding: 2rem;
+    background:
+      linear-gradient(rgba(36, 24, 15, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(36, 24, 15, 0.04) 1px, transparent 1px),
+      var(--bg);
+    background-size: 32px 32px, 32px 32px, auto;
   }
 
   .auth-container {
+    position: relative;
+    overflow: hidden;
     width: 100%;
-    max-width: 380px;
+    max-width: 430px;
     text-align: center;
-    padding: 2rem;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: var(--shadow);
+    padding: 2.1rem;
+    border: 2px solid rgba(36, 24, 15, 0.88);
+    border-radius: 8px;
+    background: var(--paper-strong);
+    box-shadow: 6px 6px 0 rgba(36, 24, 15, 0.14);
+  }
+
+  .auth-container::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 0.55rem;
+    background: var(--leaf);
+  }
+
+  .auth-kicker {
+    margin: 0 0 0.25rem;
+    font-family: var(--font-ui);
+    font-size: 0.7rem;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--moss);
   }
 
   h1 {
-    font-size: 2rem;
+    font-size: clamp(2.6rem, 5vw, 4rem);
+    line-height: 0.88;
     margin-bottom: 0.3rem;
   }
 
   .auth-subtitle {
     font-family: var(--font-ui);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
     color: var(--dark-soft);
-    margin-bottom: 2rem;
+    margin-bottom: 1.6rem;
   }
 
   form {
@@ -237,7 +267,7 @@
     padding: 0.35rem 0.6rem;
     font-family: var(--font-ui);
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--dark-soft);
@@ -262,5 +292,28 @@
     font-family: var(--font-ui);
     font-size: 0.85rem;
     color: var(--dark-soft);
+  }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .auth-container {
+      transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+    }
+
+    .auth-container:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 7px 7px 0 rgba(36, 24, 15, 0.16);
+    }
+  }
+
+  @media (max-width: 520px) {
+    .auth-page {
+      align-items: stretch;
+      padding: 1rem;
+    }
+
+    .auth-container {
+      align-self: center;
+      padding: 1.6rem;
+    }
   }
 </style>

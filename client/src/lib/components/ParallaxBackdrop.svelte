@@ -96,14 +96,12 @@
   style={`--backdrop-offset: ${offset}px; --backdrop-progress: ${progress};`}
   aria-hidden="true"
 >
-  <span class="backdrop-plane backdrop-plane-a"></span>
-  <span class="backdrop-plane backdrop-plane-b"></span>
-  <span class="backdrop-plane backdrop-plane-c"></span>
+  <img class="botanical-cutout backdrop-leaf backdrop-leaf-a" src="/plants/fern-branch.png" alt="" aria-hidden="true" loading="lazy" decoding="async" />
+  <img class="botanical-cutout backdrop-leaf backdrop-leaf-b" src="/plants/palm-fan.png" alt="" aria-hidden="true" loading="lazy" decoding="async" />
+  <img class="botanical-cutout backdrop-leaf backdrop-leaf-c" src="/plants/fern-canopy.png" alt="" aria-hidden="true" loading="lazy" decoding="async" />
   <span class="backdrop-line backdrop-line-a"></span>
   <span class="backdrop-line backdrop-line-b"></span>
   <span class="backdrop-line backdrop-line-c"></span>
-  <span class="backdrop-ring backdrop-ring-a"></span>
-  <span class="backdrop-ring backdrop-ring-b"></span>
 </div>
 
 <style>
@@ -115,42 +113,32 @@
     pointer-events: none;
   }
 
-  .backdrop-plane,
-  .backdrop-line,
-  .backdrop-ring {
+  .backdrop-leaf,
+  .backdrop-line {
     position: absolute;
-    border-color: rgba(11, 110, 58, 0.08);
+    opacity: 0.055;
+    filter: saturate(0.78) contrast(1.02);
   }
 
-  .backdrop-plane {
-    border: 1px solid rgba(11, 110, 58, 0.08);
-    background: rgba(255, 255, 255, 0.22);
-    border-radius: 14px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
-  }
-
-  .backdrop-plane-a {
+  .backdrop-leaf-a {
     top: 8rem;
-    left: -10rem;
-    width: min(30rem, 34vw);
-    height: 20rem;
-    transform: translate3d(0, calc(var(--backdrop-offset) * 0.025), 0) rotate(-7deg);
+    left: -8rem;
+    width: min(28rem, 32vw);
+    transform: translate3d(0, calc(var(--backdrop-offset) * 0.025), 0);
   }
 
-  .backdrop-plane-b {
+  .backdrop-leaf-b {
     top: 24rem;
-    right: -12rem;
-    width: min(38rem, 38vw);
-    height: 22rem;
-    transform: translate3d(0, calc(var(--backdrop-offset) * -0.03), 0) rotate(8deg);
+    right: -15rem;
+    width: min(40rem, 42vw);
+    transform: translate3d(0, calc(var(--backdrop-offset) * -0.03), 0);
   }
 
-  .backdrop-plane-c {
-    bottom: 8rem;
+  .backdrop-leaf-c {
+    bottom: 7rem;
     left: 24%;
-    width: min(22rem, 26vw);
-    height: 11rem;
-    transform: translate3d(0, calc(var(--backdrop-offset) * 0.02), 0) rotate(-4deg);
+    width: min(24rem, 28vw);
+    transform: translate3d(0, calc(var(--backdrop-offset) * 0.02), 0);
   }
 
   .backdrop-line {
@@ -179,47 +167,22 @@
     transform: translate3d(0, calc(var(--backdrop-offset) * 0.012), 0);
   }
 
-  .backdrop-ring {
-    border: 1px solid rgba(11, 110, 58, 0.08);
-    border-radius: 999px;
-    background: transparent;
-  }
-
-  .backdrop-ring-a {
-    top: 6rem;
-    right: 18%;
-    width: 11rem;
-    height: 11rem;
-    transform: translate3d(0, calc(var(--backdrop-offset) * -0.05), 0);
-  }
-
-  .backdrop-ring-b {
-    bottom: 5rem;
-    right: -3rem;
-    width: 16rem;
-    height: 16rem;
-    transform: translate3d(0, calc(var(--backdrop-offset) * 0.04), 0);
-  }
-
   @media (max-width: 900px) {
-    .backdrop-plane-b,
-    .backdrop-ring-b {
+    .backdrop-leaf-b {
       display: none;
     }
   }
 
   @media (max-width: 640px) {
-    .backdrop-plane-a,
-    .backdrop-plane-c,
-    .backdrop-ring-a {
+    .backdrop-leaf-a,
+    .backdrop-leaf-c {
       display: none;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .backdrop-plane,
-    .backdrop-line,
-    .backdrop-ring {
+    .backdrop-leaf,
+    .backdrop-line {
       transform: none !important;
     }
   }

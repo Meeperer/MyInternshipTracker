@@ -3,6 +3,7 @@
   import { progress } from '$stores/progress.js';
   import { goto } from '$app/navigation';
   import Nav from './Nav.svelte';
+  import ParallaxBackdrop from './ParallaxBackdrop.svelte';
 
   let { children } = $props();
 
@@ -28,6 +29,7 @@
   </div>
 {:else if $isAuthenticated}
   <div class="app-shell">
+    <ParallaxBackdrop />
     <Nav />
     <main id="main-content" class="page-enter">
       {@render children()}
@@ -61,14 +63,20 @@
   }
 
   .app-shell {
+    position: relative;
     min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
     display: grid;
     grid-template-columns: 16rem minmax(0, 1fr);
     background: var(--bg);
+    isolation: isolate;
+    overflow: hidden;
   }
 
   main {
     position: relative;
+    z-index: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -81,17 +89,24 @@
     .app-shell {
       grid-template-columns: 1fr;
       grid-template-rows: auto minmax(0, 1fr);
+      height: 100dvh;
+      max-height: 100dvh;
+      overflow: hidden;
     }
 
     main {
-      height: auto;
+      height: 100%;
       min-height: 0;
+      overflow: auto;
+      padding-bottom: calc(4.9rem + env(safe-area-inset-bottom, 0px));
+      scrollbar-gutter: stable;
     }
   }
 
   @media (max-width: 480px) {
     main {
       min-height: 40vh;
+      padding-bottom: calc(4.65rem + env(safe-area-inset-bottom, 0px));
     }
   }
 </style>

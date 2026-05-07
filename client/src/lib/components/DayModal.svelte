@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte';
   import { journal } from '$stores/journal.js';
   import { events } from '$stores/events.js';
   import { toast } from '$stores/toast.js';
@@ -11,7 +12,7 @@
   } from '$utils/offlineDrafts.js';
   import EventForm from './EventForm.svelte';
 
-  let { date = '', onClose = () => {} } = $props();
+  let { date = '', intent = 'view', onClose = () => {} } = $props();
 
   let entry = $state(null);
   let dayEvents = $state([]);
@@ -27,21 +28,32 @@
   let contentRaw = $state('');
   let refining = $state(false);
   let generatingAras = $state(false);
+  let savingEntry = $state(false);
+  let loggingHours = $state(false);
+  let quickCompleting = $state(false);
+  let quickAction = $state('');
+  let quickSavedPulse = $state(false);
+  let quickSaveMessage = $state('Ready');
   let finishing = $state(false);
   let hoursError = $state('');
   let initialHoursOnEdit = $state('');
   let initialContentOnEdit = $state('');
   let modalContentEl = $state(null);
+  let quickHoursInputEl = $state(null);
   let previousActiveElement = $state(null);
   let autoSaveStatus = $state('');
-  let autoSaveTimer = $state(null);
-  let localDraftTimer = $state(null);
+  let autoSaveTimer = null;
+  let localDraftTimer = null;
+  let quickSavedPulseTimer = null;
   let online = $state(typeof navigator === 'undefined' ? true : navigator.onLine);
   let draftRecovery = $state(null);
 
+  const MIN_SAVE_FEEDBACK_MS = 420;
+
   const isDirty = $derived(
     (mode === 'edit' && (hours !== initialHoursOnEdit || contentRaw !== initialContentOnEdit)) ||
-    (mode === 'log-hours' && hours !== initialHoursOnEdit)
+    (mode === 'log-hours' && hours !== initialHoursOnEdit) ||
+    (mode === 'quick' && (hours !== initialHoursOnEdit || contentRaw !== initialContentOnEdit))
   );
 
   $effect(() => {
@@ -81,13 +93,13 @@
           autoSaveStatus = 'offline-saved';
           persistLocalDraft(true);
         }
-      }, 5000);
+      }, 1200);
     }
     return () => { if (autoSaveTimer) clearTimeout(autoSaveTimer); };
   });
 
   $effect(() => {
-    if (!date || (mode !== 'edit' && mode !== 'log-hours')) {
+    if (!date || (mode !== 'edit' && mode !== 'log-hours' && mode !== 'quick')) {
       return () => {
         if (localDraftTimer) clearTimeout(localDraftTimer);
       };
@@ -145,6 +157,12 @@
   });
 
   $effect(() => {
+    return () => {
+      if (quickSavedPulseTimer) clearTimeout(quickSavedPulseTimer);
+    };
+  });
+
+  $effect(() => {
     if (loading || !modalContentEl) return;
     const el = modalContentEl;
     const focusables = el.querySelectorAll(
@@ -197,6 +215,26 @@
     }
   }
 
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function withSaveFeedback(promise) {
+    const [result] = await Promise.all([promise, delay(MIN_SAVE_FEEDBACK_MS)]);
+    return result;
+  }
+
+  function showQuickSaved(message) {
+    quickSaveMessage = message;
+    quickSavedPulse = true;
+    if (quickSavedPulseTimer) clearTimeout(quickSavedPulseTimer);
+    quickSavedPulseTimer = setTimeout(() => {
+      quickSavedPulse = false;
+      quickSaveMessage = 'Ready';
+      quickSavedPulseTimer = null;
+    }, 1600);
+  }
+
   function requestClose() {
     if (isDirty) {
       confirmingUnsaved = true;
@@ -229,8 +267,12 @@
 
   async function loadEntry() {
     loading = true;
-    entry = await journal.fetchDate(date);
-    dayEvents = await events.fetchDate(date);
+    const [loadedEntry, loadedEvents] = await Promise.all([
+      journal.fetchDate(date),
+      events.fetchDate(date)
+    ]);
+    entry = loadedEntry;
+    dayEvents = loadedEvents;
     showEventForm = false;
     editingEvent = null;
     if (entry) {
@@ -240,11 +282,16 @@
       hours = '';
       contentRaw = '';
     }
-    mode = 'view';
-    initialHoursOnEdit = '';
-    initialContentOnEdit = '';
+    mode = intent === 'quick' && entry?.status !== 'finished' ? 'quick' : 'view';
+    initialHoursOnEdit = hours;
+    initialContentOnEdit = contentRaw;
     hydrateDraftRecovery();
     loading = false;
+    if (mode === 'quick') {
+      await tick();
+      quickHoursInputEl?.focus();
+      quickHoursInputEl?.select();
+    }
   }
 
   function persistLocalDraft(unsynced = !online) {
@@ -302,7 +349,7 @@
     contentRaw = draftRecovery.content_raw || '';
     initialHoursOnEdit = hours;
     initialContentOnEdit = contentRaw;
-    mode = draftRecovery.mode === 'log-hours' ? 'log-hours' : 'edit';
+    mode = ['quick', 'log-hours'].includes(draftRecovery.mode) ? draftRecovery.mode : 'edit';
     autoSaveStatus = draftRecovery.unsynced ? 'offline-saved' : 'saved';
     entry = {
       ...(entry || {}),
@@ -353,6 +400,7 @@
 
   async function saveEntry() {
     if (!validateHours(true)) return;
+    savingEntry = true;
 
     if (!online) {
       const draft = persistLocalDraft(true);
@@ -370,15 +418,16 @@
       };
       draftRecovery = draft;
       toast.success('Draft saved locally for offline use');
+      savingEntry = false;
       return;
     }
 
     try {
-      const result = await journal.save({
+      const result = await withSaveFeedback(journal.save({
         date,
         hours: parseFloat(hours) || 0,
         content_raw: contentRaw
-      });
+      }));
       entry = result;
       clearOfflineDraft(date);
       draftRecovery = null;
@@ -386,11 +435,14 @@
       toast.success('Entry saved');
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      savingEntry = false;
     }
   }
 
   async function logHoursOnly() {
     if (!validateHours(false)) return;
+    loggingHours = true;
 
     if (!online) {
       const draft = persistLocalDraft(true);
@@ -407,11 +459,12 @@
       };
       draftRecovery = draft;
       toast.success('Hours saved locally for offline use');
+      loggingHours = false;
       return;
     }
 
     try {
-      const result = await journal.logHours(date, parseFloat(hours));
+      const result = await withSaveFeedback(journal.logHours(date, parseFloat(hours)));
       entry = result;
       clearOfflineDraft(date);
       draftRecovery = null;
@@ -419,6 +472,67 @@
       mode = 'view';
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      loggingHours = false;
+    }
+  }
+
+  async function saveQuickEntry({ finish = false } = {}) {
+    if (!validateHours(!finish)) return;
+
+    if (!online) {
+      const draft = persistLocalDraft(true);
+      initialHoursOnEdit = hours;
+      initialContentOnEdit = contentRaw;
+      autoSaveStatus = 'offline-saved';
+      entry = {
+        ...(entry || {}),
+        date,
+        hours: parseFloat(hours) || 0,
+        content_raw: contentRaw,
+        status: entry?.status || 'draft',
+        local_only: true
+      };
+      draftRecovery = draft;
+      toast.success(finish ? 'Saved locally. Finish when back online.' : 'Draft saved locally');
+      return;
+    }
+
+    quickCompleting = true;
+    quickAction = finish ? 'finish' : 'draft';
+    quickSaveMessage = finish ? 'Finishing day...' : 'Saving draft...';
+    quickSavedPulse = false;
+
+    try {
+      const payload = {
+        date,
+        hours: parseFloat(hours) || 0,
+        content_raw: contentRaw
+      };
+      const result = await withSaveFeedback(
+        finish ? journal.completeDay(payload) : journal.save(payload)
+      );
+      entry = result;
+      clearOfflineDraft(date);
+      draftRecovery = null;
+      initialHoursOnEdit = String(result.hours || '');
+      initialContentOnEdit = result.content_raw || '';
+      hours = String(result.hours || '');
+      contentRaw = result.content_raw || '';
+      showQuickSaved(finish ? 'Day finished' : 'Draft saved');
+      toast.success(finish ? 'Day finished' : 'Entry saved');
+
+      if (finish) {
+        setTimeout(() => {
+          returnFocus();
+          onClose();
+        }, 420);
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      quickCompleting = false;
+      quickAction = '';
     }
   }
 
@@ -430,7 +544,7 @@
     confirmingFinish = false;
     finishing = true;
     try {
-      const result = await journal.finishDay(date);
+      const result = await withSaveFeedback(journal.finishDay(date));
       entry = result;
       clearOfflineDraft(date);
       draftRecovery = null;
@@ -593,12 +707,120 @@
           <p>This will lock the entry and hours permanently. This action cannot be undone.</p>
           <div class="confirm-actions">
             <button class="btn" onclick={() => (confirmingFinish = false)}>Cancel</button>
-            <button class="btn btn-primary" onclick={confirmFinishDay}>Finish Day</button>
+            <button class="btn btn-primary save-button" class:is-saving={finishing} onclick={confirmFinishDay} disabled={finishing}>
+              {#if finishing}
+                <span class="button-spinner" aria-hidden="true"></span>
+              {/if}
+              {finishing ? 'Finishing' : 'Finish Day'}
+            </button>
+          </div>
+        </div>
+      {:else if mode === 'quick'}
+        <div class="quick-log-panel">
+          <div class="quick-log-head">
+            <div>
+              <h3>Quick log</h3>
+              <p>Hours, note, done.</p>
+            </div>
+            {#if entry?.hours > 0 || entry?.content_raw}
+              <button class="quick-mode-link" type="button" onclick={() => (mode = 'view')}>Details</button>
+            {/if}
+          </div>
+
+          <div class="quick-log-grid">
+            <div class="field quick-hours-field">
+              <label class="label" for="quick-hours-input">Hours</label>
+              <input
+                id="quick-hours-input"
+                bind:this={quickHoursInputEl}
+                class="input quick-hours-input"
+                class:invalid={hoursError}
+                type="number"
+                min="0"
+                max="24"
+                step="0.5"
+                bind:value={hours}
+                placeholder="8"
+                onfocus={() => (hoursError = '')}
+              />
+              {#if hoursError}
+                <p class="field-error" role="alert">{hoursError}</p>
+              {:else}
+                <p class="field-hint">Use 0 for a note-only draft.</p>
+              {/if}
+            </div>
+
+            <div class="field quick-notes-field">
+              <label class="label" for="quick-content-input">Journal</label>
+              <textarea
+                id="quick-content-input"
+                class="textarea quick-textarea"
+                rows="6"
+                bind:value={contentRaw}
+                placeholder="What moved today?"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <button
+              class="btn save-button"
+              class:is-saving={quickCompleting && quickAction === 'draft'}
+              type="button"
+              onclick={() => saveQuickEntry()}
+              disabled={quickCompleting}
+            >
+              {#if quickCompleting && quickAction === 'draft'}
+                <span class="button-spinner" aria-hidden="true"></span>
+              {/if}
+              {quickCompleting && quickAction === 'draft' ? 'Saving' : 'Save draft'}
+            </button>
+            <button
+              class="btn btn-primary save-button"
+              class:is-saving={quickCompleting && quickAction === 'finish'}
+              type="button"
+              onclick={() => saveQuickEntry({ finish: true })}
+              disabled={quickCompleting}
+            >
+              {#if quickCompleting && quickAction === 'finish'}
+                <span class="button-spinner" aria-hidden="true"></span>
+              {/if}
+              {quickCompleting && quickAction === 'finish' ? 'Finishing' : 'Save & finish'}
+            </button>
+          </div>
+
+          <div
+            class="save-status-line"
+            class:active={quickCompleting}
+            class:done={quickSavedPulse}
+            role="status"
+            aria-live="polite"
+          >
+            <span class="save-status-dot" aria-hidden="true"></span>
+            <span>
+              {quickCompleting
+                ? quickSaveMessage
+                : quickSavedPulse
+                  ? quickSaveMessage
+                  : 'Ready to save'}
+            </span>
+          </div>
+
+          <div class="quick-secondary-actions">
+            <button class="quick-mode-link" type="button" onclick={() => { showEventForm = true; editingEvent = null; }}>
+              Add event
+            </button>
+            <button class="quick-mode-link" type="button" onclick={enterEditMode}>
+              Full editor
+            </button>
           </div>
         </div>
       {:else if mode === 'view'}
         <div class="action-buttons">
           {#if !isFinished}
+            <button class="btn btn-sm btn-primary" onclick={() => (mode = 'quick')}>
+              Quick Log
+            </button>
             <button class="btn btn-sm" onclick={enterEditMode}>
               {entry ? 'Edit Entry' : 'Add Entry'}
             </button>
@@ -673,6 +895,14 @@
           {/if}
         {:else}
           <div class="empty-state-box">
+            <img
+              class="botanical-cutout modal-empty-plant"
+              src="/plants/monstera-pot.png"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+            />
             <p class="empty-state-text">No entry for this date yet.</p>
             <button class="btn btn-sm btn-primary" onclick={enterEditMode}>
               Create Entry
@@ -754,7 +984,12 @@
               </span>
             {/if}
             <div class="editor-actions">
-              <button class="btn btn-primary" onclick={saveEntry}>Save</button>
+              <button class="btn btn-primary save-button" class:is-saving={savingEntry} onclick={saveEntry} disabled={savingEntry}>
+                {#if savingEntry}
+                  <span class="button-spinner" aria-hidden="true"></span>
+                {/if}
+                {savingEntry ? 'Saving...' : 'Save'}
+              </button>
               <button class="btn" onclick={requestModeView}>Cancel</button>
             </div>
           </div>
@@ -783,7 +1018,12 @@
             {/if}
           </div>
           <div class="editor-actions">
-            <button class="btn btn-primary" onclick={logHoursOnly}>Log Hours</button>
+            <button class="btn btn-primary save-button" class:is-saving={loggingHours} onclick={logHoursOnly} disabled={loggingHours}>
+              {#if loggingHours}
+                <span class="button-spinner" aria-hidden="true"></span>
+              {/if}
+              {loggingHours ? 'Logging...' : 'Log Hours'}
+            </button>
             <button class="btn" onclick={requestModeView}>Cancel</button>
           </div>
         </div>
@@ -930,6 +1170,165 @@
   .confirm-actions .btn {
     min-width: 120px;
     justify-content: center;
+  }
+
+  .quick-log-panel {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .quick-log-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid rgba(36, 24, 15, 0.12);
+  }
+
+  .quick-log-head h3 {
+    color: var(--canopy);
+    font-size: clamp(1.5rem, 3vw, 2.1rem);
+    line-height: 0.95;
+  }
+
+  .quick-log-head p {
+    margin-top: 0.35rem;
+    color: var(--dark-soft);
+    font-family: var(--font-ui);
+    font-size: 0.88rem;
+  }
+
+  .quick-log-grid {
+    display: grid;
+    grid-template-columns: minmax(7rem, 0.34fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .quick-hours-field {
+    position: sticky;
+    top: 0;
+  }
+
+  .quick-hours-input {
+    min-height: 4.8rem;
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    line-height: 1;
+  }
+
+  .quick-textarea {
+    min-height: 9.5rem;
+  }
+
+  .quick-actions,
+  .quick-secondary-actions {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+  }
+
+  .quick-actions {
+    justify-content: flex-end;
+    padding-top: 0.85rem;
+    border-top: 1px solid rgba(36, 24, 15, 0.12);
+  }
+
+  .quick-secondary-actions {
+    justify-content: space-between;
+  }
+
+  .quick-mode-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.35rem;
+    padding: 0.42rem 0.7rem;
+    border: 1px solid rgba(36, 24, 15, 0.28);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--canopy);
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    transition: background 0.16s var(--ease-out), transform 0.16s var(--ease-out);
+  }
+
+  .quick-mode-link:hover {
+    background: rgba(11, 110, 58, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .save-button {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .save-button.is-saving {
+    cursor: progress;
+    box-shadow: 2px 2px 0 rgba(36, 24, 15, 0.12);
+  }
+
+  .save-button.is-saving::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(246, 239, 210, 0.34),
+      transparent
+    );
+    animation: saveSweep 0.82s var(--ease-out) infinite;
+  }
+
+  .button-spinner {
+    width: 0.95rem;
+    height: 0.95rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: buttonSpin 0.62s linear infinite;
+  }
+
+  .save-status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    justify-self: end;
+    min-height: 1.8rem;
+    color: var(--dark-soft);
+    font-family: var(--font-ui);
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+
+  .save-status-dot {
+    width: 0.52rem;
+    height: 0.52rem;
+    border-radius: 50%;
+    background: rgba(36, 24, 15, 0.34);
+  }
+
+  .save-status-line.active {
+    color: var(--canopy);
+  }
+
+  .save-status-line.active .save-status-dot {
+    background: var(--leaf);
+    animation: savePulse 0.78s ease-in-out infinite;
+  }
+
+  .save-status-line.done {
+    color: var(--leaf);
+  }
+
+  .save-status-line.done .save-status-dot {
+    background: var(--leaf);
   }
 
   .action-buttons {
@@ -1092,6 +1491,12 @@
     color: var(--dark-soft);
     font-style: italic;
     font-size: 0.95rem;
+  }
+
+  .modal-empty-plant {
+    width: min(8.5rem, 52vw);
+    opacity: 0.78;
+    filter: saturate(0.82) contrast(1.02) brightness(0.94);
   }
 
   .editor {
@@ -1318,6 +1723,26 @@
     to { transform: rotate(360deg); }
   }
 
+  @keyframes buttonSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes saveSweep {
+    from { transform: translateX(-110%); }
+    to { transform: translateX(110%); }
+  }
+
+  @keyframes savePulse {
+    0%, 100% {
+      opacity: 0.48;
+      transform: scale(0.92);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.14);
+    }
+  }
+
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -1352,6 +1777,16 @@
       flex: 1;
       justify-content: center;
     }
+    .quick-log-grid {
+      grid-template-columns: 1fr;
+    }
+    .quick-hours-field {
+      position: static;
+    }
+    .quick-actions .btn,
+    .quick-secondary-actions .quick-mode-link {
+      flex: 1;
+    }
   }
 
   @media (max-width: 480px) {
@@ -1370,5 +1805,23 @@
     .editor-actions .btn { width: 100%; }
     .confirm-actions { flex-direction: column; }
     .confirm-actions .btn { width: 100%; }
+    .quick-log-head,
+    .quick-actions,
+    .quick-secondary-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .quick-actions .btn,
+    .quick-secondary-actions .quick-mode-link {
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .save-button.is-saving::after,
+    .button-spinner,
+    .save-status-line.active .save-status-dot {
+      animation: none;
+    }
   }
 </style>

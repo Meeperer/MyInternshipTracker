@@ -174,17 +174,17 @@
     entranceContext = gsapInstance.context(() => {
       const timeline = gsapInstance.timeline({
         defaults: {
-          ease: 'power3.out',
-          duration: 0.64
+          ease: 'power2.out',
+          duration: 0.36
         }
       });
 
       timeline
-        .from('[data-animate="hero"]', { autoAlpha: 0, y: 18 })
-        .from('[data-animate="trajectory"]', { autoAlpha: 0, y: 22, duration: 0.72 }, '-=0.38')
-        .from('[data-animate="metric"]', { autoAlpha: 0, y: 16, stagger: 0.055, duration: 0.52 }, '-=0.34')
-        .from('[data-animate="summary"]', { autoAlpha: 0, y: 18, stagger: 0.08, duration: 0.58 }, '-=0.28')
-        .from('[data-animate="cta"]', { autoAlpha: 0, y: 20, duration: 0.62 }, '-=0.22');
+        .from('[data-animate="hero"]', { autoAlpha: 0.92, y: 8 })
+        .from('[data-animate="trajectory"]', { autoAlpha: 0.92, y: 10, duration: 0.38 }, '-=0.22')
+        .from('[data-animate="metric"]', { autoAlpha: 0.94, y: 8, stagger: 0.035, duration: 0.3 }, '-=0.18')
+        .from('[data-animate="summary"]', { autoAlpha: 0.94, y: 8, stagger: 0.045, duration: 0.32 }, '-=0.16')
+        .from('[data-animate="cta"]', { autoAlpha: 0.94, y: 8, duration: 0.32 }, '-=0.14');
     }, dashboardElement);
   }
 
@@ -540,6 +540,16 @@
         <figcaption>{todayQuote.author}</figcaption>
       </figure>
     </div>
+
+    <img
+      class="botanical-cutout dashboard-hero-plant"
+      src="/plants/palm-fan.png"
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      data-tone="cream"
+    />
   </header>
 
   <section class="trajectory-board" data-animate="trajectory" aria-labelledby="trajectory-title">
@@ -728,6 +738,15 @@
   </section>
 
   <section class="journal-cta" data-animate="cta" aria-labelledby="journal-cta-title">
+    <img
+      class="botanical-cutout cta-plant"
+      src="/plants/fern-canopy.png"
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      data-tone="cream"
+    />
     <div>
       <div class="section-marker section-marker-icon">
         <PencilSimpleLine size={14} weight="bold" />
@@ -1725,6 +1744,35 @@
     box-shadow: var(--dash-shadow);
   }
 
+  .trajectory-board,
+  .summary-panel,
+  .report-panel,
+  .metric-card,
+  .hours-lockup,
+  .journal-cta {
+    transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out),
+      border-color 0.16s var(--ease-out), background-color 0.16s var(--ease-out);
+  }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .trajectory-board:hover,
+    .summary-panel:hover,
+    .report-panel:hover,
+    .hours-lockup:hover,
+    .journal-cta:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0 rgba(36, 24, 15, 0.17);
+    }
+
+    .metric-card:hover {
+      background-color: rgba(248, 239, 212, 0.78);
+    }
+
+    .metric-card-primary:hover {
+      background-color: var(--dash-red-dark);
+    }
+  }
+
   .dashboard-hero {
     position: relative;
     overflow: hidden;
@@ -1740,16 +1788,14 @@
     box-shadow: var(--dash-shadow);
   }
 
-  .dashboard-hero::after {
-    content: '';
+  .dashboard-hero-plant {
     position: absolute;
-    right: clamp(0.8rem, 2vw, 1.35rem);
-    bottom: clamp(0.8rem, 2vw, 1.25rem);
-    width: clamp(5.4rem, 12vw, 9rem);
-    height: clamp(3.4rem, 8vw, 5.4rem);
-    background: var(--dash-pollen);
-    clip-path: polygon(8% 56%, 28% 18%, 68% 0, 100% 34%, 82% 76%, 44% 100%);
-    opacity: 0.92;
+    right: clamp(-5.4rem, -5vw, -3rem);
+    bottom: clamp(-4.6rem, -5vw, -2.8rem);
+    z-index: 0;
+    width: clamp(9.5rem, 16vw, 14rem);
+    opacity: 0.2;
+    pointer-events: none;
   }
 
   .hero-copy,
@@ -1942,16 +1988,13 @@
     box-shadow: var(--dash-shadow);
   }
 
-  .journal-cta::after {
-    content: '';
+  .cta-plant {
     position: absolute;
-    right: 0.95rem;
-    top: 0.95rem;
-    width: clamp(3.4rem, 8vw, 6.5rem);
-    height: clamp(3.4rem, 8vw, 6.5rem);
-    border: 2px solid rgba(248, 239, 212, 0.42);
-    background: var(--dash-pollen);
-    clip-path: polygon(50% 0, 92% 25%, 76% 84%, 24% 84%, 8% 25%);
+    right: -1.4rem;
+    top: 50%;
+    width: clamp(7rem, 13vw, 11rem);
+    opacity: 0.3;
+    transform: translateY(-50%) rotate(4deg);
   }
 
   .journal-cta > div,
@@ -2136,6 +2179,213 @@
   @media (prefers-reduced-motion: reduce) {
     .dashboard-dialog[open] .dashboard-dialog-shell {
       animation: none;
+    }
+  }
+
+  /* Core mobile product pass */
+  @media (max-width: 760px) {
+    .dashboard {
+      display: grid;
+      gap: 0.7rem;
+      padding: 0.65rem;
+    }
+
+    .dashboard-hero,
+    .trajectory-board,
+    .metric-grid,
+    .summary-grid,
+    .journal-cta,
+    .report-panel {
+      margin-top: 0;
+    }
+
+    .dashboard-hero {
+      gap: 0.65rem;
+      padding: 0.85rem;
+      box-shadow: 3px 3px 0 rgba(36, 24, 15, 0.12);
+    }
+
+    .dashboard h1 {
+      font-size: clamp(2rem, 12vw, 2.85rem);
+      max-width: none;
+    }
+
+    .hero-topline {
+      gap: 0.45rem;
+      font-size: 0.78rem;
+    }
+
+    .hero-summary {
+      font-size: 0.9rem;
+    }
+
+    .hero-tools {
+      grid-template-rows: auto;
+    }
+
+    .quote-strip {
+      display: none;
+    }
+
+    .month-console {
+      padding: 0.65rem;
+    }
+
+    .month-controls {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 0.35rem;
+    }
+
+    .block-button,
+    .text-button,
+    .dashboard-dialog-close,
+    .cta-button {
+      min-height: 2.55rem;
+      padding: 0.55rem 0.7rem;
+      font-size: 0.82rem;
+    }
+
+    .trajectory-board {
+      gap: 0.7rem;
+      padding: 0.85rem;
+      box-shadow: 3px 3px 0 rgba(36, 24, 15, 0.12);
+    }
+
+    .trajectory-board::before {
+      inset: 0.65rem auto 0.65rem 0.65rem;
+      width: 0.35rem;
+    }
+
+    .trajectory-copy {
+      padding-left: 0.65rem;
+      gap: 0.55rem;
+    }
+
+    .trajectory-copy h2,
+    .summary-head h2,
+    .journal-cta h2,
+    .report-panel h2,
+    .dashboard-dialog-head h2 {
+      font-size: 1.45rem;
+    }
+
+    .hours-lockup {
+      padding: 0.8rem;
+    }
+
+    .hours-value {
+      font-size: 2.65rem;
+    }
+
+    .trajectory-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+
+    .trajectory-stats dd {
+      font-size: 1.3rem;
+    }
+
+    .metric-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0;
+      border-width: 1px;
+      box-shadow: none;
+    }
+
+    .metric-card,
+    .metric-card:not(:first-child) {
+      min-height: 6.4rem;
+      padding: 0.75rem;
+      border-left: 0;
+      border-top: 1px solid var(--dash-border);
+    }
+
+    .metric-card:nth-child(odd) {
+      border-right: 1px solid var(--dash-border);
+    }
+
+    .metric-card:nth-child(-n + 2) {
+      border-top: 0;
+    }
+
+    .metric-card-primary {
+      grid-column: span 2;
+      min-height: 7rem;
+      border-right: 0 !important;
+    }
+
+    .metric-card-primary strong,
+    .metric-card strong {
+      font-size: 2.05rem;
+    }
+
+    .summary-grid {
+      gap: 0.7rem;
+    }
+
+    .summary-panel {
+      padding: 0.85rem;
+      box-shadow: 3px 3px 0 rgba(36, 24, 15, 0.1);
+    }
+
+    .summary-head {
+      align-items: stretch;
+      gap: 0.65rem;
+    }
+
+    .summary-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0;
+      border-top: 1px solid var(--dash-divider);
+    }
+
+    .summary-list > div,
+    .summary-list > div:not(:first-child) {
+      padding: 0.65rem 0.55rem 0.1rem 0;
+      border-left: 0;
+      border-top: 0;
+    }
+
+    .summary-list > div:nth-child(odd) {
+      border-right: 1px solid var(--dash-divider);
+    }
+
+    .summary-list dd {
+      font-size: 1.2rem;
+    }
+
+    .milestone-strip {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem;
+    }
+
+    .journal-cta {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      padding: 0.9rem;
+      box-shadow: 3px 3px 0 rgba(36, 24, 15, 0.13);
+    }
+
+    .cta-plant {
+      display: none;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .dashboard {
+      padding: 0.5rem;
+    }
+
+    .trajectory-stats,
+    .summary-list,
+    .milestone-strip {
+      grid-template-columns: 1fr;
+    }
+
+    .summary-list > div:nth-child(odd),
+    .metric-card:nth-child(odd) {
+      border-right: 0;
     }
   }
 </style>

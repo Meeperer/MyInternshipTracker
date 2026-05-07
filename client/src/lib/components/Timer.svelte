@@ -263,8 +263,8 @@
     display: inline-flex;
     align-items: baseline;
     justify-content: center;
-    font-weight: 900;
-    letter-spacing: 0.1em;
+    font-weight: 400;
+    letter-spacing: 0;
     color: var(--red);
     font-size: clamp(4.6rem, 26vw, 15rem);
   }
@@ -298,8 +298,8 @@
     gap: 0.5rem;
     min-height: 3rem;
     padding: 0.72rem 1rem;
-    border-radius: 999px;
-    border: 1px solid rgba(11, 110, 58, 0.18);
+    border-radius: 8px;
+    border: 2px solid rgba(36, 24, 15, 0.78);
     background: rgba(255, 255, 255, 0.84);
     color: var(--red);
     font-family: var(--font-ui);
@@ -311,8 +311,13 @@
   }
 
   .timer-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 10px 18px rgba(34, 24, 8, 0.08);
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 rgba(36, 24, 15, 0.12);
+  }
+
+  .timer-button:active {
+    transform: translate(0, 0) scale(0.985);
+    box-shadow: 2px 2px 0 rgba(36, 24, 15, 0.1);
   }
 
   .timer-button-primary {
@@ -363,11 +368,12 @@
     min-height: 2.75rem;
     text-align: center;
     background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(11, 110, 58, 0.16);
-    border-radius: 999px;
+    border: 2px solid rgba(36, 24, 15, 0.72);
+    border-radius: 8px;
     color: var(--red);
     font-family: var(--font-display);
     font-size: 1.1rem;
+    font-weight: 400;
     padding: 0.15rem 0;
     -moz-appearance: textfield;
   }
@@ -429,6 +435,102 @@
 
     .duration-input {
       width: 3.6rem;
+    }
+  }
+
+  /* Mobile focus pass */
+  @media (max-width: 760px) {
+    .pomodoro-view-old {
+      justify-content: start;
+      gap: 0.75rem;
+      min-height: 100%;
+      padding: 0.85rem 0.75rem 1rem;
+    }
+
+    .timer-ribbon,
+    .timer-presets {
+      width: 100%;
+      justify-content: stretch;
+      gap: 0.4rem;
+    }
+
+    .timer-ribbon-chip,
+    .timer-preset {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 2.35rem;
+      padding: 0.45rem 0.5rem;
+      border-radius: 8px;
+      font-size: 0.66rem;
+    }
+
+    .timer-status {
+      width: 100%;
+    }
+
+    .timer-display-wrap {
+      width: 100%;
+      margin-block: 0.35rem;
+      font-size: clamp(3.4rem, 22vw, 7.6rem);
+      line-height: 0.95;
+    }
+
+    .timer-buttons {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+      gap: 0.55rem;
+      width: 100%;
+      margin-top: 0.25rem;
+    }
+
+    .timer-button {
+      width: 100%;
+      min-height: 3.1rem;
+      padding: 0.7rem 0.75rem;
+      border-radius: 8px;
+    }
+
+    .duration-controls {
+      width: 100%;
+      margin-top: 0.25rem;
+      align-items: stretch;
+    }
+
+    .duration-row {
+      display: grid;
+      grid-template-columns: 2.6rem minmax(0, 1fr) auto 2.6rem;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    .duration-btn {
+      width: 2.6rem;
+      border-radius: 8px;
+    }
+
+    .duration-input {
+      width: 100%;
+      min-height: 2.75rem;
+    }
+  }
+
+  @media (max-width: 390px), (max-height: 740px) and (max-width: 760px) {
+    .pomodoro-view-old {
+      gap: 0.55rem;
+      padding-top: 0.55rem;
+    }
+
+    .timer-display-wrap {
+      font-size: clamp(3rem, 20vw, 5.9rem);
+      margin-block: 0.1rem;
+    }
+
+    .timer-ribbon-chip {
+      display: none;
+    }
+
+    .timer-preset {
+      min-height: 2.15rem;
     }
   }
 </style>

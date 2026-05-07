@@ -1,4 +1,14 @@
 @font-face {
+  font-family: 'Manosque';
+  src:
+    url('/fonts/Manosque-Regular.woff2') format('woff2'),
+    url('/fonts/Manosque-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Recoleta';
   src: url('/fonts/Recoleta-Regular.otf') format('opentype');
   font-weight: 400;
@@ -54,8 +64,8 @@
   --success: var(--leaf);
   --warning: var(--moss);
 
-  --font-brand: 'Recoleta', Georgia, serif;
-  --font-display: 'Aileron', 'Segoe UI', system-ui, sans-serif;
+  --font-brand: 'Manosque', 'Recoleta', Georgia, serif;
+  --font-display: 'Manosque', 'Aileron', 'Segoe UI', system-ui, sans-serif;
   --font-body: 'Aileron', system-ui, -apple-system, sans-serif;
   --font-mono: 'Moonshine', monospace;
   --font-ui: 'Aileron', 'Segoe UI', sans-serif;
@@ -69,6 +79,23 @@
   --transition-fast: 0.15s var(--ease-out);
   --transition-normal: 0.25s var(--ease-out);
   --transition-slow: 0.4s var(--ease-out);
+}
+
+.botanical-cutout {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.botanical-cutout[data-tone='cream'] {
+  filter: brightness(0) saturate(100%) invert(91%) sepia(15%) saturate(485%) hue-rotate(27deg) brightness(101%) contrast(88%);
+}
+
+.botanical-cutout[data-tone='canopy'] {
+  filter: saturate(0.78) contrast(1.05) brightness(0.82);
 }
 
 .skip-link {
@@ -141,9 +168,10 @@ button {
 h1, h2, h3, h4 {
   font-family: var(--font-display);
   color: var(--red);
-  font-weight: 900;
+  font-weight: 400;
   line-height: 1.08;
   letter-spacing: 0;
+  font-feature-settings: 'kern' 1;
 }
 
 /* Utility classes */
@@ -181,7 +209,8 @@ h1, h2, h3, h4 {
   box-shadow: 4px 4px 0 rgba(42, 34, 23, 0.14);
 }
 .btn:active {
-  transform: translateY(0);
+  transform: translate(0, 0) scale(0.985);
+  box-shadow: 2px 2px 0 rgba(42, 34, 23, 0.12);
 }
 .btn:disabled {
   opacity: 0.4;
@@ -228,12 +257,14 @@ h1, h2, h3, h4 {
   font-size: 0.94rem;
   background: var(--paper-strong);
   color: var(--dark);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
+    transform var(--transition-fast);
 }
 .input:focus {
   outline: none;
   border-color: var(--red);
   box-shadow: 0 0 0 3px rgba(11, 110, 58, 0.18);
+  transform: translateY(-1px);
 }
 
 .textarea {
@@ -248,12 +279,14 @@ h1, h2, h3, h4 {
   resize: vertical;
   min-height: 120px;
   line-height: 1.7;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
+    transform var(--transition-fast);
 }
 .textarea:focus {
   outline: none;
   border-color: var(--red);
   box-shadow: 0 0 0 3px rgba(11, 110, 58, 0.18);
+  transform: translateY(-1px);
 }
 
 /* Validation - theme-matched */
@@ -302,8 +335,18 @@ h1, h2, h3, h4 {
   background: rgba(255, 255, 255, 0.72);
 }
 .card:hover {
+  transform: translate(-1px, -1px);
   box-shadow: var(--shadow-soft);
   border-color: rgba(42, 34, 23, 0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:active,
+  .input:focus,
+  .textarea:focus,
+  .card:hover {
+    transform: none;
+  }
 }
 
 .label {

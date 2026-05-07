@@ -182,6 +182,92 @@ router.post('/log-hours', validateHours, async (req, res) => {
   }
 });
 
+router.post('/complete-day', validateJournalEntry, async (req, res) => {
+  const { date, hours, content_raw } = req.body;
+  const parsedHours = parseFloat(hours);
+
+  if (isNaN(parsedHours) || parsedHours <= 0) {
+    return res.status(400).json({ error: 'Log hours before finishing the day' });
+  }
+
+  try {
+    const { data: existing } = await supabaseAdmin
+      .from('journals')
+      .select('id, status')
+      .eq('user_id', req.user.id)
+      .eq('date', date)
+      .maybeSingle();
+
+    if (existing?.status === 'finished') {
+      return res.status(403).json({ error: 'Day already finished' });
+    }
+
+    const { data: progress } = await supabaseAdmin
+      .from('internship_progress')
+      .select('is_completed')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (progress?.is_completed) {
+      return res.status(403).json({ error: 'Internship hours completed. No new entries allowed.' });
+    }
+
+    let journalId = existing?.id;
+
+    if (existing) {
+      const updates = {
+        hours: parsedHours,
+        updated_at: new Date().toISOString()
+      };
+
+      if (content_raw !== undefined) {
+        updates.content_raw = content_raw;
+      }
+
+      const { data, error } = await userDb(req)
+        .from('journals')
+        .update(updates)
+        .eq('id', existing.id)
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      journalId = data.id;
+    } else {
+      const { data, error } = await userDb(req)
+        .from('journals')
+        .insert({
+          user_id: req.user.id,
+          date,
+          hours: parsedHours,
+          content_raw: content_raw || '',
+          status: 'draft'
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      journalId = data.id;
+    }
+
+    const { data: rows, error } = await supabaseAdmin.rpc('finish_journal_day', {
+      p_journal_id: journalId,
+      p_user_id: req.user.id
+    });
+
+    if (error) throw error;
+    const data = Array.isArray(rows) ? rows[0] : rows;
+    if (!data) {
+      return res.status(400).json({ error: 'Day already finished or not found' });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error('Complete day error:', err);
+    res.status(500).json({ error: 'Failed to complete day' });
+  }
+});
+
 router.post('/finish-day', validateFinishDay, async (req, res) => {
   const { date } = req.body;
 
