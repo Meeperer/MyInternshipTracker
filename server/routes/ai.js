@@ -27,7 +27,9 @@ const SUMMARY_SELECT =
 
 function isMissingSummaryTableError(error) {
   const message = error?.message || '';
-  return error?.code === '42P01' || message.includes('journal_period_summaries');
+  return error?.code === '42P01'
+    || error?.code === 'PGRST205'
+    || message.includes('journal_period_summaries');
 }
 
 function isMissingSummaryPinColumnError(error) {

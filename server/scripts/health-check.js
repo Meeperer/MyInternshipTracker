@@ -4,10 +4,10 @@
  */
 const base = process.env.API_BASE_URL || 'http://localhost:3001';
 
-fetch(`${base}/api/health`)
-  .then((r) => r.json())
-  .then((body) => {
-    if (body.status === 'ok' || body.status === 'degraded') process.exit(0);
-    process.exit(1);
-  })
-  .catch(() => process.exit(1));
+try {
+  const response = await fetch(`${base}/api/health`);
+  const body = await response.json();
+  process.exitCode = body.status === 'ok' || body.status === 'degraded' ? 0 : 1;
+} catch {
+  process.exitCode = 1;
+}

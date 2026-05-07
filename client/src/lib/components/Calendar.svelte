@@ -164,10 +164,10 @@
 
   let heroSummary = $derived.by(() => {
     if (monthStats.count === 0 && monthStats.eventCount === 0) {
-      return `${monthHeading} is open.`;
+      return `${monthHeading} is clear.`;
     }
 
-    return `${monthStats.count} days · ${formatHours(monthStats.hours)} · ${monthStats.eventCount} items`;
+    return `${monthStats.count} days / ${formatHours(monthStats.hours)} / ${monthStats.eventCount} items`;
   });
 
   function formatHours(value) {
@@ -179,7 +179,10 @@
   function truncate(value, maxLength = 144) {
     const normalized = String(value || '').trim().replace(/\s+/g, ' ');
     if (!normalized) return '';
-    return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1).trimEnd()}…` : normalized;
+    if (normalized.length > maxLength) {
+      return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
+    }
+    return normalized;
   }
 
   function getEntryPreview(entry) {
@@ -443,10 +446,16 @@
 <div class="calendar-view" bind:this={calendarRoot} aria-busy={calendarBusy}>
   <section class="calendar-hero calendar-surface">
     <div class="calendar-hero-copy" data-calendar-animate="hero-copy">
-      <p class="calendar-kicker">Calendar</p>
+      <p class="calendar-kicker">Month plot</p>
       <div class="calendar-title-row">
         <h1>{monthHeading} <span>{currentYear}</span></h1>
       </div>
+      <svg class="calendar-botanical-mark" width="118" height="70" viewBox="0 0 118 70" aria-hidden="true">
+        <path d="M10 58h78" />
+        <path d="M45 58V12" />
+        <path d="M45 28C31 16 21 15 13 20c7 13 18 17 32 8Z" />
+        <path d="M45 39c18-18 34-20 49-12-10 18-25 24-49 12Z" />
+      </svg>
       <p class="calendar-hero-summary">{heroSummary}</p>
 
       <div class="calendar-hero-metrics">
@@ -523,7 +532,7 @@
         </button>
         <button type="button" class="calendar-primary-btn" onclick={openTodayPlanner}>
           <Plus size={16} weight="bold" />
-          <span>New entry</span>
+          <span>Write</span>
         </button>
       </div>
 
@@ -724,7 +733,7 @@
 
             <button type="button" class="calendar-foot-btn" onclick={openTodayPlanner}>
               <Plus size={16} weight="bold" />
-              <span>Add entry</span>
+              <span>Write</span>
             </button>
           </div>
         </article>
@@ -742,7 +751,7 @@
     padding: clamp(0.85rem, 1.2vw, 1.2rem);
     overflow: auto;
     background:
-      radial-gradient(circle at top left, rgba(190, 53, 25, 0.08), transparent 26%),
+      radial-gradient(circle at top left, rgba(11, 110, 58, 0.08), transparent 26%),
       linear-gradient(180deg, rgba(255, 254, 248, 0.98), rgba(251, 249, 236, 0.98));
   }
 
@@ -751,14 +760,14 @@
   }
 
   .calendar-view::-webkit-scrollbar-thumb {
-    background: rgba(190, 53, 25, 0.18);
+    background: rgba(11, 110, 58, 0.18);
     border-radius: 999px;
   }
 
   .calendar-hero,
   .calendar-workspace {
-    width: min(100%, 1440px);
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
   }
 
   .calendar-hero {
@@ -779,10 +788,10 @@
     position: relative;
     overflow: hidden;
     background: rgba(255, 252, 244, 0.95);
-    border: 2px solid rgba(190, 53, 25, 0.16);
+    border: 2px solid rgba(11, 110, 58, 0.16);
     border-radius: 1.4rem;
     box-shadow:
-      10px 10px 0 rgba(190, 53, 25, 0.08),
+      10px 10px 0 rgba(11, 110, 58, 0.08),
       0 18px 36px rgba(37, 21, 7, 0.08);
   }
 
@@ -853,15 +862,15 @@
     font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: rgba(190, 53, 25, 0.72);
+    color: rgba(11, 110, 58, 0.72);
   }
 
   .calendar-view-tag {
     flex-shrink: 0;
     padding: 0.45rem 0.72rem;
-    border: 2px solid rgba(190, 53, 25, 0.18);
+    border: 2px solid rgba(11, 110, 58, 0.18);
     border-radius: 999px;
-    background: rgba(190, 53, 25, 0.08);
+    background: rgba(11, 110, 58, 0.08);
     font-family: var(--font-ui);
     font-size: 0.72rem;
     font-weight: 800;
@@ -888,7 +897,7 @@
   .calendar-mini-stat {
     padding: 0.9rem 0.95rem;
     background: rgba(255, 255, 255, 0.72);
-    border: 2px solid rgba(190, 53, 25, 0.1);
+    border: 2px solid rgba(11, 110, 58, 0.1);
     border-radius: 1rem;
   }
 
@@ -944,7 +953,7 @@
     width: 100%;
     min-height: 3.2rem;
     padding: 0.85rem 1rem;
-    border: 2px solid rgba(190, 53, 25, 0.16);
+    border: 2px solid rgba(11, 110, 58, 0.16);
     border-radius: 1rem;
     background: rgba(255, 255, 255, 0.78);
     color: var(--dark);
@@ -956,8 +965,8 @@
 
   .calendar-month-input:focus {
     outline: none;
-    border-color: rgba(190, 53, 25, 0.42);
-    box-shadow: 0 0 0 4px rgba(190, 53, 25, 0.1);
+    border-color: rgba(11, 110, 58, 0.42);
+    box-shadow: 0 0 0 4px rgba(11, 110, 58, 0.1);
   }
 
   .calendar-nav-btn,
@@ -987,7 +996,7 @@
   .calendar-nav-btn,
   .calendar-secondary-btn,
   .calendar-foot-btn {
-    border: 2px solid rgba(190, 53, 25, 0.16);
+    border: 2px solid rgba(11, 110, 58, 0.16);
     background: rgba(255, 255, 255, 0.82);
     color: var(--red);
   }
@@ -996,14 +1005,14 @@
     border: 2px solid var(--red);
     background: var(--red);
     color: var(--bg-soft);
-    box-shadow: 0 12px 20px rgba(190, 53, 25, 0.18);
+    box-shadow: 0 12px 20px rgba(11, 110, 58, 0.18);
   }
 
   .calendar-nav-btn:hover,
   .calendar-secondary-btn:hover,
   .calendar-foot-btn:hover {
-    background: rgba(190, 53, 25, 0.08);
-    border-color: rgba(190, 53, 25, 0.32);
+    background: rgba(11, 110, 58, 0.08);
+    border-color: rgba(11, 110, 58, 0.32);
     transform: translateY(-1px);
   }
 
@@ -1011,7 +1020,7 @@
     background: var(--red-hover);
     border-color: var(--red-hover);
     transform: translateY(-1px);
-    box-shadow: 0 14px 24px rgba(190, 53, 25, 0.24);
+    box-shadow: 0 14px 24px rgba(11, 110, 58, 0.24);
   }
 
   .calendar-nav-btn:active,
@@ -1083,7 +1092,7 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.42rem 0.65rem;
-    border: 1px solid rgba(190, 53, 25, 0.14);
+    border: 1px solid rgba(11, 110, 58, 0.14);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.7);
     font-family: var(--font-ui);
@@ -1098,7 +1107,7 @@
     width: 0.5rem;
     height: 0.5rem;
     border-radius: 999px;
-    background: rgba(190, 53, 25, 0.22);
+    background: rgba(11, 110, 58, 0.22);
   }
 
   .legend-today {
@@ -1106,11 +1115,11 @@
   }
 
   .legend-selected {
-    background: rgba(190, 53, 25, 0.46);
+    background: rgba(11, 110, 58, 0.46);
   }
 
   .legend-events {
-    background: #d58c25;
+    background: var(--moss);
   }
 
   .calendar-grid-head {
@@ -1123,7 +1132,7 @@
 
   .calendar-day-head {
     padding: 0.55rem 0.45rem;
-    border: 2px solid rgba(190, 53, 25, 0.12);
+    border: 2px solid rgba(11, 110, 58, 0.12);
     border-radius: 0.9rem;
     background: rgba(255, 255, 255, 0.62);
     text-align: center;
@@ -1150,7 +1159,7 @@
     min-width: 0;
     min-height: 0;
     border-radius: 1.1rem;
-    border: 2px solid rgba(190, 53, 25, 0.1);
+    border: 2px solid rgba(11, 110, 58, 0.1);
     background: rgba(255, 255, 255, 0.76);
   }
 
@@ -1173,7 +1182,7 @@
 
   .calendar-day-cell:hover {
     transform: translateY(-2px);
-    border-color: rgba(190, 53, 25, 0.28);
+    border-color: rgba(11, 110, 58, 0.28);
     box-shadow: 0 10px 18px rgba(37, 21, 7, 0.08);
   }
 
@@ -1183,15 +1192,15 @@
   }
 
   .calendar-day-cell.today {
-    border-color: rgba(190, 53, 25, 0.4);
-    background: rgba(190, 53, 25, 0.08);
+    border-color: rgba(11, 110, 58, 0.4);
+    background: rgba(11, 110, 58, 0.08);
   }
 
   .calendar-day-cell.selected {
     border-color: var(--red);
-    background: rgba(190, 53, 25, 0.12);
+    background: rgba(11, 110, 58, 0.12);
     box-shadow:
-      6px 6px 0 rgba(190, 53, 25, 0.12),
+      6px 6px 0 rgba(11, 110, 58, 0.12),
       0 12px 20px rgba(37, 21, 7, 0.09);
   }
 
@@ -1234,7 +1243,7 @@
 
   .calendar-cell-status {
     width: fit-content;
-    background: rgba(190, 53, 25, 0.08);
+    background: rgba(11, 110, 58, 0.08);
     color: rgba(126, 40, 21, 0.88);
   }
 
@@ -1272,17 +1281,17 @@
   }
 
   .calendar-cell-pill-hours {
-    background: rgba(190, 53, 25, 0.09);
+    background: rgba(11, 110, 58, 0.09);
     color: var(--red);
   }
 
   .calendar-cell-pill-events {
-    background: rgba(213, 140, 37, 0.12);
-    color: #8a5114;
+    background: rgba(89, 107, 64, 0.14);
+    color: var(--moss);
   }
 
   .event-type-meeting {
-    background: rgba(190, 53, 25, 0.1);
+    background: rgba(11, 110, 58, 0.1);
     color: var(--red);
   }
 
@@ -1292,13 +1301,13 @@
   }
 
   .event-type-reminder {
-    background: rgba(184, 134, 11, 0.14);
-    color: #8a6210;
+    background: rgba(89, 107, 64, 0.16);
+    color: var(--moss);
   }
 
   .event-type-personal {
     background: rgba(45, 122, 58, 0.12);
-    color: #2d7a3a;
+    color: var(--leaf);
   }
 
   .calendar-grid-skeleton {
@@ -1307,7 +1316,7 @@
 
   .calendar-skeleton-cell {
     aspect-ratio: 1.42 / 1;
-    background: rgba(190, 53, 25, 0.05);
+    background: rgba(11, 110, 58, 0.05);
     animation: calendarPulse 1.1s ease-in-out infinite alternate;
   }
 
@@ -1319,7 +1328,7 @@
     gap: 0.8rem;
     margin-top: 0.95rem;
     padding-top: 0.95rem;
-    border-top: 1px solid rgba(190, 53, 25, 0.1);
+    border-top: 1px solid rgba(11, 110, 58, 0.1);
   }
 
   .selected-day-summary,
@@ -1353,7 +1362,7 @@
 
   .selected-event-item,
   .agenda-item {
-    border: 2px solid rgba(190, 53, 25, 0.1);
+    border: 2px solid rgba(11, 110, 58, 0.1);
     border-radius: 1rem;
     background: rgba(255, 255, 255, 0.74);
   }
@@ -1391,7 +1400,7 @@
   .calendar-empty-note {
     margin-top: 1rem;
     padding: 0.9rem 1rem;
-    border: 2px dashed rgba(190, 53, 25, 0.16);
+    border: 2px dashed rgba(11, 110, 58, 0.16);
     border-radius: 1rem;
     background: rgba(255, 255, 255, 0.54);
   }
@@ -1422,17 +1431,17 @@
 
   .agenda-item:hover {
     transform: translateY(-2px);
-    border-color: rgba(190, 53, 25, 0.24);
-    background: rgba(190, 53, 25, 0.04);
+    border-color: rgba(11, 110, 58, 0.24);
+    background: rgba(11, 110, 58, 0.04);
   }
 
   .agenda-date-block {
     width: 3.3rem;
     min-width: 3.3rem;
     padding: 0.55rem 0.35rem;
-    border: 2px solid rgba(190, 53, 25, 0.12);
+    border: 2px solid rgba(11, 110, 58, 0.12);
     border-radius: 0.9rem;
-    background: rgba(190, 53, 25, 0.06);
+    background: rgba(11, 110, 58, 0.06);
     text-align: center;
   }
 
@@ -1481,15 +1490,15 @@
     height: 0.7rem;
     overflow: hidden;
     border-radius: 999px;
-    background: rgba(190, 53, 25, 0.08);
-    border: 1px solid rgba(190, 53, 25, 0.08);
+    background: rgba(11, 110, 58, 0.08);
+    border: 1px solid rgba(11, 110, 58, 0.08);
   }
 
   .agenda-progress-fill {
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, rgba(190, 53, 25, 0.92), rgba(158, 42, 19, 0.82));
+    background: linear-gradient(90deg, rgba(11, 110, 58, 0.92), rgba(5, 45, 25, 0.82));
   }
 
   .calendar-surface {
@@ -1507,7 +1516,7 @@
     gap: 0.8rem 1.15rem;
     margin-top: 1rem;
     padding-top: 0.95rem;
-    border-top: 1px solid rgba(190, 53, 25, 0.12);
+    border-top: 1px solid rgba(11, 110, 58, 0.12);
   }
 
   .calendar-mini-stat {
@@ -1521,7 +1530,7 @@
   .calendar-board-head,
   .rail-card-head {
     padding-bottom: 0.85rem;
-    border-bottom: 1px solid rgba(190, 53, 25, 0.08);
+    border-bottom: 1px solid rgba(11, 110, 58, 0.08);
   }
 
   .legend-chip,
@@ -1542,7 +1551,7 @@
     border: 0;
     border-radius: 0;
     background: transparent;
-    border-bottom: 1px solid rgba(190, 53, 25, 0.12);
+    border-bottom: 1px solid rgba(11, 110, 58, 0.12);
   }
 
   .calendar-day-cell,
@@ -1555,11 +1564,11 @@
   .calendar-day-cell:hover {
     transform: none;
     box-shadow: none;
-    background: rgba(190, 53, 25, 0.05);
+    background: rgba(11, 110, 58, 0.05);
   }
 
   .calendar-day-cell.selected {
-    box-shadow: inset 0 0 0 1px rgba(190, 53, 25, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(11, 110, 58, 0.14);
   }
 
   .selected-day-events,
@@ -1578,7 +1587,7 @@
   .agenda-item + .agenda-item {
     margin-top: 0.8rem;
     padding-top: 0.8rem;
-    border-top: 1px solid rgba(190, 53, 25, 0.1);
+    border-top: 1px solid rgba(11, 110, 58, 0.1);
   }
 
   .agenda-item {
@@ -1588,7 +1597,7 @@
   .agenda-item:hover {
     transform: none;
     border-color: transparent;
-    background: rgba(190, 53, 25, 0.03);
+    background: rgba(11, 110, 58, 0.03);
   }
 
   .selected-event-item {
@@ -1608,9 +1617,332 @@
   .calendar-empty-note {
     padding: 0.9rem 0 0;
     border: 0;
-    border-top: 1px dashed rgba(190, 53, 25, 0.18);
+    border-top: 1px dashed rgba(11, 110, 58, 0.18);
     border-radius: 0;
     background: transparent;
+  }
+
+  .calendar-view {
+    background:
+      linear-gradient(rgba(42, 34, 23, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42, 34, 23, 0.035) 1px, transparent 1px),
+      var(--bg);
+    background-size: 30px 30px, 30px 30px, auto;
+  }
+
+  .calendar-surface {
+    background: rgba(255, 250, 232, 0.94);
+    border: 2px solid rgba(42, 34, 23, 0.78);
+    border-radius: 10px;
+    box-shadow: 5px 5px 0 rgba(42, 34, 23, 0.1);
+  }
+
+  .calendar-hero {
+    position: relative;
+    align-items: stretch;
+  }
+
+  .calendar-botanical-mark {
+    position: absolute;
+    right: clamp(0.6rem, 2vw, 1rem);
+    bottom: clamp(0.65rem, 2vw, 1rem);
+    width: clamp(5.4rem, 11vw, 7.4rem);
+    height: auto;
+    fill: none;
+    stroke: rgba(49, 95, 54, 0.3);
+    stroke-width: 3;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+    pointer-events: none;
+  }
+
+  .calendar-hero-copy {
+    min-height: 15rem;
+    padding-right: clamp(0rem, 10vw, 7rem);
+  }
+
+  .calendar-title-row h1,
+  .calendar-board-head h2,
+  .rail-card-head h3,
+  .calendar-mini-stat strong,
+  .agenda-date-day,
+  .calendar-day-number {
+    color: var(--red);
+  }
+
+  .calendar-kicker,
+  .calendar-section-label,
+  .mini-label,
+  .control-label,
+  .calendar-input-label {
+    color: var(--red);
+    letter-spacing: 0.14em;
+  }
+
+  .calendar-view-tag,
+  .calendar-cell-status,
+  .calendar-cell-pill-hours,
+  .event-type-meeting,
+  .calendar-day-cell.today,
+  .calendar-day-cell.selected,
+  .calendar-primary-btn,
+  .calendar-day-flag {
+    border-color: rgba(42, 34, 23, 0.76);
+  }
+
+  .calendar-hero-metrics,
+  .calendar-board-head,
+  .rail-card-head,
+  .calendar-board-foot,
+  .agenda-footer {
+    border-color: rgba(42, 34, 23, 0.12);
+  }
+
+  .calendar-mini-stat {
+    min-width: 7.4rem;
+  }
+
+  .calendar-month-input,
+  .calendar-nav-btn,
+  .calendar-secondary-btn,
+  .calendar-primary-btn,
+  .calendar-foot-btn {
+    border-radius: 6px;
+    border-width: 2px;
+  }
+
+  .calendar-month-input,
+  .calendar-nav-btn,
+  .calendar-secondary-btn,
+  .calendar-foot-btn {
+    border-color: rgba(42, 34, 23, 0.68);
+    background: var(--paper-strong);
+  }
+
+  .calendar-primary-btn {
+    background: var(--red);
+    color: var(--bg-soft);
+    box-shadow: 4px 4px 0 rgba(42, 34, 23, 0.13);
+  }
+
+  .calendar-primary-btn:hover,
+  .calendar-nav-btn:hover,
+  .calendar-secondary-btn:hover,
+  .calendar-foot-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 rgba(42, 34, 23, 0.12);
+  }
+
+  .calendar-day-cell,
+  .calendar-skeleton-cell {
+    border-radius: 8px;
+    border: 1px solid rgba(42, 34, 23, 0.18);
+    background: rgba(255, 252, 240, 0.72);
+  }
+
+  .calendar-day-cell.selected {
+    background: rgba(49, 95, 54, 0.12);
+    border-color: rgba(42, 34, 23, 0.82);
+  }
+
+  .calendar-day-cell.today {
+    background: rgba(111, 125, 58, 0.12);
+  }
+
+  .agenda-progress-fill,
+  .trend-bar-fill {
+    background: var(--red);
+  }
+
+  .event-type-deadline {
+    background: rgba(42, 34, 23, 0.1);
+    color: var(--soil);
+  }
+
+  /* Eco-enterprise calendar pass */
+  .calendar-view {
+    background:
+      linear-gradient(rgba(36, 24, 15, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(36, 24, 15, 0.04) 1px, transparent 1px),
+      var(--bg);
+    background-size: 32px 32px, 32px 32px, auto;
+  }
+
+  .calendar-hero {
+    border-color: rgba(36, 24, 15, 0.92);
+    background:
+      linear-gradient(rgba(248, 239, 212, 0.075) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(248, 239, 212, 0.075) 1px, transparent 1px),
+      var(--canopy);
+    background-size: 24px 24px, 24px 24px, auto;
+    color: var(--cream);
+  }
+
+  .calendar-hero::after {
+    content: '';
+    position: absolute;
+    right: clamp(0.9rem, 2vw, 1.4rem);
+    top: clamp(0.9rem, 2vw, 1.35rem);
+    width: clamp(4.5rem, 10vw, 7rem);
+    height: clamp(4.5rem, 10vw, 7rem);
+    border: 2px solid rgba(248, 239, 212, 0.24);
+    background: var(--pollen);
+    clip-path: polygon(50% 0, 92% 25%, 76% 84%, 24% 84%, 8% 25%);
+    pointer-events: none;
+  }
+
+  .calendar-title-row h1,
+  .calendar-title-row h1 span,
+  .calendar-hero-summary,
+  .calendar-controls-copy p,
+  .control-subtle {
+    color: var(--cream);
+  }
+
+  .calendar-kicker,
+  .calendar-hero .mini-label,
+  .calendar-hero .control-label,
+  .calendar-hero .calendar-input-label {
+    color: var(--pollen);
+  }
+
+  .calendar-botanical-mark {
+    stroke: rgba(216, 227, 184, 0.72);
+  }
+
+  .calendar-mini-stat {
+    padding-right: 1rem;
+    border-right: 1px solid rgba(248, 239, 212, 0.18);
+  }
+
+  .calendar-mini-stat:last-child {
+    border-right: 0;
+  }
+
+  .calendar-mini-stat strong,
+  .calendar-hero .mini-note {
+    color: var(--cream);
+    opacity: 1;
+  }
+
+  .calendar-hero .mini-note {
+    color: rgba(248, 239, 212, 0.78);
+  }
+
+  .calendar-hero-controls {
+    padding: 1rem;
+    border: 1px solid rgba(248, 239, 212, 0.2);
+    background: rgba(248, 239, 212, 0.08);
+  }
+
+  .calendar-surface {
+    border-color: rgba(36, 24, 15, 0.9);
+    border-radius: 8px;
+    background: var(--paper-strong);
+    box-shadow: 5px 5px 0 rgba(36, 24, 15, 0.12);
+  }
+
+  .calendar-hero.calendar-surface {
+    background:
+      linear-gradient(rgba(248, 239, 212, 0.075) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(248, 239, 212, 0.075) 1px, transparent 1px),
+      var(--canopy);
+    background-size: 24px 24px, 24px 24px, auto;
+  }
+
+  .calendar-board {
+    background: var(--cream);
+  }
+
+  .calendar-board-head h2,
+  .rail-card-head h3,
+  .calendar-day-number,
+  .agenda-date-day {
+    color: var(--canopy);
+  }
+
+  .calendar-section-label,
+  .calendar-input-label,
+  .control-label,
+  .mini-label {
+    color: var(--leaf);
+  }
+
+  .calendar-month-input,
+  .calendar-nav-btn,
+  .calendar-secondary-btn,
+  .calendar-foot-btn {
+    border-color: rgba(36, 24, 15, 0.72);
+    background: var(--paper-strong);
+    color: var(--canopy);
+  }
+
+  .calendar-primary-btn {
+    border-color: rgba(36, 24, 15, 0.88);
+    background: var(--paprika);
+    color: var(--cream);
+    box-shadow: 4px 4px 0 rgba(36, 24, 15, 0.16);
+  }
+
+  .calendar-primary-btn:hover {
+    background: var(--moss);
+    border-color: rgba(36, 24, 15, 0.88);
+  }
+
+  .calendar-day-head {
+    color: var(--canopy);
+    border-color: rgba(36, 24, 15, 0.18);
+  }
+
+  .calendar-day-cell,
+  .calendar-skeleton-cell {
+    border: 1px solid rgba(36, 24, 15, 0.22);
+    background: rgba(255, 246, 210, 0.66);
+  }
+
+  .calendar-day-cell:hover {
+    background: rgba(216, 227, 184, 0.22);
+  }
+
+  .calendar-day-cell.today {
+    background: rgba(216, 227, 184, 0.32);
+    border-color: rgba(36, 24, 15, 0.88);
+  }
+
+  .calendar-day-cell.selected {
+    background: var(--canopy);
+    color: var(--cream);
+    border-color: rgba(36, 24, 15, 0.95);
+    box-shadow: inset 0 0 0 1px rgba(248, 239, 212, 0.24);
+  }
+
+  .calendar-day-cell.selected .calendar-day-number,
+  .calendar-day-cell.selected .calendar-cell-meta,
+  .calendar-day-cell.selected .calendar-cell-status {
+    color: var(--cream);
+  }
+
+  .calendar-day-flag,
+  .calendar-cell-pill-hours,
+  .event-type-meeting,
+  .agenda-progress-fill {
+    background: var(--leaf);
+    color: var(--cream);
+  }
+
+  .calendar-cell-pill-events,
+  .event-type-reminder {
+    background: var(--pollen-soft);
+    color: var(--soil);
+  }
+
+  .event-type-personal {
+    background: var(--paprika-soft);
+    color: var(--paprika);
+  }
+
+  .agenda-date-block {
+    color: var(--canopy);
   }
 
   @keyframes calendarPulse {

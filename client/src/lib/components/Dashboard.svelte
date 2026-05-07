@@ -505,7 +505,7 @@
           {todaySummary}
         </span>
       </div>
-      <h1>Overview</h1>
+      <h1>Field log</h1>
       <p class="hero-summary">
         <strong>{formatHours($progress.total_hours)}</strong> of <strong>{formatHours(targetHours)}</strong> logged. <strong>{formatHours($progress.remaining_hours)}</strong> left.
       </p>
@@ -548,7 +548,7 @@
         <Target size={14} weight="bold" />
         Trajectory
       </div>
-      <h2 id="trajectory-title">Milestone path</h2>
+      <h2 id="trajectory-title">Growth path</h2>
       <p>{trajectoryLine}</p>
     </div>
 
@@ -733,7 +733,7 @@
         <PencilSimpleLine size={14} weight="bold" />
         Action
       </div>
-      <h2 id="journal-cta-title">Log today</h2>
+      <h2 id="journal-cta-title">Write today</h2>
       <p>{todaySummary}. Capture it while it is fresh.</p>
     </div>
 
@@ -746,7 +746,7 @@
       onmousedown={pressCtaFeedback}
       onmouseup={playCtaFeedback}
     >
-      Write entry
+      Open journal
     </button>
   </section>
 
@@ -928,22 +928,28 @@
 
 <style>
   .dashboard {
-    --dash-canvas: #fff0cf;
-    --dash-paper: #fff8e8;
-    --dash-paper-strong: #fffbef;
-    --dash-red: var(--red);
-    --dash-red-dark: #8f2412;
-    --dash-ink: #24150e;
-    --dash-muted: #725f4c;
-    --dash-border: rgba(36, 21, 14, 0.18);
-    --dash-divider: rgba(36, 21, 14, 0.12);
-    --dash-shadow: 0 1px 0 rgba(36, 21, 14, 0.08), 0 18px 34px rgba(36, 21, 14, 0.05);
-    --dash-red-shadow: 0 1px 0 rgba(190, 53, 25, 0.12), 0 18px 34px rgba(190, 53, 25, 0.08);
+    --dash-canvas: var(--bg);
+    --dash-paper: var(--paper);
+    --dash-paper-strong: var(--paper-strong);
+    --dash-red: var(--leaf);
+    --dash-pollen: var(--pollen);
+    --dash-paprika: var(--paprika);
+    --dash-red-dark: var(--canopy);
+    --dash-ink: var(--soil);
+    --dash-muted: var(--moss);
+    --dash-border: rgba(36, 24, 15, 0.9);
+    --dash-divider: rgba(36, 24, 15, 0.16);
+    --dash-shadow: 5px 5px 0 rgba(36, 24, 15, 0.12);
+    --dash-red-shadow: 5px 5px 0 rgba(36, 24, 15, 0.14);
     width: 100%;
     min-height: 100%;
     padding: 1.35rem;
     color: var(--dash-ink);
-    background: var(--dash-canvas);
+    background:
+      linear-gradient(rgba(42, 34, 23, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42, 34, 23, 0.035) 1px, transparent 1px),
+      var(--dash-canvas);
+    background-size: 30px 30px, 30px 30px, auto;
     overflow: visible;
   }
 
@@ -1092,7 +1098,7 @@
     min-height: 2.65rem;
     border: 1px solid var(--dash-border);
     border-radius: 8px;
-    background: #fffef8;
+    background: var(--dash-paper-strong);
     color: var(--dash-ink);
     font-family: var(--font-ui);
     font-size: 0.95rem;
@@ -1101,7 +1107,7 @@
   }
 
   .month-input:focus {
-    outline: 3px solid rgba(190, 53, 25, 0.28);
+    outline: 3px solid rgba(49, 95, 54, 0.26);
     outline-offset: 2px;
   }
 
@@ -1236,7 +1242,7 @@
         transparent 1px,
         transparent 12px
       ),
-      #fffef8;
+      var(--dash-paper-strong);
     overflow: hidden;
   }
 
@@ -1363,7 +1369,7 @@
 
   .metric-card-red {
     border-left-color: var(--dash-red);
-    background: rgba(190, 53, 25, 0.06);
+    background: rgba(49, 95, 54, 0.07);
   }
 
   .metric-card-red .metric-label {
@@ -1483,7 +1489,7 @@
     color: var(--dash-paper-strong);
     border: none;
     border-radius: 10px;
-    box-shadow: 0 16px 28px rgba(190, 53, 25, 0.16);
+    box-shadow: 5px 5px 0 rgba(42, 34, 23, 0.13);
   }
 
   .journal-cta h2,
@@ -1543,7 +1549,7 @@
   .text-button:focus-visible,
   .dashboard-dialog-close:focus-visible,
   .cta-button:focus-visible {
-    outline: 3px solid rgba(190, 53, 25, 0.32);
+    outline: 3px solid rgba(49, 95, 54, 0.3);
     outline-offset: 3px;
   }
 
@@ -1704,6 +1710,288 @@
     border-radius: 3px;
   }
 
+  /* Eco-branded product pass */
+  .dashboard {
+    padding: clamp(0.9rem, 1.8vw, 1.6rem);
+  }
+
+  .trajectory-board,
+  .metric-grid,
+  .summary-panel,
+  .report-panel {
+    border: 2px solid var(--dash-border);
+    border-radius: 8px;
+    background: var(--dash-paper-strong);
+    box-shadow: var(--dash-shadow);
+  }
+
+  .dashboard-hero {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(1.05rem, 2vw, 1.45rem);
+    border: 2px solid var(--dash-border);
+    border-radius: 8px;
+    background:
+      linear-gradient(rgba(248, 239, 212, 0.075) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(248, 239, 212, 0.075) 1px, transparent 1px),
+      var(--dash-red-dark);
+    background-size: 24px 24px, 24px 24px, auto;
+    color: var(--cream);
+    box-shadow: var(--dash-shadow);
+  }
+
+  .dashboard-hero::after {
+    content: '';
+    position: absolute;
+    right: clamp(0.8rem, 2vw, 1.35rem);
+    bottom: clamp(0.8rem, 2vw, 1.25rem);
+    width: clamp(5.4rem, 12vw, 9rem);
+    height: clamp(3.4rem, 8vw, 5.4rem);
+    background: var(--dash-pollen);
+    clip-path: polygon(8% 56%, 28% 18%, 68% 0, 100% 34%, 82% 76%, 44% 100%);
+    opacity: 0.92;
+  }
+
+  .hero-copy,
+  .hero-tools {
+    position: relative;
+    z-index: 1;
+  }
+
+  .dashboard h1 {
+    color: var(--cream);
+    font-size: clamp(3.4rem, 6vw, 5.5rem);
+    max-width: 9ch;
+  }
+
+  .dashboard h2,
+  .dashboard h3 {
+    color: var(--dash-red-dark);
+  }
+
+  .hero-topline,
+  .hero-summary,
+  .quote-strip figcaption,
+  .month-input {
+    color: var(--cream);
+  }
+
+  .status-block,
+  .console-label {
+    color: var(--dash-pollen);
+  }
+
+  .hero-topline-meta {
+    color: rgba(248, 239, 212, 0.72);
+  }
+
+  .hero-summary strong {
+    color: var(--dash-pollen);
+  }
+
+  .month-console,
+  .quote-strip {
+    padding: 0.9rem;
+    border: 1px solid rgba(248, 239, 212, 0.18);
+    background: rgba(248, 239, 212, 0.08);
+  }
+
+  .quote-strip {
+    border-top: 1px solid rgba(248, 239, 212, 0.18);
+  }
+
+  .quote-strip blockquote {
+    color: var(--dash-pollen);
+  }
+
+  .month-input {
+    border: 2px solid rgba(248, 239, 212, 0.3);
+    background: rgba(3, 28, 15, 0.48);
+  }
+
+  .month-input:focus {
+    outline-color: rgba(216, 227, 184, 0.28);
+  }
+
+  .trajectory-board {
+    position: relative;
+    margin-top: 1.1rem;
+    background: var(--dash-pollen);
+  }
+
+  .trajectory-board::before {
+    content: '';
+    position: absolute;
+    inset: 0.85rem auto 0.85rem 0.85rem;
+    width: 0.55rem;
+    background: var(--dash-paprika);
+  }
+
+  .trajectory-copy {
+    padding-left: 1rem;
+  }
+
+  .trajectory-copy p,
+  .trajectory-stats p,
+  .summary-list dt,
+  .trajectory-stats dt {
+    color: rgba(36, 24, 15, 0.72);
+  }
+
+  .hours-lockup {
+    border: 2px solid var(--dash-border);
+    border-radius: 8px;
+    background: var(--dash-paprika);
+    color: var(--cream);
+    box-shadow: var(--dash-shadow);
+  }
+
+  .progress-head strong,
+  .trajectory-stats dd,
+  .summary-list dd,
+  .metric-card strong,
+  .milestone-block strong {
+    color: var(--dash-red);
+  }
+
+  .brutal-track,
+  .small-track,
+  .milestone-pin {
+    border: 2px solid var(--dash-border);
+    background-color: var(--cream);
+  }
+
+  .brutal-fill,
+  .small-track span {
+    background: var(--dash-red);
+  }
+
+  .milestone-pin.reached {
+    background: var(--dash-red-dark);
+  }
+
+  .metric-grid {
+    grid-template-columns: minmax(18rem, 1.25fr) repeat(3, minmax(12rem, 1fr));
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .metric-card {
+    padding: 1.05rem 1.1rem;
+  }
+
+  .metric-card-primary {
+    background: var(--dash-red-dark);
+    color: var(--cream);
+  }
+
+  .metric-card-primary .metric-label,
+  .metric-card-primary p,
+  .metric-card-primary strong {
+    color: var(--cream);
+  }
+
+  .metric-card-red {
+    background: var(--dash-pollen);
+  }
+
+  .metric-card:not(:first-child) {
+    border-left: 2px solid var(--dash-border);
+    padding-left: 1.1rem;
+  }
+
+  .metric-label,
+  .section-marker,
+  .dashboard-dialog-kicker {
+    color: var(--dash-red);
+  }
+
+  .summary-grid {
+    gap: 1.1rem;
+  }
+
+  .summary-panel {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .summary-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 0.45rem;
+    background: var(--dash-red);
+  }
+
+  .milestone-block {
+    border-top: 2px solid var(--dash-border);
+  }
+
+  .milestone-block.reached {
+    border-top-color: var(--dash-paprika);
+  }
+
+  .journal-cta {
+    position: relative;
+    overflow: hidden;
+    border: 2px solid var(--dash-border);
+    border-radius: 8px;
+    background: var(--dash-paprika);
+    color: var(--cream);
+    box-shadow: var(--dash-shadow);
+  }
+
+  .journal-cta::after {
+    content: '';
+    position: absolute;
+    right: 0.95rem;
+    top: 0.95rem;
+    width: clamp(3.4rem, 8vw, 6.5rem);
+    height: clamp(3.4rem, 8vw, 6.5rem);
+    border: 2px solid rgba(248, 239, 212, 0.42);
+    background: var(--dash-pollen);
+    clip-path: polygon(50% 0, 92% 25%, 76% 84%, 24% 84%, 8% 25%);
+  }
+
+  .journal-cta > div,
+  .journal-cta .cta-button {
+    position: relative;
+    z-index: 1;
+  }
+
+  .journal-cta .section-marker,
+  .journal-cta h2,
+  .journal-cta p {
+    color: var(--cream);
+  }
+
+  .cta-button {
+    border: 2px solid var(--dash-border);
+    background: var(--dash-pollen);
+    color: var(--dash-red-dark);
+  }
+
+  .cta-button:hover,
+  .block-button:hover,
+  .text-button:hover,
+  .dashboard-dialog-close:hover {
+    background: var(--dash-red-dark);
+    color: var(--cream);
+  }
+
+  .block-button,
+  .text-button,
+  .dashboard-dialog-close {
+    border: 2px solid var(--dash-border);
+    background: var(--dash-paper-strong);
+  }
+
+  .block-button-primary {
+    background: var(--dash-red);
+    color: var(--cream);
+  }
+
   @keyframes dashboard-dialog-reveal {
     from {
       opacity: 0;
@@ -1728,7 +2016,7 @@
     }
 
     .hero-copy {
-      min-height: 14rem;
+      min-height: 9.5rem;
     }
 
     .metric-grid {

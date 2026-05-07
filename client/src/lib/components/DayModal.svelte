@@ -532,7 +532,7 @@
             {online ? 'Online' : 'Offline mode'}
           </span>
           {#if entry}
-            <span class="hours-badge">{entry.hours} {Number(entry.hours) === 1 ? 'hour' : 'hours'} rendered</span>
+            <span class="hours-badge">{entry.hours} {Number(entry.hours) === 1 ? 'hour' : 'hours'}</span>
           {/if}
         </div>
         <button class="close-btn" onclick={requestClose} aria-label="Close">&times;</button>
@@ -664,10 +664,10 @@
           {#if !isFinished && entry.content_raw}
             <div class="ai-actions">
               <button class="btn btn-sm" onclick={refineWithAI} disabled={refining || entry.local_only}>
-                {refining ? 'Refining...' : 'Refine with AI'}
+                {refining ? 'Refining...' : 'Refine'}
               </button>
               <button class="btn btn-sm" onclick={generateARAS} disabled={generatingAras || entry.local_only}>
-                {generatingAras ? 'Generating...' : 'Generate ARAS'}
+                {generatingAras ? 'Generating...' : 'ARAS'}
               </button>
             </div>
           {/if}
@@ -695,7 +695,7 @@
                   </div>
                   {#if ev.start_time || ev.end_time}
                     <span class="event-time">
-                      {ev.start_time?.slice(0, 5) || '–'} – {ev.end_time?.slice(0, 5) || '–'}
+                      {ev.start_time?.slice(0, 5) || '-'} - {ev.end_time?.slice(0, 5) || '-'}
                     </span>
                   {/if}
                   {#if ev.description}
@@ -712,7 +712,7 @@
       {:else if mode === 'edit'}
         <div class="editor">
           <div class="field">
-            <label class="label" for="hours-input">Hours Rendered</label>
+            <label class="label" for="hours-input">Hours</label>
             <input
               id="hours-input"
               class="input"
@@ -728,19 +728,19 @@
             {#if hoursError}
               <p class="field-error" role="alert">{hoursError}</p>
             {:else}
-              <p class="field-hint">Enter 0–24 hours for this day</p>
+              <p class="field-hint">0-24 hours</p>
             {/if}
           </div>
           <div class="field">
-            <label class="label" for="content-input">Journal Content</label>
+            <label class="label" for="content-input">Notes</label>
             <textarea
               id="content-input"
               class="textarea"
               rows="8"
               bind:value={contentRaw}
-              placeholder="Describe your tasks, challenges, learnings, and reflections..."
+              placeholder="Tasks, blockers, wins..."
             ></textarea>
-            <p class="field-hint">Optional. Add notes for AI refine and ARAS.</p>
+            <p class="field-hint">Optional.</p>
           </div>
           <div class="editor-footer">
             {#if autoSaveStatus}
@@ -763,7 +763,7 @@
       {:else if mode === 'log-hours'}
         <div class="editor">
           <div class="field">
-            <label class="label" for="log-hours-input">Hours to Log</label>
+            <label class="label" for="log-hours-input">Hours</label>
             <input
               id="log-hours-input"
               class="input"
@@ -779,7 +779,7 @@
             {#if hoursError}
               <p class="field-error" role="alert">{hoursError}</p>
             {:else}
-              <p class="field-hint">Minimum 0.5, maximum 24 hours per day</p>
+              <p class="field-hint">0.5-24 hours</p>
             {/if}
           </div>
           <div class="editor-actions">
@@ -818,7 +818,7 @@
   }
 
   .badge-offline {
-    background: rgba(184, 134, 11, 0.14);
+    background: rgba(89, 107, 64, 0.16);
     color: var(--warning);
   }
 
@@ -837,7 +837,7 @@
   }
 
   .connectivity-chip.offline {
-    background: rgba(184, 134, 11, 0.14);
+    background: rgba(89, 107, 64, 0.16);
     color: var(--warning);
   }
 
@@ -849,7 +849,7 @@
     margin-bottom: 1rem;
     padding: 1rem 1.1rem;
     background: rgba(255, 251, 239, 0.92);
-    border-color: rgba(184, 134, 11, 0.18);
+    border-color: rgba(89, 107, 64, 0.2);
     box-shadow: none;
   }
 
@@ -898,7 +898,7 @@
   }
   .close-btn:hover {
     color: var(--red);
-    background: rgba(190, 53, 25, 0.08);
+    background: rgba(11, 110, 58, 0.08);
     transform: scale(1.05);
   }
 
@@ -986,7 +986,7 @@
   .event-tag-meeting { background: var(--red); color: var(--bg); }
   .event-tag-deadline { background: var(--dark); color: var(--bg); }
   .event-tag-reminder { background: var(--warning); color: var(--bg); }
-  .event-tag-personal { background: rgba(190, 53, 25, 0.12); color: var(--red); }
+  .event-tag-personal { background: rgba(11, 110, 58, 0.12); color: var(--red); }
   .event-title {
     font-family: var(--font-body);
     font-size: 0.88rem;
@@ -1160,6 +1160,158 @@
     border-top-color: var(--red);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
+  }
+
+  .modal-header {
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid rgba(42, 34, 23, 0.12);
+  }
+
+  .close-btn,
+  .event-edit-btn {
+    border: 2px solid rgba(42, 34, 23, 0.72);
+    border-radius: 6px;
+    background: var(--paper-strong);
+    color: var(--red);
+  }
+
+  .section,
+  .aras-sections,
+  .events-section,
+  .empty-state-box,
+  .confirm-dialog,
+  .event-item,
+  .aras-block {
+    border-color: rgba(42, 34, 23, 0.16);
+  }
+
+  .event-tag,
+  .connectivity-chip,
+  .hours-badge {
+    border-radius: 4px;
+  }
+
+  .entry-content,
+  .aras-block p,
+  .event-desc,
+  .no-events-text {
+    color: var(--dark-soft);
+  }
+
+  .modal-overlay {
+    background: rgba(3, 28, 15, 0.68);
+  }
+
+  .modal-content {
+    border: 2px solid rgba(36, 24, 15, 0.94);
+    border-radius: 8px;
+    background: var(--paper-strong);
+    box-shadow: 8px 8px 0 rgba(36, 24, 15, 0.18);
+  }
+
+  .modal-header {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(36, 24, 15, 0.16);
+  }
+
+  .modal-header h2 {
+    color: var(--canopy);
+    font-size: clamp(1.3rem, 2vw, 1.75rem);
+    line-height: 1.05;
+  }
+
+  .badge,
+  .connectivity-chip,
+  .hours-badge,
+  .event-tag,
+  .autosave-status {
+    border-radius: 4px;
+    font-family: var(--font-ui);
+    font-weight: 800;
+  }
+
+  .hours-badge,
+  .badge-draft {
+    padding: 0.24rem 0.52rem;
+    border: 1px solid rgba(36, 24, 15, 0.18);
+    background: var(--pollen-soft);
+    color: var(--soil);
+  }
+
+  .badge-finished,
+  .connectivity-chip {
+    background: var(--leaf);
+    color: var(--cream);
+  }
+
+  .close-btn,
+  .event-edit-btn {
+    border: 2px solid rgba(36, 24, 15, 0.72);
+    border-radius: 6px;
+    background: var(--cream);
+    color: var(--canopy);
+  }
+
+  .close-btn:hover,
+  .event-edit-btn:hover {
+    border-color: rgba(36, 24, 15, 0.92);
+    background: var(--pollen);
+    color: var(--canopy);
+    transform: translate(-1px, -1px);
+  }
+
+  .action-buttons {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(36, 24, 15, 0.12);
+  }
+
+  .section,
+  .aras-sections,
+  .events-section {
+    margin-bottom: 1rem;
+  }
+
+  .section h4,
+  .aras-sections h4,
+  .aras-label {
+    color: var(--leaf);
+  }
+
+  .entry-content.refined,
+  .aras-block {
+    border-left-color: var(--pollen);
+  }
+
+  .event-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(36, 24, 15, 0.12);
+  }
+
+  .event-tag-meeting,
+  .event-tag-personal {
+    background: var(--leaf);
+    color: var(--cream);
+  }
+
+  .event-tag-deadline {
+    background: var(--paprika);
+    color: var(--cream);
+  }
+
+  .event-tag-reminder {
+    background: var(--pollen);
+    color: var(--soil);
+  }
+
+  .empty-state-box,
+  .confirm-dialog,
+  .draft-recovery {
+    border: 2px solid rgba(36, 24, 15, 0.18);
+    border-radius: 8px;
+    background: rgba(216, 227, 184, 0.18);
+    padding: 1rem;
   }
 
   @keyframes spin {

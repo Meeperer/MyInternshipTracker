@@ -242,7 +242,7 @@
   .command-palette {
     max-width: 760px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 251, 244, 0.96));
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
   }
 
   .command-palette-header {
@@ -274,7 +274,7 @@
     height: 2.5rem;
     border: none;
     border-radius: 999px;
-    background: rgba(190, 53, 25, 0.08);
+    background: rgba(11, 110, 58, 0.08);
     color: var(--red);
     font-size: 1.4rem;
     line-height: 1;
@@ -285,7 +285,7 @@
     min-height: 56px;
     padding: 0.95rem 1rem;
     border-radius: 18px;
-    border: 1px solid rgba(190, 53, 25, 0.16);
+    border: 1px solid rgba(11, 110, 58, 0.16);
     background: rgba(255, 255, 255, 0.96);
     font-family: var(--font-ui);
     font-size: 0.98rem;
@@ -295,7 +295,7 @@
   .command-input:focus {
     outline: none;
     border-color: var(--red);
-    box-shadow: 0 0 0 4px rgba(190, 53, 25, 0.1);
+    box-shadow: 0 0 0 4px rgba(11, 110, 58, 0.1);
   }
 
   .command-shortcuts {
@@ -312,7 +312,7 @@
     padding: 0.3rem 0.65rem;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.86);
-    border: 1px solid rgba(190, 53, 25, 0.08);
+    border: 1px solid rgba(11, 110, 58, 0.08);
   }
 
   .command-results {
@@ -330,7 +330,7 @@
     width: 100%;
     padding: 0.95rem 1rem;
     border-radius: 18px;
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
     background: rgba(255, 255, 255, 0.86);
     text-align: left;
     transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
@@ -339,7 +339,7 @@
   .command-result:hover,
   .command-result.selected {
     transform: translateY(-1px);
-    border-color: rgba(190, 53, 25, 0.2);
+    border-color: rgba(11, 110, 58, 0.2);
     box-shadow: 0 14px 28px rgba(42, 25, 8, 0.08);
     background: rgba(255, 255, 255, 0.97);
   }
@@ -365,7 +365,7 @@
     flex-shrink: 0;
     padding: 0.35rem 0.65rem;
     border-radius: 999px;
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
     font-family: var(--font-ui);
     font-size: 0.72rem;
     font-weight: 700;
@@ -378,7 +378,7 @@
     margin-top: 1rem;
     padding: 1.2rem;
     border-radius: 18px;
-    border: 1px dashed rgba(190, 53, 25, 0.18);
+    border: 1px dashed rgba(11, 110, 58, 0.18);
     background: rgba(255, 255, 255, 0.7);
     text-align: center;
     color: var(--dark-soft);

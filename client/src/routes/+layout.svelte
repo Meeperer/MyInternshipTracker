@@ -90,6 +90,10 @@
   });
 </script>
 
+<svelte:head>
+  <title>JOURNAL by lord</title>
+</svelte:head>
+
 <div class="site-shell">
   <div class="site-content">
     {@render children()}

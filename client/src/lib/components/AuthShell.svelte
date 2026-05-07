@@ -43,14 +43,15 @@
     justify-content: center;
     gap: 1rem;
     min-height: 100vh;
-    color: var(--dark-soft);
+    background: var(--canopy);
+    color: var(--cream);
   }
 
   .auth-spinner {
     width: 32px;
     height: 32px;
-    border: 3px solid var(--border);
-    border-top-color: var(--red);
+    border: 3px solid rgba(248, 239, 212, 0.34);
+    border-top-color: var(--lichen);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
   }
@@ -60,23 +61,31 @@
   }
 
   .app-shell {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: 16rem minmax(0, 1fr);
+    background: var(--bg);
   }
 
   main {
-    flex: 1;
+    position: relative;
     min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: auto;
     width: 100%;
+    height: 100dvh;
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 980px) {
+    .app-shell {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
     main {
-      min-height: 50vh;
+      height: auto;
+      min-height: 0;
     }
   }
 

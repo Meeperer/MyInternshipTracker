@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { supabaseAdmin } from '../services/supabase.js';
-import { requireAuth } from '../middleware/auth.js';
+import { clearAuthCache, requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -142,6 +142,8 @@ router.post('/logout', requireAuth, async (req, res) => {
     await supabaseAdmin.auth.admin.signOut(req.accessToken, 'global');
   } catch {
     // Best-effort server-side invalidation
+  } finally {
+    clearAuthCache(req.accessToken);
   }
   res.json({ message: 'Logged out' });
 });

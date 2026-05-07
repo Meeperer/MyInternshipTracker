@@ -104,7 +104,7 @@
   }
 
   function formatSummaryType(period) {
-    return period === 'week' ? 'Weekly summary' : 'Monthly summary';
+    return period === 'week' ? 'Week' : 'Month';
   }
 
   function prefersReducedMotion() {
@@ -120,13 +120,13 @@
     return `Week of ${formatRangeLabel(summary.start_date, summary.end_date)}`;
   }
 
-  function getSummaryPreview(summaryText, maxLength = 210) {
+  function getSummaryPreview(summaryText, maxLength = 140) {
     const normalized = String(summaryText || '').trim().replace(/\s+/g, ' ');
-    if (!normalized) return 'No saved text yet.';
+    if (!normalized) return 'Empty.';
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3).trimEnd()}...` : normalized;
   }
 
-  function getEntryPreview(entry, maxLength = 200) {
+  function getEntryPreview(entry, maxLength = 150) {
     const preview = [
       entry.content_ai_refined,
       entry.aras_summary,
@@ -134,7 +134,7 @@
       entry.aras_action
     ].find((value) => typeof value === 'string' && value.trim());
 
-    if (!preview) return 'No notes yet.';
+    if (!preview) return 'Empty.';
 
     const normalized = preview.trim().replace(/\s+/g, ' ');
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3).trimEnd()}...` : normalized;
@@ -891,26 +891,32 @@
     <div class="journal-view" bind:this={journalViewEl} aria-busy={$journal.loading || summaryLoading}>
       <section class="journal-hero" data-journal-parallax-section>
         <div class="journal-hero-main" data-journal-hero-main data-journal-section-copy>
-          <p class="journal-hero-mark" data-journal-hero-mark><Notebook size={14} weight="bold" />Journal</p>
+          <p class="journal-hero-mark" data-journal-hero-mark><Notebook size={14} weight="bold" />Workspace</p>
           <h1 class="journal-hero-title" data-journal-hero-title>Journal</h1>
-          <p class="journal-subtitle" data-journal-hero-copy>Write, review, and export the month.</p>
+          <p class="journal-subtitle" data-journal-hero-copy>Write, plan, recap.</p>
+          <svg class="journal-botanical-emblem" width="136" height="78" viewBox="0 0 136 78" aria-hidden="true" data-journal-hero-copy>
+            <path d="M16 64h86" />
+            <path d="M56 64V12" />
+            <path d="M56 30C39 16 26 16 16 22c8 15 22 20 40 8Z" />
+            <path d="M56 44c22-22 43-25 62-14-12 21-31 29-62 14Z" />
+          </svg>
 
           <div class="journal-capability-strip" data-journal-hero-copy data-journal-support-layer>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
               <PencilSimpleLine size={18} weight="bold" />
-              <strong>New entry</strong>
+              <strong>Write</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
               <CalendarBlank size={18} weight="bold" />
-              <strong>Months</strong>
+              <strong>Dates</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
               <TrendUp size={18} weight="bold" />
-              <strong>Themes</strong>
+              <strong>Signals</strong>
             </article>
             <article class="journal-capability-card" data-journal-card data-journal-hover-lift>
               <Brain size={18} weight="bold" />
-              <strong>Summaries</strong>
+              <strong>Recap</strong>
             </article>
           </div>
         </div>
@@ -939,7 +945,7 @@
             </button>
             <button class="btn btn-sm btn-primary hero-new-entry" onclick={openNewEntryForToday} data-journal-hero-control>
               <PencilSimpleLine size={16} weight="bold" />
-              <span>New entry</span>
+              <span>Write today</span>
             </button>
           </div>
 
@@ -957,22 +963,22 @@
       </section>
 
       <div class="journal-section-heading" data-journal-parallax-section>
-        <h2><TrendUp size={18} weight="bold" /> Overview</h2>
+        <h2><TrendUp size={18} weight="bold" /> Month</h2>
       </div>
 
       <section class="journal-metrics-band" data-journal-parallax-section>
         <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
-          <span class="overview-label">Selected month</span>
+          <span class="overview-label">Month</span>
           <strong>{formatMonthLabel($selectedMonth)}</strong>
           <p>{$journal.entries.length} entr{$journal.entries.length === 1 ? 'y' : 'ies'}</p>
         </article>
         <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
-          <span class="overview-label">Hours logged</span>
+          <span class="overview-label">Hours</span>
           <strong>{formatHoursValue(monthHours)}</strong>
           <p>This month</p>
         </article>
         <article class="overview-card journal-metric-card" data-journal-card data-journal-hover-lift>
-          <span class="overview-label">Finished days</span>
+          <span class="overview-label">Done</span>
           <strong>{monthFinishedCount}</strong>
           <p>Completed</p>
         </article>
@@ -998,7 +1004,7 @@
             </div>
           {:else}
             <div class="insights-empty">
-              <strong>Themes will appear here.</strong>
+              <strong>No themes yet.</strong>
             </div>
           {/if}
         </article>
@@ -1028,7 +1034,7 @@
             </div>
           {:else}
             <div class="insights-empty">
-              <strong>More entries will show a trend.</strong>
+              <strong>No trend yet.</strong>
             </div>
           {/if}
         </article>
@@ -1294,7 +1300,7 @@
       </div>
     {:else}
       <div class="insights-empty summary-library-empty">
-        <strong>No saved summaries yet.</strong>
+              <strong>No summaries yet.</strong>
       </div>
     {/if}
   </section>
@@ -1351,9 +1357,11 @@
       {:else if $journal.entries.length === 0}
         <div class="empty-state">
           <div class="empty-icon" aria-hidden="true">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-              <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+            <svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
+              <path d="M28 49V9" />
+              <path d="M28 22C17 12 10 12 5 16c5 11 13 14 23 6Z" />
+              <path d="M28 35c13-13 24-15 34-9-7 12-18 17-34 9Z" />
+              <path d="M15 49h28" />
             </svg>
           </div>
           <p>No entries in {formatMonthLabel($selectedMonth)}.</p>
@@ -1590,7 +1598,7 @@
     border: 2px solid rgba(42, 24, 15, 0.12);
     border-radius: 8px;
     background: rgba(255, 248, 235, 0.52);
-    box-shadow: 0 0 0 1px rgba(190, 53, 25, 0.025);
+    box-shadow: 0 0 0 1px rgba(11, 110, 58, 0.025);
   }
 
   .journal-accent-a {
@@ -1626,7 +1634,7 @@
   }
 
   .journal-accent-line {
-    background: linear-gradient(90deg, rgba(190, 53, 25, 0), rgba(190, 53, 25, 0.12), rgba(190, 53, 25, 0));
+    background: linear-gradient(90deg, rgba(11, 110, 58, 0), rgba(11, 110, 58, 0.12), rgba(11, 110, 58, 0));
   }
 
   .journal-accent-line-a {
@@ -1660,8 +1668,8 @@
 
   .journal-view {
     flex: 1;
-    max-width: 1120px;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
     padding: 2rem 2.25rem 1.75rem;
     width: 100%;
     display: flex;
@@ -1678,13 +1686,13 @@
     padding: 1.35rem 1.45rem;
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.96);
-    border: 1px solid rgba(190, 53, 25, 0.14);
+    border: 1px solid rgba(11, 110, 58, 0.14);
     box-shadow: 0 10px 22px rgba(34, 24, 8, 0.05);
   }
 
   .journal-afterflow {
-    max-width: 1120px;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
     padding: 0 2.25rem 5rem;
     display: flex;
     flex-direction: column;
@@ -1735,7 +1743,7 @@
     width: 100%;
     min-height: 48px;
     padding: 0.8rem 1rem;
-    border: 1px solid rgba(190, 53, 25, 0.16);
+    border: 1px solid rgba(11, 110, 58, 0.16);
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.88);
     color: var(--dark);
@@ -1750,13 +1758,13 @@
   .search-input:focus {
     outline: none;
     border-color: var(--red);
-    box-shadow: 0 0 0 4px rgba(190, 53, 25, 0.12);
+    box-shadow: 0 0 0 4px rgba(11, 110, 58, 0.12);
   }
 
   .nav-chip {
     min-height: 48px;
     padding: 0 1rem;
-    border: 1px solid rgba(190, 53, 25, 0.16);
+    border: 1px solid rgba(11, 110, 58, 0.16);
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.82);
     color: var(--dark-soft);
@@ -1794,7 +1802,7 @@
     padding: 0.6rem 0.8rem;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
     font-family: var(--font-ui);
     font-size: 0.82rem;
     color: var(--dark-soft);
@@ -1848,14 +1856,14 @@
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: rgba(190, 53, 25, 0.88);
+    background: rgba(11, 110, 58, 0.88);
   }
 
   .insight-note {
     flex: 1 1 240px;
     padding: 0.95rem 1rem;
     border-radius: 16px;
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
     background: rgba(255, 255, 255, 0.9);
   }
 
@@ -1872,14 +1880,14 @@
 
   .insight-note-blocker {
     background: rgba(255, 250, 246, 0.96);
-    border-color: rgba(190, 53, 25, 0.14);
+    border-color: rgba(11, 110, 58, 0.14);
   }
 
   .insights-empty {
     margin-top: 1rem;
     padding: 1rem 1.05rem;
     border-radius: 18px;
-    border: 1px dashed rgba(190, 53, 25, 0.16);
+    border: 1px dashed rgba(11, 110, 58, 0.16);
     background: rgba(255, 255, 255, 0.78);
     color: var(--dark-soft);
   }
@@ -1896,7 +1904,7 @@
     padding: 1.1rem 1.2rem;
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
     box-shadow: 0 10px 24px rgba(34, 24, 8, 0.05);
   }
 
@@ -1933,7 +1941,7 @@
 
   .glass-card {
     border-radius: 18px;
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
     background: rgba(255, 255, 255, 0.95);
     box-shadow: 0 10px 24px rgba(34, 24, 8, 0.05);
     backdrop-filter: none;
@@ -1994,8 +2002,8 @@
     gap: 0.2rem;
     padding: 0.22rem;
     border-radius: 999px;
-    background: rgba(190, 53, 25, 0.08);
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    background: rgba(11, 110, 58, 0.08);
+    border: 1px solid rgba(11, 110, 58, 0.1);
   }
 
   .period-toggle button {
@@ -2038,7 +2046,7 @@
     padding: 0.8rem 1rem;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.9);
-    border: 1px dashed rgba(190, 53, 25, 0.18);
+    border: 1px dashed rgba(11, 110, 58, 0.18);
     color: var(--dark);
     font-family: var(--font-ui);
     font-size: 0.95rem;
@@ -2055,7 +2063,7 @@
     padding: 0.35rem 0.75rem;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
     font-family: var(--font-ui);
     font-size: 0.76rem;
     color: var(--dark-soft);
@@ -2067,7 +2075,7 @@
     padding: 1.15rem 1.2rem;
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
   }
 
   .summary-result {
@@ -2106,8 +2114,8 @@
   }
 
   .summary-state-error {
-    background: rgba(190, 53, 25, 0.06);
-    border-color: rgba(190, 53, 25, 0.18);
+    background: rgba(11, 110, 58, 0.06);
+    border-color: rgba(11, 110, 58, 0.18);
   }
 
   .summary-result-header {
@@ -2137,7 +2145,7 @@
   }
 
   .summary-save-pill.summary-live {
-    background: rgba(184, 134, 11, 0.14);
+    background: rgba(89, 107, 64, 0.16);
     color: var(--warning);
   }
 
@@ -2152,7 +2160,7 @@
 
   .summary-modal {
     max-width: 760px;
-    background: #fffef8;
+    background: var(--journal-paper-strong);
   }
 
   .summary-modal-header {
@@ -2184,7 +2192,7 @@
     height: 2.5rem;
     border: none;
     border-radius: 999px;
-    background: rgba(190, 53, 25, 0.08);
+    background: rgba(11, 110, 58, 0.08);
     color: var(--red);
     font-size: 1.4rem;
     line-height: 1;
@@ -2192,7 +2200,7 @@
   }
 
   .summary-modal-close:hover {
-    background: rgba(190, 53, 25, 0.14);
+    background: rgba(11, 110, 58, 0.14);
     color: var(--red-hover);
     transform: translateY(-1px);
   }
@@ -2208,7 +2216,7 @@
     padding: 0.35rem 0.75rem;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
     font-family: var(--font-ui);
     font-size: 0.75rem;
     color: var(--dark-soft);
@@ -2218,7 +2226,7 @@
     margin-top: 1rem;
     padding: 1.15rem 1.2rem;
     border-radius: 16px;
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
     background: rgba(255, 255, 255, 0.84);
     min-height: 14rem;
     max-height: min(60vh, 34rem);
@@ -2291,7 +2299,7 @@
     padding: 0.45rem 0.8rem;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.84);
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
     font-family: var(--font-ui);
     font-size: 0.76rem;
     color: var(--dark-soft);
@@ -2309,19 +2317,19 @@
     gap: 1rem;
     padding: 1rem 1.05rem;
     border-radius: 20px;
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
     background: rgba(255, 255, 255, 0.88);
     transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
   }
 
   .summary-library-item:hover {
     transform: translateY(-1px);
-    border-color: rgba(190, 53, 25, 0.18);
+    border-color: rgba(11, 110, 58, 0.18);
     box-shadow: 0 14px 28px rgba(34, 24, 8, 0.06);
   }
 
   .summary-library-item.pinned {
-    border-color: rgba(184, 134, 11, 0.22);
+    border-color: rgba(89, 107, 64, 0.22);
     background: rgba(255, 251, 240, 0.96);
   }
 
@@ -2350,12 +2358,12 @@
   }
 
   .summary-library-type {
-    background: rgba(190, 53, 25, 0.08);
+    background: rgba(11, 110, 58, 0.08);
     color: var(--red);
   }
 
   .summary-library-pin {
-    background: rgba(184, 134, 11, 0.14);
+    background: rgba(89, 107, 64, 0.16);
     color: var(--warning);
   }
 
@@ -2418,7 +2426,7 @@
   .entries-page-indicator {
     padding: 0.4rem 0.75rem;
     border-radius: 999px;
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
     background: rgba(255, 255, 255, 0.82);
     white-space: nowrap;
   }
@@ -2442,7 +2450,7 @@
     gap: 0.75rem;
     padding: 1.15rem 1.2rem;
     border-radius: 18px;
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
     background: rgba(255, 255, 255, 0.84);
     animation: skeletonLift 0.45s var(--ease-out) both;
   }
@@ -2472,14 +2480,14 @@
   }
 
   .entry-accordion {
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.88);
     overflow: hidden;
   }
 
   .entry-accordion.open {
-    border-color: rgba(190, 53, 25, 0.22);
+    border-color: rgba(11, 110, 58, 0.22);
     box-shadow: 0 14px 28px rgba(34, 24, 8, 0.06);
   }
 
@@ -2567,7 +2575,7 @@
   }
 
   .entry-panel {
-    border-top: 1px solid rgba(190, 53, 25, 0.12);
+    border-top: 1px solid rgba(11, 110, 58, 0.12);
     padding: 1.15rem 1.2rem 1.2rem;
     background: rgba(255, 252, 247, 0.72);
   }
@@ -2581,7 +2589,7 @@
   .entry-detail-block,
   .entry-aras-card {
     padding: 0.95rem 1rem;
-    border: 1px solid rgba(190, 53, 25, 0.1);
+    border: 1px solid rgba(11, 110, 58, 0.1);
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.85);
   }
@@ -2638,7 +2646,7 @@
     min-height: 40px;
     padding: 0.55rem 0.9rem;
     border-radius: 12px;
-    border: 1px solid rgba(190, 53, 25, 0.14);
+    border: 1px solid rgba(11, 110, 58, 0.14);
     background: rgba(255, 255, 255, 0.84);
     color: var(--dark);
     font-family: var(--font-ui);
@@ -2648,7 +2656,7 @@
   }
 
   .pagination-button:hover:not(:disabled) {
-    border-color: rgba(190, 53, 25, 0.34);
+    border-color: rgba(11, 110, 58, 0.34);
     background: white;
   }
 
@@ -2869,11 +2877,11 @@
   }
 
   .insight-note-blocker {
-    background: rgba(190, 53, 25, 0.05);
+    background: rgba(11, 110, 58, 0.05);
   }
 
   .summary-library-item.pinned {
-    background: rgba(184, 134, 11, 0.08);
+    background: rgba(89, 107, 64, 0.12);
   }
 
   .summary-panel,
@@ -2927,21 +2935,23 @@
 
   .journal-view,
   .journal-afterflow {
-    max-width: 1220px;
+    max-width: none;
   }
 
   .journal-view {
-    --journal-cream: #fff8eb;
-    --journal-cream-deep: #f4e2c0;
-    --journal-paper: #fffdf7;
-    --journal-paper-soft: #fff2db;
-    --journal-red: #be3519;
-    --journal-red-deep: #8c2410;
-    --journal-ink: #21140d;
-    --journal-muted: #5d4637;
-    --journal-border: #2a180f;
-    --journal-shadow: 6px 6px 0 rgba(190, 53, 25, 0.18);
-    --journal-shadow-tight: 4px 4px 0 rgba(33, 20, 13, 0.14);
+    --journal-cream: var(--bg);
+    --journal-cream-deep: var(--border-light);
+    --journal-paper: var(--paper-strong);
+    --journal-paper-soft: var(--pollen-soft);
+    --journal-red: var(--leaf);
+    --journal-red-deep: var(--canopy);
+    --journal-pollen: var(--pollen);
+    --journal-paprika: var(--paprika);
+    --journal-ink: var(--soil);
+    --journal-muted: var(--moss);
+    --journal-border: var(--soil);
+    --journal-shadow: 6px 6px 0 rgba(36, 24, 15, 0.16);
+    --journal-shadow-tight: 4px 4px 0 rgba(36, 24, 15, 0.12);
     gap: 1.35rem;
     padding: 2.2rem 1.8rem 1rem;
     position: relative;
@@ -3000,6 +3010,18 @@
     color: var(--journal-ink);
     font-size: 1.04rem;
     line-height: 1.65;
+  }
+
+  .journal-botanical-emblem {
+    display: block;
+    width: clamp(6.8rem, 14vw, 8.5rem);
+    height: auto;
+    margin-top: 1rem;
+    fill: none;
+    stroke: rgba(49, 95, 54, 0.45);
+    stroke-width: 3;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
   }
 
   .journal-capability-strip {
@@ -3074,7 +3096,7 @@
   .period-toggle button:focus-visible,
   .pagination-button:focus-visible,
   .summary-modal-close:focus-visible {
-    outline: 3px solid rgba(190, 53, 25, 0.25);
+    outline: 3px solid rgba(11, 110, 58, 0.25);
     outline-offset: 2px;
   }
 
@@ -3319,11 +3341,11 @@
   }
 
   .insight-note-win {
-    background: #f2efe1;
+    background: var(--journal-pollen-soft);
   }
 
   .insight-note-blocker {
-    background: #fff1e8;
+    background: rgba(216, 227, 184, 0.16);
   }
 
   .trend-list {
@@ -3361,7 +3383,7 @@
   }
 
   .trend-bar-fill {
-    background: linear-gradient(90deg, var(--journal-red), var(--journal-red-deep));
+    background: var(--journal-red);
   }
 
   .journal-afterflow {
@@ -3437,11 +3459,11 @@
   }
 
   .summary-library-item.pinned {
-    background: #ffe8d4;
+    background: rgba(216, 227, 184, 0.2);
   }
 
   .entry-trigger:hover {
-    background: rgba(190, 53, 25, 0.05);
+    background: rgba(11, 110, 58, 0.05);
   }
 
   .entry-panel {
@@ -3601,7 +3623,7 @@
   .summary-library-item.pinned {
     padding-inline: 0.9rem;
     border-radius: 10px;
-    background: rgba(190, 53, 25, 0.05);
+    background: rgba(11, 110, 58, 0.05);
   }
 
   .entry-trigger {
@@ -3631,6 +3653,264 @@
   .entry-aras-grid > .entry-aras-card:nth-child(-n + 2) {
     border-top: 0;
     padding-top: 0;
+  }
+
+  .journal-parallax-page {
+    background:
+      linear-gradient(rgba(42, 34, 23, 0.032) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42, 34, 23, 0.032) 1px, transparent 1px),
+      var(--bg);
+    background-size: 30px 30px, 30px 30px, auto;
+  }
+
+  .journal-accent {
+    border-color: rgba(42, 34, 23, 0.1);
+    background: rgba(49, 95, 54, 0.045);
+    box-shadow: none;
+  }
+
+  .journal-accent::before {
+    content: '';
+    position: absolute;
+    left: 18%;
+    top: 14%;
+    width: 42%;
+    height: 62%;
+    border-left: 2px solid rgba(49, 95, 54, 0.16);
+    border-bottom: 2px solid rgba(49, 95, 54, 0.12);
+    transform: skewX(-18deg);
+  }
+
+  .journal-accent-line {
+    background: rgba(49, 95, 54, 0.1);
+  }
+
+  .insight-note-blocker,
+  .summary-library-item.pinned {
+    background: rgba(111, 125, 58, 0.12);
+  }
+
+  .entry-trigger:hover,
+  .journal-view .btn:hover:not(:disabled),
+  .journal-afterflow .btn:hover:not(:disabled),
+  .nav-chip:hover:not(:disabled),
+  .pagination-button:hover:not(:disabled) {
+    background: rgba(49, 95, 54, 0.06);
+  }
+
+  .empty-icon {
+    color: var(--journal-red);
+  }
+
+  /* Fertile-inspired journal product pass */
+  .journal-hero {
+    position: relative;
+    overflow: hidden;
+    border: 2px solid var(--journal-border);
+    background:
+      linear-gradient(rgba(248, 239, 212, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(248, 239, 212, 0.07) 1px, transparent 1px),
+      var(--journal-red-deep);
+    background-size: 24px 24px, 24px 24px, auto;
+    box-shadow: var(--journal-shadow);
+  }
+
+  .journal-hero::after {
+    content: '';
+    position: absolute;
+    right: clamp(1rem, 3vw, 2rem);
+    bottom: clamp(1rem, 3vw, 1.6rem);
+    width: clamp(5rem, 14vw, 9rem);
+    height: clamp(3.4rem, 10vw, 6rem);
+    background: var(--journal-pollen);
+    clip-path: polygon(8% 56%, 28% 18%, 68% 0, 100% 34%, 82% 76%, 44% 100%);
+    opacity: 0.9;
+    pointer-events: none;
+  }
+
+  .journal-hero-main,
+  .journal-control-deck {
+    position: relative;
+    z-index: 1;
+  }
+
+  .journal-hero-title {
+    color: var(--cream);
+    font-size: clamp(3.5rem, 8vw, 6rem);
+  }
+
+  .journal-subtitle {
+    color: rgba(248, 239, 212, 0.82);
+    font-family: var(--font-ui);
+    font-size: clamp(1rem, 1.4vw, 1.25rem);
+  }
+
+  .journal-hero-mark,
+  .journal-control-label {
+    border-color: rgba(248, 239, 212, 0.24);
+    background: rgba(248, 239, 212, 0.08);
+    color: var(--journal-pollen);
+  }
+
+  .journal-botanical-emblem {
+    stroke: rgba(216, 227, 184, 0.72);
+  }
+
+  .journal-capability-strip {
+    border-top-color: rgba(248, 239, 212, 0.2);
+  }
+
+  .journal-capability-card {
+    color: var(--cream);
+  }
+
+  .journal-capability-card strong,
+  .journal-capability-card :global(svg) {
+    color: var(--cream);
+  }
+
+  .journal-control-deck {
+    border: 2px solid rgba(36, 24, 15, 0.95);
+    background: var(--journal-pollen);
+    box-shadow: var(--journal-shadow-tight);
+  }
+
+  .journal-control-notes {
+    border-top-color: rgba(36, 24, 15, 0.18);
+  }
+
+  .journal-control-note span {
+    color: rgba(36, 24, 15, 0.66);
+  }
+
+  .journal-control-note strong {
+    color: var(--journal-red-deep);
+  }
+
+  .journal-control-deck .hero-month-input,
+  .journal-control-deck .nav-chip {
+    border-color: rgba(36, 24, 15, 0.88);
+    background: var(--cream);
+    color: var(--journal-red-deep);
+  }
+
+  .journal-control-deck .btn-primary {
+    border-color: rgba(36, 24, 15, 0.88);
+    background: var(--journal-paprika);
+    color: var(--cream);
+  }
+
+  .journal-section-heading {
+    border-top: 2px solid rgba(36, 24, 15, 0.9);
+  }
+
+  .journal-section-heading h2,
+  .panel-header h3,
+  .summary-topline h3,
+  .entries-toolbar h3,
+  .summary-library-item h4,
+  .overview-card strong,
+  .theme-chip strong,
+  .trend-copy strong,
+  .trend-hours,
+  .entry-hours-value {
+    color: var(--journal-red-deep);
+  }
+
+  .journal-metrics-band {
+    border-top: 2px solid rgba(36, 24, 15, 0.86);
+    border-bottom: 2px solid rgba(36, 24, 15, 0.86);
+  }
+
+  .journal-metric-card:first-child {
+    background: var(--journal-red-deep);
+  }
+
+  .journal-metric-card:first-child .overview-label,
+  .journal-metric-card:first-child strong,
+  .journal-metric-card:first-child p {
+    color: var(--cream);
+  }
+
+  .journal-metric-card:nth-child(2) {
+    background: rgba(216, 227, 184, 0.28);
+  }
+
+  .journal-metric-card:nth-child(3) {
+    background: rgba(11, 127, 56, 0.1);
+  }
+
+  .glass-card,
+  .overview-card,
+  .summary-state,
+  .summary-result,
+  .summary-library-item,
+  .entry-accordion,
+  .entry-panel,
+  .entry-detail-block,
+  .entry-aras-card,
+  .summary-modal-body,
+  .summary-modal,
+  .theme-chip,
+  .insight-note,
+  .trend-row {
+    background: var(--journal-paper);
+  }
+
+  .journal-feature-panel,
+  .journal-controls,
+  .summary-panel,
+  .summary-library-shell,
+  .entries-shell {
+    border: 2px solid rgba(36, 24, 15, 0.9);
+    border-radius: 8px;
+    box-shadow: var(--journal-shadow-tight);
+  }
+
+  .panel-kicker,
+  .overview-label,
+  .entry-detail-label,
+  .summary-modal-kicker,
+  .summary-state strong,
+  .summary-result-label {
+    border-color: rgba(36, 24, 15, 0.88);
+    background: var(--journal-red);
+    color: var(--cream);
+  }
+
+  .trend-bar-fill,
+  .period-toggle button.active,
+  .pagination-button.active,
+  .summary-save-pill,
+  .summary-library-type {
+    background: var(--journal-red);
+    color: var(--cream);
+  }
+
+  .summary-library-pin,
+  .summary-save-pill.summary-live,
+  .badge {
+    background: var(--journal-pollen);
+    color: var(--journal-ink);
+  }
+
+  .summary-library-item.pinned,
+  .insight-note-blocker {
+    background: rgba(216, 227, 184, 0.26);
+  }
+
+  .insight-note-win {
+    background: rgba(11, 127, 56, 0.1);
+  }
+
+  .entry-accordion.open {
+    background: rgba(216, 227, 184, 0.2);
+  }
+
+  .journal-accent {
+    border-color: rgba(36, 24, 15, 0.14);
+    background: rgba(216, 227, 184, 0.18);
+    clip-path: polygon(8% 56%, 28% 18%, 68% 0, 100% 34%, 82% 76%, 44% 100%);
   }
 
   @media (max-width: 1100px) {

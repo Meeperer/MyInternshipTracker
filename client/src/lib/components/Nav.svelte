@@ -50,17 +50,38 @@
   });
 
   const views = [
-    { id: 'dashboard', label: 'Dashboard', shortLabel: 'Home', href: '/dashboard', icon: SquaresFour },
-    { id: 'calendar', label: 'Calendar', shortLabel: 'Calendar', href: '/calendar', icon: CalendarBlank },
-    { id: 'pomodoro', label: 'Pomodoro', shortLabel: 'Focus', href: '/pomodoro', icon: Timer },
-    { id: 'journal', label: 'Journal', shortLabel: 'Journal', href: '/journal', icon: Notebook }
+    { id: 'dashboard', label: 'Home', shortLabel: 'Home', href: '/dashboard', icon: SquaresFour },
+    { id: 'calendar', label: 'Calendar', shortLabel: 'Cal', href: '/calendar', icon: CalendarBlank },
+    { id: 'pomodoro', label: 'Focus', shortLabel: 'Focus', href: '/pomodoro', icon: Timer },
+    { id: 'journal', label: 'Journal', shortLabel: 'Log', href: '/journal', icon: Notebook }
   ];
 
   const activePath = $derived($page.url.pathname);
 </script>
 
-<nav class="top-nav animate-rise rise-1">
+<nav class="top-nav animate-rise rise-1" aria-label="App">
   <div class="nav-meta">
+    <a class="nav-brand" href="/dashboard" aria-label="Journal dashboard">
+      <span class="nav-brand-mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 21V5" stroke="currentColor" stroke-width="2" stroke-linecap="square" />
+          <path d="M12 9C8.8 5.8 5.8 5 3 6.2c1.3 3.4 4.2 5.1 9 2.8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
+          <path d="M12 14c4.1-4.1 7.4-4.7 10-3.1-1.8 3.7-5.1 5-10 3.1Z" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
+        </svg>
+      </span>
+      <span class="nav-brand-copy">
+        <strong>JOURNAL</strong>
+        <small>by lord</small>
+      </span>
+    </a>
+
+    <svg class="nav-organic-mark" width="132" height="92" viewBox="0 0 132 92" aria-hidden="true">
+      <path d="M18 70c20-17 36-19 48-8-15 18-31 20-48 8Z" />
+      <path d="M66 62c9-27 25-38 48-34-5 28-21 40-48 34Z" />
+      <path d="M43 39c-11-18-8-30 8-37 9 15 6 29-8 37Z" />
+      <path d="M72 42c-3-18 5-29 24-33 2 18-6 30-24 33Z" />
+    </svg>
+
     <div class="meta-clock">
       <span class="meta-icon" aria-hidden="true">
         <ClockCountdown size={18} weight="duotone" />
@@ -88,7 +109,7 @@
     </label>
   </div>
 
-  <div class="nav-center" role="navigation" aria-label="Primary">
+  <div class="nav-center" aria-label="Primary">
     {#each views as view}
       <a
         href={view.href}
@@ -113,43 +134,103 @@
       aria-label="Open command palette"
     >
       <Command size={16} weight="bold" />
-      <span class="command-trigger-label">Quick actions</span>
-      <span class="command-trigger-shortcut">Ctrl/Cmd K</span>
+      <span class="command-trigger-label">Command</span>
+      <span class="command-trigger-shortcut">K</span>
     </button>
 
     <button class="logout-trigger" onclick={handleLogout} aria-label="Log out">
       <SignOut size={16} weight="bold" />
-      <span>Logout</span>
+      <span>Exit</span>
     </button>
   </div>
 </nav>
 
 <style>
   .top-nav {
-    position: relative;
+    position: sticky;
+    top: 0;
     z-index: 100;
     display: grid;
-    grid-template-columns: minmax(0, 300px) minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 1rem 1.25rem;
-    padding: 1.15rem 1.4rem;
-    border-bottom: 1px solid rgba(190, 53, 25, 0.12);
-    background: rgba(251, 250, 233, 0.92);
-    backdrop-filter: blur(10px);
-    flex-shrink: 0;
+    grid-template-rows: auto auto 1fr auto;
+    align-items: start;
+    gap: 1rem;
+    min-height: 100dvh;
+    padding: 1rem;
+    border-right: 2px solid rgba(36, 24, 15, 0.92);
+    background:
+      linear-gradient(rgba(246, 239, 210, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(246, 239, 210, 0.035) 1px, transparent 1px),
+      var(--canopy);
+    background-size: 28px 28px, 28px 28px, auto;
+    color: var(--cream);
+    overflow: hidden auto;
   }
 
   .nav-meta {
     display: grid;
-    gap: 0.6rem;
+    gap: 1rem;
     min-width: 0;
   }
 
-  .meta-clock {
-    display: flex;
+  .nav-brand {
+    display: inline-flex;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: 0.7rem;
+    color: var(--cream);
+  }
+
+  .nav-brand-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 2px solid var(--cream);
+    border-radius: 7px;
+    background: var(--leaf);
+    color: var(--cream);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+  }
+
+  .nav-brand-copy {
+    display: grid;
+    line-height: 1;
+  }
+
+  .nav-brand-copy strong {
+    color: var(--cream);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  .nav-brand-copy small {
+    margin-top: 0.2rem;
+    color: rgba(248, 239, 212, 0.72);
+    font-family: var(--font-ui);
+    font-size: 0.62rem;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .nav-organic-mark {
+    width: min(100%, 10.5rem);
+    height: auto;
+    fill: var(--lichen);
+    color: var(--lichen);
+  }
+
+  .meta-clock {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.6rem;
     min-width: 0;
+    padding: 0.8rem 0;
+    border-top: 1px solid rgba(248, 239, 212, 0.2);
+    border-bottom: 1px solid rgba(248, 239, 212, 0.2);
   }
 
   .meta-icon,
@@ -157,7 +238,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--red);
+    color: var(--lichen);
   }
 
   .meta-copy {
@@ -167,41 +248,41 @@
 
   .clock {
     font-family: var(--font-display);
-    font-size: clamp(1.45rem, 2vw, 1.95rem);
+    font-size: 1.25rem;
     font-weight: 700;
     line-height: 1;
-    color: var(--red);
+    color: var(--cream);
     letter-spacing: 0.02em;
   }
 
   .clock-label {
-    margin-top: 0.35rem;
+    margin-top: 0.2rem;
     font-family: var(--font-ui);
-    font-size: 0.76rem;
+    font-size: 0.64rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: var(--dark-muted);
+    color: rgba(248, 239, 212, 0.66);
   }
 
   .timezone-control {
     display: inline-flex;
     align-items: center;
     gap: 0.55rem;
-    width: min(100%, 320px);
+    width: 100%;
     min-width: 0;
   }
 
   .timezone-select {
     width: 100%;
-    min-height: 2.5rem;
-    padding: 0.45rem 0.75rem;
-    border-radius: 999px;
-    border: 1px solid rgba(190, 53, 25, 0.14);
-    background: rgba(255, 255, 255, 0.72);
-    color: var(--dark-soft);
+    min-height: 2.3rem;
+    padding: 0.42rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid rgba(248, 239, 212, 0.24);
+    background: rgba(3, 28, 15, 0.42);
+    color: var(--cream);
     font-family: var(--font-ui);
-    font-size: 0.74rem;
+    font-size: 0.68rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -213,16 +294,15 @@
 
   .timezone-select:hover,
   .timezone-select:focus-visible {
-    background: rgba(255, 255, 255, 0.92);
-    border-color: rgba(190, 53, 25, 0.28);
-    box-shadow: 0 0 0 1px rgba(190, 53, 25, 0.08);
+    background: rgba(3, 28, 15, 0.72);
+    border-color: var(--lichen);
+    box-shadow: 0 0 0 3px rgba(216, 227, 184, 0.16);
   }
 
   .nav-center {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.55rem;
+    display: grid;
+    gap: 0.35rem;
+    align-content: start;
     min-width: 0;
   }
 
@@ -230,33 +310,35 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    min-height: 2.85rem;
-    padding: 0.62rem 0.95rem;
-    border-radius: 999px;
+    justify-content: flex-start;
+    gap: 0.6rem;
+    min-height: 2.75rem;
+    padding: 0.62rem 0.7rem;
+    border-radius: 6px;
     font-family: var(--font-ui);
     font-size: 0.86rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--dark-soft);
+    color: rgba(248, 239, 212, 0.82);
     background: transparent;
-    border: 1px solid transparent;
+    border: 2px solid transparent;
     transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
     white-space: nowrap;
   }
 
   .nav-link:hover {
-    color: var(--red);
-    background: rgba(190, 53, 25, 0.06);
-    border-color: rgba(190, 53, 25, 0.12);
-    transform: translateY(-1px);
+    color: var(--cream);
+    background: rgba(216, 227, 184, 0.1);
+    border-color: rgba(248, 239, 212, 0.2);
+    transform: none;
   }
 
   .nav-link.active {
-    color: var(--red);
-    background: rgba(190, 53, 25, 0.1);
-    border-color: rgba(190, 53, 25, 0.18);
+    color: var(--cream);
+    background: var(--leaf);
+    border-color: var(--cream);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
   }
 
   .nav-link-icon {
@@ -272,9 +354,11 @@
   .nav-actions {
     display: flex;
     align-items: center;
+    align-self: end;
     justify-content: flex-end;
-    gap: 0.7rem;
+    gap: 0.55rem;
     min-width: 0;
+    flex-wrap: wrap;
   }
 
   .command-trigger,
@@ -282,45 +366,66 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    min-height: 2.7rem;
-    padding: 0.55rem 0.85rem;
-    border-radius: 999px;
-    border: 1px solid rgba(190, 53, 25, 0.14);
-    background: rgba(255, 255, 255, 0.8);
+    gap: 0.45rem;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid rgba(248, 239, 212, 0.26);
+    background: rgba(3, 28, 15, 0.44);
     font-family: var(--font-ui);
     font-size: 0.76rem;
     font-weight: 700;
     letter-spacing: 0.06em;
-    color: var(--dark-soft);
+    color: var(--cream);
     transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
   }
 
   .command-trigger:hover,
   .logout-trigger:hover {
-    transform: translateY(-1px);
-    border-color: rgba(190, 53, 25, 0.24);
-    background: white;
-    color: var(--red);
-    box-shadow: 0 10px 20px rgba(34, 24, 8, 0.06);
+    transform: none;
+    border-color: var(--lichen);
+    background: rgba(216, 227, 184, 0.12);
+    color: var(--cream);
+    box-shadow: none;
   }
 
   .command-trigger-shortcut {
-    padding: 0.2rem 0.42rem;
-    border-radius: 999px;
-    background: rgba(190, 53, 25, 0.08);
-    color: var(--red);
+    padding: 0.16rem 0.35rem;
+    border-radius: 4px;
+    background: var(--lichen);
+    color: var(--canopy);
     font-size: 0.67rem;
     letter-spacing: 0.03em;
   }
 
-  @media (max-width: 1120px) {
+  @media (max-width: 980px) {
     .top-nav {
+      position: sticky;
+      min-height: 0;
       grid-template-columns: minmax(0, 1fr) auto;
-      padding: 1rem 1.2rem;
+      grid-template-rows: auto auto;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border-right: 0;
+      border-bottom: 2px solid rgba(36, 24, 15, 0.9);
+      overflow: visible;
+    }
+
+    .nav-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .nav-organic-mark,
+    .meta-clock,
+    .timezone-control {
+      display: none;
     }
 
     .nav-center {
+      display: flex;
       grid-column: 1 / -1;
       order: 3;
       justify-content: flex-start;
@@ -333,32 +438,26 @@
       display: none;
     }
 
-    .command-trigger-label {
-      display: none;
-    }
-  }
-
-  @media (max-width: 720px) {
-    .top-nav {
-      grid-template-columns: 1fr;
-      gap: 0.85rem;
-      padding: 0.95rem 1rem;
+    .nav-link {
+      min-height: 2.45rem;
     }
 
     .nav-actions {
-      justify-content: space-between;
+      align-self: center;
+      justify-content: flex-end;
     }
 
+    .command-trigger-label,
     .command-trigger-shortcut {
-      display: none;
-    }
-
-    .logout-trigger span {
       display: none;
     }
   }
 
   @media (max-width: 520px) {
+    .nav-center {
+      gap: 0.2rem;
+    }
+
     .nav-link-label {
       display: none;
     }
@@ -368,11 +467,23 @@
     }
 
     .nav-link {
-      padding-inline: 0.85rem;
+      min-height: 2.25rem;
+      gap: 0.35rem;
+      padding-inline: 0.55rem;
+      font-size: 0.72rem;
     }
 
-    .timezone-control {
-      width: 100%;
+    .nav-brand-copy strong {
+      font-size: 1rem;
+    }
+
+    .nav-brand-mark {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+
+    .logout-trigger span {
+      display: none;
     }
   }
 </style>

@@ -15,6 +15,9 @@ import { supabaseAdmin } from './services/supabase.js';
 const app = express();
 const isDev = process.env.NODE_ENV !== 'production';
 const LOCAL_DEV_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+const HEALTH_CACHE_TTL_MS = 15_000;
+let healthCache = null;
+let healthCheckPromise = null;
 
 app.use(helmet());
 
@@ -47,17 +50,40 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/compilation', compilationRoutes);
 app.use('/api/events', eventRoutes);
 
-app.get('/api/health', async (_req, res) => {
+async function getHealthSnapshot() {
   try {
     const { error } = await supabaseAdmin.from('profiles').select('id').limit(1);
-    res.json({
+    const body = {
       status: error ? 'degraded' : 'ok',
       timestamp: new Date().toISOString(),
       supabase: error ? 'unreachable' : 'connected'
-    });
+    };
+    return { statusCode: 200, body };
   } catch {
-    res.status(503).json({ status: 'error', timestamp: new Date().toISOString(), supabase: 'unreachable' });
+    const body = { status: 'error', timestamp: new Date().toISOString(), supabase: 'unreachable' };
+    return { statusCode: 503, body };
   }
+}
+
+app.get('/api/health', async (_req, res) => {
+  if (healthCache && healthCache.expiresAt > Date.now()) {
+    return res.status(healthCache.statusCode).json(healthCache.body);
+  }
+
+  healthCheckPromise ||= getHealthSnapshot()
+    .then((snapshot) => {
+      healthCache = {
+        ...snapshot,
+        expiresAt: Date.now() + HEALTH_CACHE_TTL_MS
+      };
+      return snapshot;
+    })
+    .finally(() => {
+      healthCheckPromise = null;
+    });
+
+  const snapshot = await healthCheckPromise;
+  res.status(snapshot.statusCode).json(snapshot.body);
 });
 
 app.use((err, _req, res, _next) => {

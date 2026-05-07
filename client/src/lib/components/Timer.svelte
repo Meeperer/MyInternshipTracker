@@ -186,7 +186,7 @@
     min-height: 2.5rem;
     padding: 0.55rem 0.85rem;
     border-radius: 999px;
-    border: 1px solid rgba(190, 53, 25, 0.12);
+    border: 1px solid rgba(11, 110, 58, 0.12);
     background: rgba(255, 255, 255, 0.82);
     color: var(--dark-soft);
     font-family: var(--font-ui);
@@ -209,8 +209,8 @@
   .timer-preset.active,
   .duration-btn:hover {
     transform: translateY(-1px);
-    border-color: rgba(190, 53, 25, 0.22);
-    background: rgba(190, 53, 25, 0.08);
+    border-color: rgba(11, 110, 58, 0.22);
+    background: rgba(11, 110, 58, 0.08);
     color: var(--red);
   }
 
@@ -299,7 +299,7 @@
     min-height: 3rem;
     padding: 0.72rem 1rem;
     border-radius: 999px;
-    border: 1px solid rgba(190, 53, 25, 0.18);
+    border: 1px solid rgba(11, 110, 58, 0.18);
     background: rgba(255, 255, 255, 0.84);
     color: var(--red);
     font-family: var(--font-ui);
@@ -328,7 +328,7 @@
   }
 
   .timer-button-reset:hover {
-    background: rgba(190, 53, 25, 0.08);
+    background: rgba(11, 110, 58, 0.08);
   }
 
   .duration-controls {
@@ -363,7 +363,7 @@
     min-height: 2.75rem;
     text-align: center;
     background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(190, 53, 25, 0.16);
+    border: 1px solid rgba(11, 110, 58, 0.16);
     border-radius: 999px;
     color: var(--red);
     font-family: var(--font-display);

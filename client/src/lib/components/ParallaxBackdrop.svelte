@@ -119,11 +119,11 @@
   .backdrop-line,
   .backdrop-ring {
     position: absolute;
-    border-color: rgba(190, 53, 25, 0.08);
+    border-color: rgba(11, 110, 58, 0.08);
   }
 
   .backdrop-plane {
-    border: 1px solid rgba(190, 53, 25, 0.08);
+    border: 1px solid rgba(11, 110, 58, 0.08);
     background: rgba(255, 255, 255, 0.22);
     border-radius: 14px;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
@@ -155,7 +155,7 @@
 
   .backdrop-line {
     height: 1px;
-    background: rgba(190, 53, 25, 0.1);
+    background: rgba(11, 110, 58, 0.1);
   }
 
   .backdrop-line-a {
@@ -180,7 +180,7 @@
   }
 
   .backdrop-ring {
-    border: 1px solid rgba(190, 53, 25, 0.08);
+    border: 1px solid rgba(11, 110, 58, 0.08);
     border-radius: 999px;
     background: transparent;
   }
